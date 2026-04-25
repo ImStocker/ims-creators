@@ -51,6 +51,12 @@ export type DialogBlockContentUserData = {
   id: string;
 };
 
+export function sortVariables(variables: DialogVariable[]) {
+  return variables
+    .sort((a, b) => a.name?.localeCompare(b.name))
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+}
+
 export class DialogBlockController
   extends BlockEditorController
   implements IDialogVariableController
@@ -743,10 +749,32 @@ export class DialogBlockController
     }
   }
 
+  getOwnVariables() {
+    const props_state = extractDialogBlockData(this.resolvedBlock.props);
+    const computed_state = this.state;
+    const res: DialogVariable[] = [];
+    for (const [v_key, v_data] of Object.entries(props_state.variables.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      if (computed_state.variables.own[v_key]) {
+        Object.assign(v_data, computed_state.variables.own[v_key]);
+      }
+      res.push(v_data);
+    }
+
+    return sortVariables(res);
+  }
+
   getVariables(): DialogVariable[] {
-    return Object.values(this.state.variables.own)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const res: DialogVariable[] = [];
+    for (const v_data of Object.values(this.state.variables.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      res.push(v_data);
+    }
+    return sortVariables(res);
   }
 
   getVariableByName(variable_name: string): DialogVariable | null {
@@ -756,11 +784,6 @@ export class DialogBlockController
   }
 
   addVariable(variable: DialogVariable) {
-    if (this.state.variables.own.hasOwnProperty(variable.name)) {
-      throw new Error(
-        this.appManager.$t('imsDialogEditor.var.variableAlreadyExists'),
-      );
-    }
     this.state.variables.own = {
       ...this.state.variables.own,
       [variable.name]: variable,
