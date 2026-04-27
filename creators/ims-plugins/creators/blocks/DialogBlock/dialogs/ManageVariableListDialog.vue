@@ -42,6 +42,7 @@
         <button
           type="button"
           class="is-button accent ManageVariableListDialog-button-ok"
+          :class="{ loading: !saveDone }"
           @click="save"
         >
           {{ $t('common.dialogs.close') }}
@@ -124,6 +125,7 @@ export default defineComponent({
       dialogLoadingError: null as string | null,
       creationLoading: false,
       controllerLoading: false,
+      saveDone: true,
       externalAssetBlockEditor: null as null | AssetBlockEditorVM,
       needSaveBlockIds: [] as string[],
     };
@@ -235,11 +237,13 @@ export default defineComponent({
         this.dialogLoadDone = true;
       }
     },
-    save() {
-      this.externalAssetBlockEditor?.saveChanges();
+    async save() {
+      this.saveDone = false;
+      await this.externalAssetBlockEditor?.saveChanges();
       this.$getAppManager()
         .get(CreatorAssetManager)
         .getAssetInstance(this.resolvedBlock.assetId, true);
+      this.saveDone = true;
       this.dialog.close();
     },
     async addVariable() {
