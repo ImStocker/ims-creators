@@ -194,11 +194,11 @@ export class FileSystemService{
         }
     }
 
-    async loadFolderAsWorkpace(path: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
+    async loadFolderAsWorkspace(path: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
         workspace: ProjectFileDbWorkspace,
         content: FileSystemWorkspaceContent
     }>{
-        return this._loadFolderAsWorkpaceImpl(path, parentWorkspaceId, async () => {
+        return this._loadFolderAsWorkspaceImpl(path, parentWorkspaceId, async () => {
             const local_path = path + WORKSPACE_EXT;
             const file = await this._loadFile(local_path, parentWorkspaceId, rootPath);
             if (file?.type ==='workspace'){
@@ -209,7 +209,7 @@ export class FileSystemService{
     }
     
 
-    async _loadFolderAsWorkpaceImpl(path: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
+    async _loadFolderAsWorkspaceImpl(path: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
         workspace: ProjectFileDbWorkspace,
         content: FileSystemWorkspaceContent
     }>{
@@ -264,7 +264,7 @@ export class FileSystemService{
                 const local_name = item.name + WORKSPACE_EXT
                 const folder = node_path.join(path, item.name);
                 const exist_workspace = workspaces.get(local_name) ?? null
-                const loaded_workspace = await this._loadFolderAsWorkpaceImpl(
+                const loaded_workspace = await this._loadFolderAsWorkspaceImpl(
                     folder,
                     parentWorkspaceId,
                     async () => exist_workspace,
@@ -287,6 +287,74 @@ export class FileSystemService{
         return [
             '**/' + PROJECT_META_FOLDER
         ]
+    }
+
+    private async _createWorkspaceWithAssets(
+        loaded_new_dir: {
+            workspace: ProjectFileDbWorkspace;
+            content: FileSystemWorkspaceContent;
+        },
+        created_workspace_ids: Set<string>,
+        workspaceId: string
+    ){
+        if(created_workspace_ids.has(workspaceId)) {
+            return;
+        }
+        let workspace = loaded_new_dir.content.workspaces.find(w => w.id === workspaceId);
+        if (!workspace) {
+            if(loaded_new_dir.workspace.id === workspaceId) {
+                workspace = loaded_new_dir.workspace;
+            }
+            else {
+                return null;
+            }
+        }
+        if(workspace.parentId && loaded_new_dir.workspace.id !== workspaceId){
+            await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.parentId)
+        }
+        await this.db.workspace.workspacesCreate(
+        {
+            ...workspace,
+            ...(workspace.parentId ? {} : {
+                parentId: loaded_new_dir.workspace.id
+            }),
+        },
+        {
+            fsProcessed: true,
+        })
+        for(const content_asset of loaded_new_dir.content.assets){
+            if(workspaceId !== content_asset.workspaceId) {
+                continue;
+            }
+            const asset = this.db.sync.prepareAssetToServer(content_asset);
+            await this.db.asset.assetsCreate(
+            {
+                ...asset,
+                id: content_asset.id,
+            }, {
+                fsProcessed: true,
+            })
+        }
+        created_workspace_ids.add(workspace.id);
+    }
+
+    private async _createWorkspacesWithAssets(
+        loaded_new_dir: {
+            workspace: ProjectFileDbWorkspace;
+            content: FileSystemWorkspaceContent;
+        },
+        created_workspace_ids: Set<string>,
+    ){
+        await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, loaded_new_dir.workspace.id);
+        for(const workspace of loaded_new_dir.content.workspaces){
+            if(created_workspace_ids.has(workspace.id)) {
+                continue;
+            }
+            if(workspace.parentId && !created_workspace_ids.has(workspace.parentId)){
+                await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.parentId)
+            }
+            await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.id);
+        }
     }
 
     private async _initWatcher(){
@@ -312,6 +380,10 @@ export class FileSystemService{
                 }
 
                 const local_path = event.path.substring(this.db.localPath.length + 1);
+                if (local_path === path.join('.imsc', 'project.db-journal') || path.join('.imsc', 'project.db')){
+
+                }
+
                 const has_workspace_meta_suffix = /\.imw\.json$/.test(local_path);
                 
                 // Find exists entities
@@ -339,13 +411,13 @@ export class FileSystemService{
                     }
                     const is_dir = await isDir(event.path);
                     if (is_dir){
-                        const loaded_new_dir = await this.loadFolderAsWorkpace(
+                        const loaded_new_dir = await this.loadFolderAsWorkspace(
                             event.path,
                             parent_workspace.id,
                             root_path
                         )
-                        debugger;
-
+                        let created_workspace_ids = new Set<string>();
+                        await this._createWorkspacesWithAssets(loaded_new_dir, created_workspace_ids);
                     }
                     else {
                         const new_entry = await this._loadFile(event.path, parent_workspace.id, root_path)
@@ -357,14 +429,47 @@ export class FileSystemService{
                                 // Asset moved
                                 deleting_assets.delete(new_entry.asset.id)
                             }
-                            this.db.asset.assets.replace(new_entry.asset);
+                            const asset = this.db.sync.prepareAssetToServer(new_entry.asset);
+                            if (exists_asset){
+                                await this.db.asset.assetsChange(
+                                {
+                                    where: {
+                                        id: new_entry.asset.id,
+                                    },
+                                    set: asset,
+                                }, {
+                                    fsProcessed: true
+                                })
+                            } else {
+                                await this.db.asset.assetsCreate(
+                                {
+                                    set: asset,
+                                    id: new_entry.asset.id,
+                                }, {
+                                    fsProcessed: true
+                                })
+                            }
                         }
                         else if (new_entry.type === 'workspace'){
                             if (deleting_workspaces.has(new_entry.workspace.id)){
-                                // Asset moved
+                                // Workspace moved
                                 deleting_workspaces.delete(new_entry.workspace.id)
                             }
-                            this.db.workspace.workspaces.replace(new_entry.workspace);
+                            if (exists_workspace){
+                                await this.db.workspace.workspacesChange(new_entry.workspace.id,
+                                {
+                                    ...new_entry.workspace,
+                                }, {
+                                    fsProcessed: true
+                                })
+                            } else {
+                                await this.db.workspace.workspacesCreate(
+                                {
+                                    ...new_entry.workspace,
+                                }, {
+                                    fsProcessed: true
+                                })
+                            }
                         }
                     }
 
@@ -375,13 +480,22 @@ export class FileSystemService{
             }
     
             // Apply delete
-            for (const deleting_asset_id of deleting_assets.keys()){
-                this.db.asset.deleteOwnAssetFromCollectionOnly(deleting_asset_id)
+            if(deleting_assets.size > 0) {
+                await this.db.asset.assetsDelete(
+                    {
+                        id: [...deleting_assets.keys()],
+                    },
+                    {
+                        pid: this.db.info.id,
+                        fsProcessed: true
+                    }
+                )
             }
             for (const deleting_workspace_id of deleting_workspaces.keys()){
-                this.db.workspace.workspaces.delete(deleting_workspace_id);
+                await this.db.workspace.workspacesDelete(deleting_workspace_id, {
+                    fsProcessed: true
+                });
             }
-
         }, {
             ignore: this._getWatcherIgnore()
         });

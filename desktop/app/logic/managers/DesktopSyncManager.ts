@@ -1,6 +1,7 @@
 import type { SyncInfo } from "#logic/types/SyncTypes";
 import { AppSubManagerBase } from "~ims-app-base/logic/managers/IAppManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
+import type { SyncCurrentState } from "~~/electron/project-file-db/services/SyncService/SyncService";
 
 export default class DesktopSyncManager extends AppSubManagerBase {
     private _synchronizationTimer: NodeJS.Timeout | undefined;
@@ -19,7 +20,14 @@ export default class DesktopSyncManager extends AppSubManagerBase {
         }
     }
 
-    getSyncStatus(): SyncInfo | undefined {
+    getCurrentSyncState(): SyncCurrentState | undefined {
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
+        if(local_path){
+            return window.imshost.sync.getCurrentSyncState(local_path);
+        }
+    }
+
+    getSyncErrors(): SyncInfo | undefined {
         return this._syncInfo ? {...this._syncInfo} : undefined;
     }
 
@@ -27,7 +35,7 @@ export default class DesktopSyncManager extends AppSubManagerBase {
     async loadSyncStatus(){
         const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
         if(local_path){
-            this._syncInfo = await window.imshost.sync.getSyncStatus(local_path);
+            this._syncInfo = await window.imshost.sync.getSyncErrors(local_path);
         }
     }
 

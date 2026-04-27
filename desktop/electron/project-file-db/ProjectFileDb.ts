@@ -15,7 +15,7 @@ import { PROJECT_META_FOLDER, PROJECT_META_INDEX } from "./project-db-constants"
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import type { DataSource } from "typeorm";
 import { getProjectDataSource } from "./project-data-source";
-import { SyncService } from "./services/SyncService/SyncService";
+import { SyncService, type SyncCurrentState } from "./services/SyncService/SyncService";
 import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import { sendEventToProjectDbWindows } from "./project-registry";
 
@@ -216,8 +216,13 @@ export class ProjectFileDb  {
     }
 
     sendProjectChange(changes: ProjectContentChangeEventArg){
+        this.sync.changeCurrentState({
+            hasChanges: [...changes.aDelIds, ...changes.aUpsIds,...changes.wDelIds, ...changes.wUpsIds, ...changes.wTchIds].length > 0,
+        })
         sendEventToProjectDbWindows(this.localPath, 'contentChange', [changes])
     }
 
-
+    sendSyncState(changes: SyncCurrentState){
+        sendEventToProjectDbWindows(this.localPath, 'syncState', [changes])
+    }
 }

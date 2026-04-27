@@ -155,7 +155,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         } 
         return res;
     }
-    async workspacesCreate(params: ChangeWorkspaceRequest): Promise<Workspace> {
+    async workspacesCreate(params: ChangeWorkspaceRequest, options?: {fsProcessed?: true}): Promise<Workspace> {
         const workspace_id = params.id ?? uuidv4();
         const workspace_props = assignPlainValueToAssetProps({}, params.props ?? {})
         const workspace_file_basename = params.title ? params.title : workspace_id;
@@ -183,14 +183,16 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             localName: suggest_title_with_ext,
         };
         this.workspaces.add(workspace);
-        const workspace_local_path_folder = workspace_local_path_meta.replace(/\.imw\.json$/, '');
-        await this.db.fileSystem.expectFsChange([
-            workspace_local_path_meta,
-            workspace_local_path_folder
-        ], async () => {
-            await fs.promises.writeFile(workspace_local_path_meta, JSON.stringify(workspace, null, 1));
-            await fs.promises.mkdir(workspace_local_path_folder);
-        })
+        if(!options?.fsProcessed){
+            const workspace_local_path_folder = workspace_local_path_meta.replace(/\.imw\.json$/, '');
+            await this.db.fileSystem.expectFsChange([
+                workspace_local_path_meta,
+                workspace_local_path_folder
+            ], async () => {
+                await fs.promises.writeFile(workspace_local_path_meta, JSON.stringify(workspace, null, 1));
+                await fs.promises.mkdir(workspace_local_path_folder);
+            })
+        }
         await this.markNotSyncedWorkspace(workspace_id);
         
         this.db.sendProjectChange({
@@ -209,7 +211,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             VALUES (?,${SQLITE_NOW_STM}) ON CONFLICT (id) DO UPDATE SET need_sync = ${SQLITE_NOW_STM};
         `, [id]);
     }
-    async workspacesChange(workspace_id: string, params: ChangeWorkspaceRequest): Promise<Workspace> {
+    async workspacesChange(workspace_id: string, params: ChangeWorkspaceRequest, options?: {fsProcessed?: true}): Promise<Workspace> {
         const workspace = this.workspaces.byId.get(workspace_id);
         if(!workspace) {
             throw new Error("Workspace doesn't exist");
@@ -222,14 +224,16 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             id: workspace.id,
         }
         
-        const old_path = getWorkspaceLocalPath(workspace, this.db);
-        let local_path = old_path;
-        if(params.parentId !== undefined || params.title !== undefined) {
-            local_path = await applyImsFileLocationChange(new_workspace_info, old_path, this.db);
-            new_workspace_info.localName = node_path.basename(local_path);
+        if(!options?.fsProcessed){
+            const old_path = getWorkspaceLocalPath(workspace, this.db);
+            let local_path = old_path;
+            if(params.parentId !== undefined || params.title !== undefined) {
+                local_path = await applyImsFileLocationChange(new_workspace_info, old_path, this.db);
+                new_workspace_info.localName = node_path.basename(local_path);
+            }
+            // сохраняю информацию о файле
+            await fs.promises.writeFile(local_path, JSON.stringify(new_workspace_info, null, 1));
         }
-        // сохраняю информацию о файле
-        await fs.promises.writeFile(local_path, JSON.stringify(new_workspace_info, null, 1));
         this.workspaces.replace(new_workspace_info);
         await this.markNotSyncedWorkspace(workspace_id);
                
@@ -312,7 +316,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         })
     }
 
-    async workspacesDelete(workspace_id: string): Promise<void> {
+    async workspacesDelete(workspace_id: string, options?: {fsProcessed?: true}): Promise<void> {
         const workspace = this.workspaces.byId.get(workspace_id);
         if (!workspace){
             console.warn('Workspace not found');
@@ -322,12 +326,12 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         const nested_assets = await this.db.asset.searchAssets({
             workspaceids: workspace_id
         })
-        if(workspace.localName) {
+        if(workspace.localName && !options?.fsProcessed) {
             await this._deleteWorkspaceFileFromFilesystem(workspace);
         }
         this.workspaces.delete(workspace_id);
         for (const nested_workspace of nested_workspaces){
-            this.workspaces.delete(workspace_id)
+            this.workspaces.delete(nested_workspace.id)
         }
         for (const nested_asset of nested_assets){
             this.db.asset.deleteOwnAssetFromCollectionOnly(nested_asset.id);

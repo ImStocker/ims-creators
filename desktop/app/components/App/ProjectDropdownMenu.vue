@@ -55,6 +55,7 @@ import AuthManager from '~ims-app-base/logic/managers/AuthManager';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
 
 
 export default defineComponent({
@@ -89,7 +90,7 @@ export default defineComponent({
   },
   methods: {
     async logout() {
-      await this.$getAppManager().get(AuthManager).logout();
+      await this.$getAppManager().get<DesktopAuthManager>(AuthManager).logout();
       await openSignInLink(this.$router as any);
     },
     changeLang(lang: LangStr) {

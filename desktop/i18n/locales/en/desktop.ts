@@ -13,7 +13,14 @@ export default {
       menu: {
         errors: 'Errors of synchronization',
         pause: 'Pause',
+        pauseEnd: 'Synchronization was paused',
+        syncNow: 'Synchronize now',
+        syncNowEnd: 'Synchronization was finished',
+        syncNowEndWithErrors: 'Synchronization was finished with errors',
         resume: 'Resume',
+        resumeEnd: 'Synchronization was resumed',
+        syncWithCloud: 'Synchronize with cloud',
+        syncWithCloudEnd: 'Synchronization with cloud is completed'
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',

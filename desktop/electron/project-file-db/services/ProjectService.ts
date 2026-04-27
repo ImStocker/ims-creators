@@ -45,7 +45,7 @@ async function unzipArchive(path_from: string, path_to: string) {
     const data = await fs.promises.readFile(path_from);
     const zip = await JSZip.loadAsync(data)
     for (const filename of Object.keys(zip.files)){
-        if (['gdd.imw.json', 'gdd/index.ima.json'].includes(filename)) continue;
+        if (['gdd.imw.json'].includes(filename)) continue;
         const content = zip.files[filename];
         const new_filename = filename.replace(/^gdd\//, '');
         const dest = node_path.join(path_to, new_filename);

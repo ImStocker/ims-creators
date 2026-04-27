@@ -6,6 +6,7 @@ import DialogManager from "~ims-app-base/logic/managers/DialogManager";
 import type { IAppManager } from "~ims-app-base/logic/managers/IAppManager";
 import { EntityCache } from "~ims-app-base/logic/types/EntityCache";
 import assert from 'assert';
+import type { ProjectLicense } from "~ims-app-base/logic/types/ProjectTypes";
 
 
 
@@ -147,6 +148,17 @@ export default class DesktopAuthManager extends AuthManager{
         `${this.appManager.$env.AUTH_API_HOST ?? '/'}auth/avatar/${size}/${user_id}` +
         (this._avatarReloadEpoch ? '?' + this._avatarReloadEpoch : '')
         );
+    }
+
+    async getUserLicense(): Promise<{
+        list: ProjectLicense[];
+        total: number;
+      }
+    >
+    {
+        return await this.appManager
+        .get(ApiManager)
+        .call(Service.CREATORS, HttpMethods.GET, 'license/user');
     }
 
 }

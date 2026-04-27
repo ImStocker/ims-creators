@@ -125,3 +125,10 @@ contextBridge.exposeInMainWorld('subscribeContentChange', (callback: (changes: P
     });
   }
 )
+
+contextBridge.exposeInMainWorld('subscribeSyncState', (callback: (changes: ProjectContentChangeEventArg) => void) => {
+    ipcRenderer.on('syncState', (event, changes) => {
+      callback(changes)
+    });
+  }
+)

@@ -3,10 +3,14 @@
     class="SyncManageDialog"
   >
     <div class="Dialog-header">{{$t('desktop.fsSync.header')}}</div>
-    <div class="Dialog-content" v-if="syncInfo">
-        <div v-if="syncInfo.assets.length > 0">
+    <div class="Dialog-content" v-if="syncErrors">
+        <div v-if="syncErrors.error" class="SyncManageDialog-error">
+          <i class="ri-error-warning-fill"></i>
+          Error: {{ syncErrors.error }}
+        </div>
+        <div v-if="syncErrors.assets.length > 0">
           <div>{{$t('desktop.fsSync.notSyncedAssets')}}:</div>
-          <div v-for="asset of syncInfo.assets"
+          <div v-for="asset of syncErrors.assets"
             :key="asset.id"
             class="SyncManageDialog-content-item"
           >
@@ -16,9 +20,9 @@
             </div>
           </div>
         </div>
-        <div v-if="syncInfo.workspaces.length > 0">
+        <div v-if="syncErrors.workspaces.length > 0">
           <div>{{$t('desktop.fsSync.notSyncedWorkspaces')}}:</div>
-          <div v-for="workspace of syncInfo.workspaces"
+          <div v-for="workspace of syncErrors.workspaces"
             :key="workspace.id"
             class="SyncManageDialog-content-item"
           >
@@ -50,6 +54,7 @@ import { defineComponent, type PropType } from 'vue';
 
 import DialogContent from '~ims-app-base/components/Dialog/DialogContent.vue';
 import type { DialogInterface } from '~ims-app-base/logic/managers/DialogManager';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
 
 type DialogProps = {
 };
@@ -68,14 +73,14 @@ export default defineComponent({
     },
   },
   computed: {
-    syncInfo(): SyncInfo | undefined {
-      return this.$getAppManager().get(DesktopSyncManager).getSyncStatus();
+    syncErrors(): SyncInfo | undefined {
+      return this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
     },
     noErrors(){
-      return !this.syncInfo || 
-      ( !this.syncInfo.error &&
-        this.syncInfo.assets.length === 0 &&
-        this.syncInfo.workspaces.length === 0)
+      return !this.syncErrors || 
+      ( !this.syncErrors.error &&
+        this.syncErrors.assets.length === 0 &&
+        this.syncErrors.workspaces.length === 0)
     }
   },
   methods: {
@@ -84,6 +89,8 @@ export default defineComponent({
     },
     async runSync(){
       await this.$getAppManager().get(DesktopSyncManager).runSync();
+      this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
+      this.close();
     },
     async resyncAssetsAndWorkspaces(){
       //await this.$getAppManager().get(DesktopSyncManager).resyncAssetsAndWorkspaces();
@@ -108,5 +115,11 @@ export default defineComponent({
   justify-content: center;
   padding-top: 20px;
   gap: 10px;
+}
+.SyncManageDialog-error{
+  border: 1px solid var(--color-main-error);
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 10px;
 }
 </style>
