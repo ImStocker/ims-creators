@@ -63,6 +63,13 @@ export type DialogBlockState = {
   };
 };
 
+export function isEdgeBelongToNode(edge_id: string, node_id: string) {
+  const parts = edge_id.split('|');
+  const bind = parts[0];
+  const node = parts[parts.length - 1];
+  return bind === node_id || node === node_id;
+}
+
 export function extractDialogBlockPlain(props: AssetProps): ScriptBlockPlain {
   return convertAssetPropsToPlainObject<ScriptBlockPlain>(props);
 }

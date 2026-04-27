@@ -325,16 +325,26 @@ export default defineComponent({
           ) {
             return;
           }
+          const flow = this.$refs.flow as VueFlowStore | undefined;
+          if (!flow) return;
           if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') {
-            const flow = this.$refs.flow as VueFlowStore | undefined;
-            if (!flow) return;
-
             const selected_node_ids = (flow.getSelectedNodes as any).map(
               (n) => n.id,
             );
-            this.blockControllerMut.copyNodesToClipboard(selected_node_ids);
+            this.blockControllerMut.copyNodesToClipboard(
+              selected_node_ids,
+              flow.getViewport(),
+            );
           } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') {
-            this.blockControllerMut.pasteNodesFromClipboard();
+            this.blockControllerMut.pasteNodesFromClipboard(flow.getViewport());
+          } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX') {
+            const selected_node_ids = (flow.getSelectedNodes as any).map(
+              (n) => n.id,
+            );
+            this.blockControllerMut.cutNodes(
+              selected_node_ids,
+              flow.getViewport(),
+            );
           }
         };
         window.addEventListener('keydown', (this as any)._keyDownHandler);
