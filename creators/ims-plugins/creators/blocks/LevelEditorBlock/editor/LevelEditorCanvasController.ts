@@ -1351,10 +1351,13 @@ export default class LevelEditorCanvasController {
   private _saveViewportTransform(canvas: fabric.Canvas) {
     this.appManager
       .get(UiPreferenceManager)
-      .setPreference(this._preferenceName, canvas.viewportTransform);
+      .setPreference(
+        this.viewportTransformPreferenceKey,
+        canvas.viewportTransform,
+      );
   }
 
-  private get _preferenceName() {
+  private get viewportTransformPreferenceKey() {
     const preference_id = getPreferenceKeyForBlock(
       this.blockController.resolvedBlock,
     );
@@ -1364,6 +1367,6 @@ export default class LevelEditorCanvasController {
   private _getSavedViewportTransform() {
     return this.appManager
       .get(UiPreferenceManager)
-      .getPreference(this._preferenceName, null);
+      .getPreference(this.viewportTransformPreferenceKey, null);
   }
 }

@@ -38,6 +38,7 @@
         @edges-change="onEdgesChange"
         @nodes-change="onNodesChange"
         @viewport-change-start="viewportHelper.onViewportChangeStart($event)"
+        @viewport-change-end="flowViewportTransform = $event"
         @edge-click="onEdgeClick"
         @node-click="onNodeClick"
       >
@@ -136,6 +137,7 @@ import {
   BezierEdge,
   type EdgeMouseEvent,
   type NodeMouseEvent,
+  type ViewportTransform,
 } from '@vue-flow/core';
 import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType } from 'vue';
@@ -149,7 +151,10 @@ import CreateNodeDropdown from './CreateNodeDropdown.vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptiors';
 import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
 import { v4 as uuidv4 } from 'uuid';
-import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
+import {
+  getPreferenceKeyForBlock,
+  type ResolvedAssetBlock,
+} from '~ims-app-base/logic/utils/assets';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { NodeData } from './NodeDataController';
 import type { DialogBlockController } from './DialogBlockController';
@@ -170,8 +175,9 @@ import {
 } from '~ims-app-base/components/utils/ui';
 import { getNextIndexWithTimestamp } from '~ims-app-base/components/Asset/Editor/blockUtils';
 import DropdownElement from '~ims-app-base/components/Common/DropdownElement.vue';
-import MenuButton from '../../../../../../ims-app-base/app/components/Common/MenuButton.vue';
+import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import ManageVariablesDropdown from '../parts/ManageVariablesDropdown.vue';
+import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 
 type CreateNodeContext = {
   clickedAt: { x: number; y: number } | null;
@@ -267,6 +273,24 @@ export default defineComponent({
         0,
       );
     },
+    flowViewportTransformPreferenceKey() {
+      const preference_id = getPreferenceKeyForBlock(
+        this.blockController.resolvedBlock,
+      );
+      return `ScriptBlock.viewportTransform.` + preference_id;
+    },
+    flowViewportTransform: {
+      get(): ViewportTransform | null {
+        return this.$getAppManager()
+          .get(UiPreferenceManager)
+          .getPreference(this.flowViewportTransformPreferenceKey, null);
+      },
+      set(value: ViewportTransform) {
+        this.$getAppManager()
+          .get(UiPreferenceManager)
+          .setPreference(this.flowViewportTransformPreferenceKey, value);
+      },
+    },
   },
   watch: {
     isFocused() {
@@ -282,6 +306,9 @@ export default defineComponent({
     const flow = this.$refs['flow'] as VueFlowStore;
     assert(flow);
     this.viewportHelper.setFlow(flow);
+    if (this.flowViewportTransform) {
+      flow.setViewport(this.flowViewportTransform);
+    }
   },
   unmounted() {
     this.resetFocusedListeners(false);
