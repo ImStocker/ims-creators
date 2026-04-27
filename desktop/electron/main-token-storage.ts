@@ -9,6 +9,7 @@ let MainTokenData: TokenMainSavedData = {
     accessToken: undefined,
     remember: true
 }
+
 const MainTokenStorage: IApiTokenStorage = {
     getMain: function (): TokenMainSavedData {
         return MainTokenData;
@@ -43,8 +44,9 @@ const MainTokenStorage: IApiTokenStorage = {
                 await storageSetKey<Partial<{userId: string}>>("auth", {
                     userId: main_user_id
                 })
-                await privateStorageSetKey<Partial<{refreshToken: string}>>(main_user_id, 'auth', {
-                  refreshToken
+                await privateStorageSetKey<Partial<{refreshToken: string, accessToken: string}>>(main_user_id, 'auth', {
+                  refreshToken,
+                  accessToken: main.accessToken
                 });
             }
         }
@@ -59,7 +61,7 @@ const MainTokenStorage: IApiTokenStorage = {
     }
 }
 
-export function initMainTokenStorage(){
+export async function initMainTokenStorage(){
     ipcMain.on('imsTokenGetMain', (event) => {
         event.returnValue = MainTokenStorage.getMain();
     })
@@ -72,6 +74,14 @@ export function initMainTokenStorage(){
     ipcMain.handle('imsTokenSave', async (event, {main, token}) => {
         await MainTokenStorage.save(main, token);
     })
+    
+    const auth = await storageGetKey<Partial<{userId: string}>>("auth")
+    if (auth && auth.userId){
+        const private_data = await privateStorageGetKey<Partial<{refreshToken: string, accessToken: string}>>(auth.userId, 'auth');
+        CurrentRefreshToken = private_data ? private_data.refreshToken : undefined;
+        MainTokenData.userId = auth.userId
+        MainTokenData.accessToken = private_data ? private_data.accessToken : undefined;
+    }
 }
 
 export function getMainTokenStorage(){
