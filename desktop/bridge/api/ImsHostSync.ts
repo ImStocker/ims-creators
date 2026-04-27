@@ -8,10 +8,15 @@ export class ImsHostSync extends ImsHostBase {
         const project_db = requestProjectDb(projectPath, this._window);
         return await project_db.sync.syncProject();
     }
-
-    async getSyncStatus(projectPath: string){
+    
+    getCurrentSyncState(projectPath: string){
         const project_db = requestProjectDb(projectPath, this._window);
-        return await project_db.sync.getSyncStatus();
+        return project_db.sync.getCurrentSyncState();
+    }
+
+    async getSyncErrors(projectPath: string){
+        const project_db = requestProjectDb(projectPath, this._window);
+        return await project_db.sync.getSyncErrors();
     }
 
     async resyncAssetsAndWorkspaces(projectPath: string, asset_ids: string[], workspace_ids: string[]){

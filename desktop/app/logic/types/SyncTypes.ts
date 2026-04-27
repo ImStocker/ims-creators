@@ -7,8 +7,6 @@ export type SyncItem = {
     conflict_message: string,
 }
 export type SyncInfo = {
-    inProcess: boolean,
-    onPause: boolean,
     syncEnd: string | null,
     syncState: string | null,
     error: string | null,

@@ -16,6 +16,7 @@ export default {
         pauseEnd: 'Synchronization was paused',
         syncNow: 'Synchronize now',
         syncNowEnd: 'Synchronization was finished',
+        syncNowEndWithErrors: 'Synchronization was finished with errors',
         resume: 'Resume',
         resumeEnd: 'Synchronization was resumed',
         syncWithCloud: 'Synchronize with cloud',

@@ -3,14 +3,14 @@
     class="SyncManageDialog"
   >
     <div class="Dialog-header">{{$t('desktop.fsSync.header')}}</div>
-    <div class="Dialog-content" v-if="syncInfo">
-        <div v-if="syncInfo.error" class="SyncManageDialog-error">
+    <div class="Dialog-content" v-if="syncErrors">
+        <div v-if="syncErrors.error" class="SyncManageDialog-error">
           <i class="ri-error-warning-fill"></i>
-          Error: {{ syncInfo.error }}
+          Error: {{ syncErrors.error }}
         </div>
-        <div v-if="syncInfo.assets.length > 0">
+        <div v-if="syncErrors.assets.length > 0">
           <div>{{$t('desktop.fsSync.notSyncedAssets')}}:</div>
-          <div v-for="asset of syncInfo.assets"
+          <div v-for="asset of syncErrors.assets"
             :key="asset.id"
             class="SyncManageDialog-content-item"
           >
@@ -20,9 +20,9 @@
             </div>
           </div>
         </div>
-        <div v-if="syncInfo.workspaces.length > 0">
+        <div v-if="syncErrors.workspaces.length > 0">
           <div>{{$t('desktop.fsSync.notSyncedWorkspaces')}}:</div>
-          <div v-for="workspace of syncInfo.workspaces"
+          <div v-for="workspace of syncErrors.workspaces"
             :key="workspace.id"
             class="SyncManageDialog-content-item"
           >
@@ -73,14 +73,14 @@ export default defineComponent({
     },
   },
   computed: {
-    syncInfo(): SyncInfo | undefined {
-      return this.$getAppManager().get(DesktopSyncManager).getSyncStatus();
+    syncErrors(): SyncInfo | undefined {
+      return this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
     },
     noErrors(){
-      return !this.syncInfo || 
-      ( !this.syncInfo.error &&
-        this.syncInfo.assets.length === 0 &&
-        this.syncInfo.workspaces.length === 0)
+      return !this.syncErrors || 
+      ( !this.syncErrors.error &&
+        this.syncErrors.assets.length === 0 &&
+        this.syncErrors.workspaces.length === 0)
     }
   },
   methods: {

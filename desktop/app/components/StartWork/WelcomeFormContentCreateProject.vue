@@ -161,7 +161,9 @@ export default defineComponent({
   },
   watch: {
     async projectPath(new_val: string){
-      this.checkPathDebounce(this);
+      if(this.checkPathDebounce){
+        this.checkPathDebounce(this);
+      }
     },
     projectName(new_val: string){
       this.params.projectFolderName = new_val.trim().replace(forbiddenFilenameCharsRegexp, '_');

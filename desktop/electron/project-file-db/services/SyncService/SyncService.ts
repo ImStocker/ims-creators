@@ -38,10 +38,27 @@ export type ProjectDbFile = {
     server_store: string
 }
 
+export enum SyncCurrentStateStatus {
+    IN_PROCESS = 'process',
+    FREE = 'free',
+    PAUSE = 'pause',
+}
+
+export type SyncCurrentState = {
+    status: SyncCurrentStateStatus,
+    hasChanges: boolean,
+    error: string | null,
+}
+
 export class SyncService {
 
     private _syncProcessRunning = false;
     private _synchronizationTimer: NodeJS.Timeout | undefined;
+    private _currentState: SyncCurrentState = {
+        status: SyncCurrentStateStatus.FREE,
+        hasChanges: false,
+        error: null
+    };
 
     constructor(public db: ProjectFileDb){
 
@@ -60,10 +77,8 @@ export class SyncService {
         }
     }
 
-    async getSyncStatus(): Promise<SyncInfo> {
+    async getSyncErrors(): Promise<SyncInfo> {
         let sync_info: SyncInfo = {
-            inProcess: this._syncProcessRunning,
-            onPause: !this._synchronizationTimer,
             syncEnd: null,
             syncState: null,
             assets: [],
@@ -106,6 +121,33 @@ export class SyncService {
         return sync_info;
     }
 
+    getCurrentSyncState(){
+        return {...this._currentState};
+    }
+
+    changeCurrentState(changes: {
+        status?: SyncCurrentStateStatus,
+        hasChanges?: boolean,
+        error?: string | null
+    }){
+        let has_changes = false;
+        if(changes.status && changes.status !== this._currentState.status) {
+            this._currentState.status = changes.status;
+            has_changes = true;
+        }
+        if(changes.hasChanges !== undefined && changes.hasChanges !== this._currentState.hasChanges) {
+            this._currentState.hasChanges = changes.hasChanges;
+            has_changes = true;
+        }
+        if(changes.error && changes.error !== this._currentState.error) {
+            this._currentState.error = changes.error;
+            has_changes = true;
+        }
+        if(has_changes){
+            this.db.sendSyncState(this._currentState);
+        }
+    }
+
     async resyncAssetsAndWorkspaces(
         asset_ids: string[],
         workspace_ids: string[],
@@ -124,6 +166,9 @@ export class SyncService {
 
     async pauseSyncProject(){
         this._synchronizationTimer = undefined;
+        this.changeCurrentState({
+            status: SyncCurrentStateStatus.PAUSE,
+        });
     }
     
     async resumeSyncProject(){
@@ -139,6 +184,9 @@ export class SyncService {
         let sync_log_id: number | null = null;
         try{
             this._syncProcessRunning = true;
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.IN_PROCESS,
+            });
             const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
                 INSERT INTO sync_logs (sync_start)
                 VALUES (${SQLITE_NOW_STM}) RETURNING id;
@@ -146,6 +194,11 @@ export class SyncService {
             sync_log_id = insert_res[0].id;
             await this.checkUnsyncedAssetsAndWorkspaces(sync_log_id);
             await this.syncAssetsAndWorkspaces();
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.FREE,
+                hasChanges: false,
+                error: null,
+            });
         }
         catch(err: any){
             if(sync_log_id) {
@@ -158,6 +211,10 @@ export class SyncService {
             else {
                 log.error('Sync failed', err);
             }
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.FREE,
+                error: err.message,
+            });
         }
         finally {
             if(sync_log_id) {
@@ -184,10 +241,10 @@ export class SyncService {
             LIMIT 1; 
         `);
 
-        const assetDeletedIdsMap = new Map();
-        const assetUpdatedIdsMap = new Map();
-        const workspaceDeletedIdsMap = new Map();
-        const workspaceUpdatedIdsMap = new Map(); 
+        const assetDeletedIdsMap = new Map<string, string>();
+        const assetUpdatedIdsMap = new Map<string, string>();
+        const workspaceDeletedIdsMap = new Map<string, string>();
+        const workspaceUpdatedIdsMap = new Map<string, string>(); 
     
         const asset_condition: AssetPropWhere = {
             issystem: false,
@@ -222,23 +279,27 @@ export class SyncService {
                     last_asset_id = changes.last.assetId;
                     last_workspace_id = changes.last.workspaceId;
                 }
-
-                for(const [updated_id, title] of Object.entries(changes.assetUpdatedIds)){
+                const assets = await this.db.asset.assetsGetShort({
+                    where: {
+                        id: [...changes.assetUpdatedIds, ...changes.assetDeletedIds]
+                    }
+                })
+                for(const updated_id of changes.assetUpdatedIds){
                     assetDeletedIdsMap.delete(updated_id);
-                    assetUpdatedIdsMap.set(updated_id, title);
+                    assetUpdatedIdsMap.set(updated_id, assets.list.find(a => a.id === updated_id)?.title ?? '');
                 }
-                for(const [deleted_id, title] of Object.entries(changes.assetDeletedIds)){
+                for(const deleted_id of changes.assetDeletedIds){
                     assetUpdatedIdsMap.delete(deleted_id);
-                    assetDeletedIdsMap.set(deleted_id, title);
+                    assetDeletedIdsMap.set(deleted_id, assets.list.find(a => a.id === deleted_id)?.title ?? '');
                 }
 
-                for(const [updated_id, title] of changes.workspaceUpdatedIds){
+                for(const updated_id of changes.workspaceUpdatedIds){
                     workspaceDeletedIdsMap.delete(updated_id);
-                    workspaceUpdatedIdsMap.set(updated_id, title);
+                    workspaceUpdatedIdsMap.set(updated_id, this.db.workspace.getWorkspaceById(updated_id)?.title ?? '');
                 }
-                for(const [deleted_id, title] of changes.workspaceDeletedIds){
+                for(const deleted_id of changes.workspaceDeletedIds){
                     workspaceUpdatedIdsMap.delete(deleted_id);
-                    workspaceDeletedIdsMap.set(deleted_id, title);
+                    workspaceDeletedIdsMap.set(deleted_id, this.db.workspace.getWorkspaceById(deleted_id)?.title ?? '');
                 }
         
                 if (

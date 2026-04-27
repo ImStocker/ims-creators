@@ -8,7 +8,7 @@
             @click="toggle"
           >
               <i 
-                :class="{ 'spinning-icon': syncIsRunning && !syncInfo?.onPause }"
+                :class="{ 'spinning-icon': syncIsRunning && !onPause }"
                 class="ri-loop-right-line"
               ></i>
           </button>
@@ -16,9 +16,9 @@
             class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
             :title="'Error: ' + hasSyncError"
           ></i>
-          <i v-else-if="syncInfo?.onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
-          <i v-else-if="syncInfo && (syncInfo.assets.length > 0 || syncInfo.workspaces.length > 0)" 
-            class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-line"></i>
+          <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
+          <i v-else-if="syncInfo && !inProcess && syncInfo.hasChanges" 
+            class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
         </template>
         <menu-list :menu-list="syncMenuList"></menu-list>
       </menu-button>
@@ -41,6 +41,7 @@ import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
+import { SyncCurrentStateStatus, type SyncCurrentState } from '~~/electron/project-file-db/services/SyncService/SyncService';
 
 export default defineComponent({
   name: 'AppSyncMenu',
@@ -50,13 +51,19 @@ export default defineComponent({
   },
   computed: {
     syncIsRunning(){
-      return this.syncInfo ? this.syncInfo.inProcess : false;
+      return this.syncInfo ? this.inProcess : false;
     },
     hasSyncError(){
        return this.syncInfo ? this.syncInfo.error : null;
     },
-    syncInfo(): SyncInfo | undefined {
-      return this.$getAppManager().get(DesktopSyncManager).getSyncStatus();
+    inProcess(){
+      return this.syncInfo ? this.syncInfo.status === SyncCurrentStateStatus.IN_PROCESS : false;
+    },
+    onPause(){
+      return this.syncInfo ? this.syncInfo.status === SyncCurrentStateStatus.PAUSE : false;
+    },
+    syncInfo(): SyncCurrentState | undefined {
+      return this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
     },
     userInfo() {
       return this.$getAppManager().get(AuthManager).getUserInfo();
@@ -75,37 +82,45 @@ export default defineComponent({
             }
         });
       }
-      if(this.projectInfo?.id && !this.syncInfo?.inProcess && !this.syncInfo?.onPause){
-        list.push({
-          title: this.$t('desktop.fsSync.menu.syncNow'),
-          action: async () => {
-              await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
-              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
+      else {
+        if(this.projectInfo?.id && !this.inProcess && !this.onPause){
+          list.push({
+            title: this.$t('desktop.fsSync.menu.syncNow'),
+            action: async () => {
+                await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
+                const sync_status = this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
+                if(sync_status?.error){
+                  this.$getAppManager().get(UiManager).showError(this.$t('desktop.fsSync.menu.syncNowEndWithErrors'));
+                }
+                else {
+                  this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
+                }
+              }
+          });
+        }
+        if(this.inProcess && !this.onPause) {
+          list.push({
+            title: this.$t('desktop.fsSync.menu.pause'),
+            action: async () => {
+              await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
+              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
             }
-        });
-      }
-      if(this.syncInfo?.inProcess && !this.syncInfo?.onPause) {
+          });
+        }
+        else if(this.projectInfo?.id && this.onPause){
+          list.push({
+            title: this.$t('desktop.fsSync.menu.resume'),
+            action: async () => {
+              await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
+              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.resumeEnd'));
+            }
+          });
+        }
         list.push({
-          title: this.$t('desktop.fsSync.menu.pause'),
-          action: async () => {
-            await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
-            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
-          }
+          title: this.$t('desktop.fsSync.menu.errors'),
+          action: async () => await this.openSyncManageDialog(),
         });
       }
-      else if(this.projectInfo?.id && this.syncInfo?.onPause){
-        list.push({
-          title: this.$t('desktop.fsSync.menu.resume'),
-          action: async () => {
-            await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
-            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.resumeEnd'));
-          }
-        });
-      }
-      list.push({
-        title: this.$t('desktop.fsSync.menu.errors'),
-        action: async () => await this.openSyncManageDialog(),
-      });
       return list;
     },
   },
@@ -181,9 +196,12 @@ export default defineComponent({
 }
 .AppSyncMenu-hasNotSyncedFiles{
   color: var(--color-main-yellow);
+  font-size: 8px;
+  bottom: 4px;
+  right: 4px;
 }
 .spinning-icon {
-  animation: spin 2s linear infinite;
+  animation: spin 1.5s linear infinite;
 }
 
 @keyframes spin {

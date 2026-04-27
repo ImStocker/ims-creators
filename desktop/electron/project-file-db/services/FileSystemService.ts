@@ -380,6 +380,10 @@ export class FileSystemService{
                 }
 
                 const local_path = event.path.substring(this.db.localPath.length + 1);
+                if (local_path === path.join('.imsc', 'project.db-journal') || path.join('.imsc', 'project.db')){
+
+                }
+
                 const has_workspace_meta_suffix = /\.imw\.json$/.test(local_path);
                 
                 // Find exists entities
