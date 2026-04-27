@@ -119,8 +119,8 @@ export default defineComponent({
             index,
             variable,
             value: this.playingNodeData.values
-              ? (this.playingNodeData.values[variable.name] ?? null)
-              : null,
+              ? (this.playingNodeData.values[variable.name] ?? variable.default)
+              : variable.default,
           };
         })
         .filter((info) => {

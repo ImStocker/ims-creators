@@ -42,7 +42,7 @@ export type NodeDataController = {
   setOptionValue(
     index: number,
     prop: string,
-    value: ScriptBlockPlainPropValue,
+    value: ScriptBlockPlainPropValue | undefined,
   ): void;
   setOptionValues(index: number, value: ScriptBlockPlainProps): void;
   deleteOptionValue(index: number, prop: string): void;

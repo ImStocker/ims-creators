@@ -49,7 +49,11 @@
           :key="variable.name"
           :ref="'main-' + variable.name"
           class="DialogSpeechNode-prop-line"
-          :model-value="nodeDataController.values[variable.name] ?? null"
+          :model-value="
+            nodeDataController.values[variable.name] === undefined
+              ? variable.default
+              : nodeDataController.values[variable.name]
+          "
           :play-value="
             playingNodeData?.values
               ? playingNodeData.values[variable.name]
@@ -69,6 +73,13 @@
             nodeDataController.setValue(variable.name, $event)
           "
         ></DataField>
+        <button
+          v-if="!readonly && mainSpeechVariablesHasDefault"
+          class="is-button is-button-action DialogSpeechNode-restore-button"
+          @click="setMainSpeechDefault()"
+        >
+          {{ $t('imsDialogEditor.speech.restoreValues') }}
+        </button>
         <div v-if="options.length > 0" class="DialogSpeechNode-options">
           <ContextMenuZone
             v-for="(option, option_index) of options"
@@ -129,7 +140,12 @@
                     nodeDataController.getOptionValue(
                       option_index,
                       variable.name,
-                    )
+                    ) === undefined
+                      ? variable.default
+                      : nodeDataController.getOptionValue(
+                          option_index,
+                          variable.name,
+                        )
                   "
                   :play-value="
                     playingNodeData?.options &&
@@ -159,6 +175,13 @@
                   "
                 ></DataField>
               </div>
+              <button
+                v-if="!readonly && optionSpeechVariablesHasDefault"
+                class="is-button is-button-action DialogSpeechNode-restore-button"
+                @click="setOptionDefault(option_index)"
+              >
+                {{ $t('imsDialogEditor.speech.restoreValues') }}
+              </button>
             </div>
             <div
               v-if="isPlaying && playOptionConditionPass(option_index)"
@@ -293,8 +316,14 @@ export default defineComponent({
     mainSpeechList() {
       return this.dialogController.getMainSpeech();
     },
+    mainSpeechVariablesHasDefault() {
+      return !!this.mainSpeechList.find((v) => v.default);
+    },
     optionSpeechList() {
       return this.dialogController.getOptionSpeech();
+    },
+    optionSpeechVariablesHasDefault() {
+      return !!this.optionSpeechList.find((v) => v.default);
     },
     isPlaying() {
       return this.dialogPlayer.currentPlayingNode?.id === this.id;
@@ -335,6 +364,16 @@ export default defineComponent({
     this.updatePins();
   },
   methods: {
+    setMainSpeechDefault() {
+      for (const variable of this.mainSpeechList) {
+        this.nodeDataController.deleteValue(variable.name);
+      }
+    },
+    setOptionDefault(option_index: number) {
+      for (const variable of this.optionSpeechList) {
+        this.nodeDataController.deleteOptionValue(option_index, variable.name);
+      }
+    },
     async deleteCover() {
       const confirm = await this.$getAppManager()
         .get(DialogManager)
@@ -610,6 +649,13 @@ export default defineComponent({
       padding-left: 22px;
     }
   }
+}
+
+.DialogSpeechNode-restore-button {
+  margin: 0 10px;
+}
+.DialogSpeechNode-options {
+  margin-top: 10px;
 }
 
 .DialogSpeechNode-prop-content {
