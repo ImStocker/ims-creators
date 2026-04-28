@@ -1,6 +1,7 @@
 <template>
   <dialog-content
     class="SyncManageDialog"
+    :loading="isLoading"
   >
     <div class="Dialog-header">{{$t('desktop.fsSync.header')}}</div>
     <div class="Dialog-content" v-if="syncErrors">
@@ -81,10 +82,18 @@ export default defineComponent({
       required: true,
     },
   },
+  data(){
+    return {
+      isLoading: true,
+      syncErrors: undefined as SyncInfo | undefined,
+    }
+  },
+  async mounted() {
+    this.isLoading = true;
+    this.syncErrors = await this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
+    this.isLoading = false;
+  },
   computed: {
-    syncErrors(): SyncInfo | undefined {
-      return this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
-    },
     noErrors(){
       return !this.syncErrors || 
       ( !this.syncErrors.error &&

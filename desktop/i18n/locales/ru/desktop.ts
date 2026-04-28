@@ -30,6 +30,8 @@ export default {
       notSyncedAssets: 'Несинхронизированные элементы',
       notSyncedWorkspaces: 'Несинхронизированные папки',
       noErrors: 'Нет ошибок',
+      createNew: 'Создать новый',
+      selectExist: 'Выбрать существующий'
     },
     welcome: {
       begin: 'Добро пожаловать в',
@@ -49,6 +51,7 @@ export default {
       typeTooltip: 'Тип',
       local: 'Локальный',
       localProject: 'Локальный проект',
+      cloudProject: 'Облачный проект',
       cloud: 'Облачный',
       name: 'Название',
       nameTooltip: 'Название',
@@ -71,7 +74,7 @@ export default {
       goToSite: 'Перейти на сайт',
       help: 'Справка',
       feedback: 'Обратная связь',
-      openOtherProject: 'Открыть другой проект',
+      openAnotherProject: 'Открыть другой проект',
       changeUser: 'Сменить пользователя',
       closeWindow: 'Закрыть окно',
       newWindow: 'Новое окно',
@@ -109,6 +112,13 @@ export default {
         maintenance: 'Сервис',
         openLogsFolder: 'Открыть папку с логами',
         autoUpdate: 'Проверять обновления при запуске приложения',
+        syncWithCloud: 'Автосинхронизация с облаком',
+        syncWithCloudTime: {
+          every30: 'Каждые 30 секунд',
+          every60: 'Каждую минуту',
+          every300: 'Каждые 5 минут',
+          'every-1': 'Нет'
+        }
       },
       close: 'Закрыть',
       plugins: {
