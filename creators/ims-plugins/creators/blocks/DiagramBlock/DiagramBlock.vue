@@ -36,8 +36,8 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import {
   type AssetProps,
-  sameAssetPropObjects,
   makeBlockRef,
+  diffAssetPropObjects,
 } from '~ims-app-base/logic/types/Props';
 import type {
   ResolvedAssetBlock,
@@ -128,21 +128,13 @@ export default defineComponent({
       if (this.$refs.diagram) {
         const res = (this.$refs.diagram as any).getValue();
         if (!res) return;
-        if (!sameAssetPropObjects(res, this.graphValue, true)) {
-          const op = this.assetChanger.makeOpId();
-          this.assetChanger.deleteBlockPropKeys(
+        const changes = diffAssetPropObjects(res, this.graphValue);
+        if (changes && changes.length) {
+          this.assetChanger.registerBlockPropsChanges(
             this.resolvedBlock.assetId,
             makeBlockRef(this.resolvedBlock),
             null,
-            ['values', 'graph', 'vertices', 'edges'],
-            op,
-          );
-          this.assetChanger.setBlockPropKeys(
-            this.resolvedBlock.assetId,
-            makeBlockRef(this.resolvedBlock),
-            null,
-            res,
-            op,
+            changes,
           );
         }
       }
