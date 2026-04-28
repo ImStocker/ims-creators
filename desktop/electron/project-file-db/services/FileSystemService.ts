@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { absolutePathToUuid, isDir, isDirSync } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
-import watcher, { type AsyncSubscription } from "@parcel/watcher"
+import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
 import path from "node:path";
 import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../project-db-constants";
 import log from 'electron-log/main';
@@ -28,6 +28,8 @@ export class FileSystemService{
 
     private _fsWatcherSubscription: AsyncSubscription | null = null;
     private _fsExpectChanges: FileSystemExpectChange[] = []
+    private _fsPendingFSEvents: Event[] = []
+    private _fsPendingFSInWork = false
 
     constructor(public db: ProjectFileDb){
 
@@ -289,7 +291,7 @@ export class FileSystemService{
         ]
     }
 
-    private async _createWorkspaceWithAssets(
+    private async _createWorkspacesWithAssetsOne(
         loaded_new_dir: {
             workspace: ProjectFileDbWorkspace;
             content: FileSystemWorkspaceContent;
@@ -310,7 +312,7 @@ export class FileSystemService{
             }
         }
         if(workspace.parentId && loaded_new_dir.workspace.id !== workspaceId){
-            await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.parentId)
+            await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.parentId)
         }
         await this.db.workspace.workspacesCreate(
         {
@@ -320,7 +322,7 @@ export class FileSystemService{
             }),
         },
         {
-            fsProcessed: true,
+            fsProcessed: true
         })
         for(const content_asset of loaded_new_dir.content.assets){
             if(workspaceId !== content_asset.workspaceId) {
@@ -329,7 +331,8 @@ export class FileSystemService{
             const asset = this.db.sync.prepareAssetToServer(content_asset);
             await this.db.asset.assetsCreate(
             {
-                ...asset,
+                set: asset,
+                localName: content_asset.localName,
                 id: content_asset.id,
             }, {
                 fsProcessed: true,
@@ -345,47 +348,38 @@ export class FileSystemService{
         },
         created_workspace_ids: Set<string>,
     ){
-        await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, loaded_new_dir.workspace.id);
+        await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, loaded_new_dir.workspace.id);
         for(const workspace of loaded_new_dir.content.workspaces){
             if(created_workspace_ids.has(workspace.id)) {
                 continue;
             }
             if(workspace.parentId && !created_workspace_ids.has(workspace.parentId)){
-                await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.parentId)
+                await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.parentId)
             }
-            await this._createWorkspaceWithAssets(loaded_new_dir, created_workspace_ids, workspace.id);
+            await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.id);
         }
     }
 
-    private async _initWatcher(){
-        this._fsWatcherSubscription = await watcher.subscribe(this.db.localPath, async (err, events) => {
-            if (err){
-                log.error('FS Watcher error', err.message);
-                return;
-            }
+    private async _handlePendingFSEvents(){
+        if (this._fsPendingFSInWork){
+            return;
+        }
+        if (this._fsPendingFSEvents.length === 0){
+            return;
+        }
+        this._fsPendingFSInWork = true;
+        try {
+            const events = this._fsPendingFSEvents;
+            this._fsPendingFSEvents = []
 
-            const sorted_events = [...events].sort((a, b) => {
-                const a_index = a.type === 'delete' ? 1 : 2
-                const b_index = b.type === 'delete' ? 1 : 2
-                return a_index - b_index;
-            })
-            // debugger;
             const root_path = this.db.localPath;
             const deleting_assets = new Map<string, ProjectFileDbAsset>()
             const deleting_workspaces = new Map<string, ProjectFileDbWorkspace>();
-            for (const event of sorted_events){
-                let ignored = this._fsExpectChanges.some(expect => expect.filepaths.some(f => event.path.startsWith(f)));
-                if (ignored){
-                    continue;
-                }
 
+            for (const event of events){
                 const local_path = event.path.substring(this.db.localPath.length + 1);
-                if (local_path === path.join('.imsc', 'project.db-journal') || path.join('.imsc', 'project.db')){
-
-                }
-
                 const has_workspace_meta_suffix = /\.imw\.json$/.test(local_path);
-                
+                    
                 // Find exists entities
                 let exists_workspace: ProjectFileDbWorkspace | null = null
                 const exists_asset = !has_workspace_meta_suffix ? this.db.asset.findByLocalPath(local_path) : null;
@@ -445,6 +439,7 @@ export class FileSystemService{
                                 {
                                     set: asset,
                                     id: new_entry.asset.id,
+                                    localName: new_entry.asset.localName
                                 }, {
                                     fsProcessed: true
                                 })
@@ -455,20 +450,21 @@ export class FileSystemService{
                                 // Workspace moved
                                 deleting_workspaces.delete(new_entry.workspace.id)
                             }
+                            const local_name_with_ext = path.basename(local_path)
                             if (exists_workspace){
-                                await this.db.workspace.workspacesChange(new_entry.workspace.id,
-                                {
-                                    ...new_entry.workspace,
-                                }, {
-                                    fsProcessed: true
-                                })
+                                await this.db.workspace.workspacesChange(
+                                    new_entry.workspace.id,
+                                    new_entry.workspace,
+                                    {
+                                        fsProcessed: true
+                                    }
+                                )
                             } else {
                                 await this.db.workspace.workspacesCreate(
-                                {
-                                    ...new_entry.workspace,
-                                }, {
-                                    fsProcessed: true
-                                })
+                                    new_entry.workspace, 
+                                    {
+                                        fsProcessed: true
+                                    })
                             }
                         }
                     }
@@ -478,7 +474,7 @@ export class FileSystemService{
                     log.error('Unexpected fs change type', event.type)
                 }
             }
-    
+        
             // Apply delete
             if(deleting_assets.size > 0) {
                 await this.db.asset.assetsDelete(
@@ -495,6 +491,75 @@ export class FileSystemService{
                 await this.db.workspace.workspacesDelete(deleting_workspace_id, {
                     fsProcessed: true
                 });
+            }
+        }
+        catch (err: any){
+            log.error('FileSystemService: handling fs events', err.message, err.stack)
+        }
+        finally{
+            this._fsPendingFSInWork = false;
+        }
+        if (this._fsPendingFSEvents.length > 0){
+            this._handlePendingFSEvents() // No await;
+        }
+    }
+
+    private async _resortPendingFSEvents(){
+        let sorted_events: Event[] = [];
+        const event_by_path = new Map<string, Event>()
+
+        for (const event of this._fsPendingFSEvents){
+            const cur = event_by_path.get(event.path)
+            if (!cur || cur.type === 'update') event_by_path.set(event.path, event);
+            else if (cur.type === 'delete' && event.type === 'create'){
+                event_by_path.set(event.path, {
+                    path: cur.path,
+                    type: 'update'
+                })
+            } 
+            else if (cur.type === 'create' && event.type === 'delete'){
+                event_by_path.delete(event.path)
+            }
+        }
+
+        sorted_events = [...event_by_path.values()];
+        sorted_events.sort((a, b) => {
+            const a_index = a.type === 'delete' ? 1 : (a.type === 'create' ? 2 : 3)
+            const b_index = b.type === 'delete' ? 1 : (b.type === 'create' ? 2 : 3)
+            if (a_index !== b_index){
+                return a_index - b_index;
+            }
+            return a.path.localeCompare(b.path);
+        })
+        this._fsPendingFSEvents = sorted_events;
+    }
+
+    private async _initWatcher(){
+        const ignoringPaths = new Set([
+            path.join(this.db.localPath, '.imsc', 'project.db-journal'),
+            path.join(this.db.localPath, '.imsc', 'project.db'),            
+        ])
+        this._fsWatcherSubscription = await watcher.subscribe(this.db.localPath, async (err, events) => {
+            if (err){
+                log.error('FS Watcher error', err.message);
+                return;
+            }
+
+            let any_added = false;
+            for (const event of events){
+                let ignored = ignoringPaths.has(event.path) || 
+                              this._fsExpectChanges.some(expect => expect.filepaths.some(f => event.path.startsWith(f)));
+                if (ignored){
+                    continue;
+                }
+
+                this._fsPendingFSEvents.push(event)
+                any_added = true;
+            }
+            
+            if (any_added){
+                this._resortPendingFSEvents();
+                this._handlePendingFSEvents() // No await;
             }
         }, {
             ignore: this._getWatcherIgnore()

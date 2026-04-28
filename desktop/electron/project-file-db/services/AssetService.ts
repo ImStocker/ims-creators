@@ -27,6 +27,14 @@ import { ASSET_BASE_ORDERING } from "../project-db-constants";
 
 import { SQLITE_NOW_STM } from "./SyncService/SyncService";
    
+export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
+
+export type AssetServiceAssetChangeBatchOpDTO = {
+  create?: boolean | { id?: string | null, localName?: string };
+  set: AssetSetDTO;
+  where?: AssetWhereParams;
+};
+
 export class AssetService implements IProjectDatabaseAsset{
 
 
@@ -645,11 +653,11 @@ export class AssetService implements IProjectDatabaseAsset{
         return block_entity;
     }   
     
-    async assetsCreate(params: AssetCreateDTO, options?:{ fsProcessed?: true}): Promise<AssetsChangeResult> {
+    async assetsCreate(params: AssetServiceAssetCreateDTO, options?:{ fsProcessed?: true}): Promise<AssetsChangeResult> {
         const change = await this.assetsChangeBatch({
             ops: [
                 {
-                    create: params.id ? { id: params.id } : true,
+                    create: params.id || params.localName ? { id: params.id, localName: params.localName} : true,
                     set: params.set ?? {}
                 }
             ]
@@ -663,7 +671,7 @@ export class AssetService implements IProjectDatabaseAsset{
         }
     }
 
-    private async _assetsCreateImpl(changeRecord: HistoryChangeRecord, params: AssetCreateDTO, options?: { fsProcessed?: true }): Promise<{
+    private async _assetsCreateImpl(changeRecord: HistoryChangeRecord, params: AssetServiceAssetCreateDTO, options?: { fsProcessed?: true }): Promise<{
         id: string,
         touchedWIds: string[]
     }> {
@@ -737,7 +745,7 @@ export class AssetService implements IProjectDatabaseAsset{
             comments: [],
             references: [],
             lastViewedAt: null,
-            localName: undefined,
+            localName: params.localName,
         };
         let parent_workspace_path = this.db.localPath;
         if(asset_full.workspaceId) {
@@ -930,7 +938,7 @@ export class AssetService implements IProjectDatabaseAsset{
         })
     }
 
-    async assetsChangeBatch(params: { ops: AssetChangeBatchOpDTO[]; }, options?: { pid?: string; fsProcessed?: true }): Promise<AssetsBatchChangeResultDTO> {
+    async assetsChangeBatch(params: { ops: AssetServiceAssetChangeBatchOpDTO[]; }, options?: { pid?: string; fsProcessed?: true }): Promise<AssetsBatchChangeResultDTO> {
         const changeRecord = new HistoryChangeRecord();
         const createdIds = new  Set<string>()
         const updatedIds = new  Set<string>()
@@ -941,6 +949,7 @@ export class AssetService implements IProjectDatabaseAsset{
             if (op.create){
                 const res = await this._assetsCreateImpl(changeRecord, {
                     id: (typeof op.create === 'object' ? op.create.id : undefined) ?? undefined,
+                    localName: (typeof op.create === 'object' ? op.create.localName : undefined) ?? undefined,
                     set: op.set
                 }, options)
                 if (res.touchedWIds.length > 0){
