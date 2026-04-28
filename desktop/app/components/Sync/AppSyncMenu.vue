@@ -41,7 +41,7 @@ import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
-import { SyncCurrentStateStatus, type SyncCurrentState } from '~~/electron/project-file-db/services/SyncService/SyncService';
+import { SyncCurrentStateStatus, type SyncCurrentState } from '#bridge/types/SyncTypes';
 
 export default defineComponent({
   name: 'AppSyncMenu',
@@ -120,6 +120,10 @@ export default defineComponent({
           title: this.$t('desktop.fsSync.menu.errors'),
           action: async () => await this.openSyncManageDialog(),
         });
+        // list.push({
+        //   title: this.$t('desktop.fsSync.menu.openInCloud'),
+        //   action: async () => await this.openSyncManageDialog(),
+        // });
       }
       return list;
     },

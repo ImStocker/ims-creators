@@ -9,28 +9,37 @@
           Error: {{ syncErrors.error }}
         </div>
         <div v-if="syncErrors.assets.length > 0">
-          <div>{{$t('desktop.fsSync.notSyncedAssets')}}:</div>
-          <div v-for="asset of syncErrors.assets"
-            :key="asset.id"
-            class="SyncManageDialog-content-item"
-          >
-            {{asset.title ?? asset.id}}
-            <div v-if="asset.conflict || asset.conflict_message"> 
-              ({{ asset.conflict_message ? asset.conflict_message : asset.conflict }})
-            </div>
+          <div class="SyncManageDialog-content-title">
+            {{$t('desktop.fsSync.notSyncedAssets')}}:
           </div>
+          <ul>
+            <li v-for="asset of syncErrors.assets"
+                :key="asset.id">
+              <div class="SyncManageDialog-content-item">
+                {{asset.title ?? asset.id}}
+                <div v-if="asset.conflict || asset.conflict_message"> 
+                  ({{ asset.conflict_message ? asset.conflict_message : asset.conflict }})
+                </div>
+              </div>
+            </li>
+          </ul>
         </div>
         <div v-if="syncErrors.workspaces.length > 0">
-          <div>{{$t('desktop.fsSync.notSyncedWorkspaces')}}:</div>
-          <div v-for="workspace of syncErrors.workspaces"
-            :key="workspace.id"
-            class="SyncManageDialog-content-item"
-          >
-            {{workspace.title ?? workspace.id}}
-            <div v-if="workspace.conflict || workspace.conflict_message"> 
-              ({{ workspace.conflict_message ? workspace.conflict_message : workspace.conflict }})
-            </div>
+          <div class="SyncManageDialog-content-title">
+            {{$t('desktop.fsSync.notSyncedWorkspaces')}}:
           </div>
+          <ul>
+            <li v-for="workspace of syncErrors.workspaces"
+              :key="workspace.id"
+            >
+              <div class="SyncManageDialog-content-item">
+                {{workspace.title ?? workspace.id}}
+                <div v-if="workspace.conflict || workspace.conflict_message"> 
+                  ({{ workspace.conflict_message ? workspace.conflict_message : workspace.conflict }})
+                </div>
+              </div>
+            </li>
+          </ul>
         </div>
         <div v-if="noErrors" class="SyncManageDialog-no-errors">
           {{$t('desktop.fsSync.noErrors')}}
@@ -105,6 +114,9 @@ export default defineComponent({
 .SyncManageDialog-no-errors{
   text-align: center;
   font-style: italic;
+}
+.SyncManageDialog-content-title{
+  font-weight: 600;
 }
 .SyncManageDialog-content-item{
   display: flex;

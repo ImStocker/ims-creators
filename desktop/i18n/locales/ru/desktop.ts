@@ -22,6 +22,7 @@ export default {
         resumeEnd: 'Синхронизация возобновлена',
         syncWithCloud: 'Синхронизировать с облаком',
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
+        openInCloud: 'Открыть в облаке',
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',

@@ -20,7 +20,8 @@ export default {
         resume: 'Resume',
         resumeEnd: 'Synchronization was resumed',
         syncWithCloud: 'Synchronize with cloud',
-        syncWithCloudEnd: 'Synchronization with cloud is completed'
+        syncWithCloudEnd: 'Synchronization with cloud is completed',
+        openInCloud: 'Open in cloud',
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',

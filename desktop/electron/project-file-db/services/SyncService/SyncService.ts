@@ -13,7 +13,8 @@ import * as node_path from 'path';
 import fs from 'node:fs'
 import crypto from 'crypto';
 import axios from "axios";
-import type { SyncInfo, SyncItem } from "#logic/types/SyncTypes";
+import type { SyncInfo } from "#logic/types/SyncTypes";
+import { SyncCurrentStateStatus, type SyncCurrentState } from "#bridge/types/SyncTypes";
 
 const SYNC_CHUNK_SIZE = 50;
 export const SQLITE_NOW_STM = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
@@ -36,18 +37,6 @@ export type ProjectDbFile = {
     server_file_id: string,
     local_path: string,
     server_store: string
-}
-
-export enum SyncCurrentStateStatus {
-    IN_PROCESS = 'process',
-    FREE = 'free',
-    PAUSE = 'pause',
-}
-
-export type SyncCurrentState = {
-    status: SyncCurrentStateStatus,
-    hasChanges: boolean,
-    error: string | null,
 }
 
 export class SyncService {
