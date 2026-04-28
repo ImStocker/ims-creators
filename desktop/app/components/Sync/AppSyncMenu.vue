@@ -35,13 +35,12 @@ import AuthManager from '~ims-app-base/logic/managers/AuthManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import BuyLicenseDialog from './BuyLicenseDialog.vue';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
-import DesktopProjectManager from '#logic/managers/DesktopProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
-import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
 import { SyncCurrentStateStatus, type SyncCurrentState } from '#bridge/types/SyncTypes';
+import SyncWithCloudDialog from './SyncWithCloudDialog.vue';
 
 export default defineComponent({
   name: 'AppSyncMenu',
@@ -78,7 +77,6 @@ export default defineComponent({
           title: this.$t('desktop.fsSync.menu.syncWithCloud'),
           action: async () => {
               await this.syncWithCloud();
-              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
             }
         });
       }
@@ -120,10 +118,13 @@ export default defineComponent({
           title: this.$t('desktop.fsSync.menu.errors'),
           action: async () => await this.openSyncManageDialog(),
         });
-        // list.push({
-        //   title: this.$t('desktop.fsSync.menu.openInCloud'),
-        //   action: async () => await this.openSyncManageDialog(),
-        // });
+        list.push({
+          title: this.$t('desktop.fsSync.menu.openInCloud'),
+          action: async () => {
+            window.open(this.$getAppManager().$env.CREATORS_HOST + 'app/p/' +
+                    encodeURIComponent(this.projectInfo?.id ?? '') + '/' + this.projectInfo?.title)
+          }
+        });
       }
       return list;
     },
@@ -142,27 +143,10 @@ export default defineComponent({
         const has_license = user_licenses.list.find(license => license.features.desktopSync);
         const project_info = this.projectInfo;
         if(project_info && (project_info.license?.features.desktopSync || has_license)){
-            try {
-              const new_project_info = await this.$getAppManager()
-              .get(DesktopProjectManager)
-              .createProject({
-                title: project_info.title,
-                template_ids: [],
-                menu_settings: {
-                  'menu-about': false,
-                  'menu-gamedesign': true,
-                  'menu-team': true,
-                },
-              })
-              if(!project_info.localPath) {
-                throw Error('localPath is not set') ;
-              }
-              await this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(new_project_info);
-              await this.$getAppManager().get(DesktopSyncManager).runSync();
-            }
-            catch(err: any) {
-              this.$getAppManager().get(UiManager).showError(err.message);
-            }
+          const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
+          if(res){
+            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
+          }
         }
         else {
           await this.$getAppManager().get(DialogManager).show(BuyLicenseDialog, {});

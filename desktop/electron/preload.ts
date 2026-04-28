@@ -1,4 +1,5 @@
 import type { ImsHostIpcCallbackCall, ImsHostIpcCallbackResult, ImsHostIpcListenerEvent } from '#bridge/types/IImsHost';
+import type { SyncCurrentState } from '#bridge/types/SyncTypes';
 import type { UpdateNewVersion } from '#logic/types/AutoUpdateTypes';
 import type { ContextBridge, IpcRenderer, IpcRendererEvent, WebUtils } from 'electron';
 import type { IApiTokenStorage, TokenMainSavedData } from '~ims-app-base/logic/managers/ApiWorker';
@@ -126,9 +127,9 @@ contextBridge.exposeInMainWorld('subscribeContentChange', (callback: (changes: P
   }
 )
 
-contextBridge.exposeInMainWorld('subscribeSyncState', (callback: (changes: ProjectContentChangeEventArg) => void) => {
-    ipcRenderer.on('syncState', (event, changes) => {
-      callback(changes)
+contextBridge.exposeInMainWorld('subscribeSyncState', (callback: (state: SyncCurrentState) => void) => {
+    ipcRenderer.on('syncState', (event, state: SyncCurrentState) => {
+      callback(state)
     });
   }
 )

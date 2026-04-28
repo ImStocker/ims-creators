@@ -53,10 +53,26 @@ export class SyncService {
 
     }
 
-    init(){
-        this._synchronizationTimer = setInterval(() => {
-            this.syncProject();
-        }, 60 * 1000);
+    async changeAutoSynchronization(new_val: number){
+        await this.db.settings.setKey('syncWithCloud', new_val);
+        if(this._synchronizationTimer){
+            clearInterval(this._synchronizationTimer);
+            this._synchronizationTimer = undefined;
+        }
+        if(new_val > 0) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, new_val * 1000);
+        }
+    }
+
+    async init(){
+        const syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
+        if(syncWithCloudTime > 0) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, syncWithCloudTime * 1000);
+        }        
     }
 
     destroy(){
