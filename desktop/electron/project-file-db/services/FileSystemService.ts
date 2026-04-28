@@ -15,9 +15,14 @@ type FileSystemExpectChange = {
     filepaths: string[]
 }
 
+type FileSystemEntryWithLocalPath<T> = {
+    entry: T,
+    localPath: string
+}
+
 type FileSystemWorkspaceContent = {
-    assets: ProjectFileDbAsset[],
-    workspaces: ProjectFileDbWorkspace[],
+    assets: FileSystemEntryWithLocalPath<ProjectFileDbAsset>[],
+    workspaces: FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>[],
 }
 
 const PARCEL_WATCHER_DELAY = 100;
@@ -35,15 +40,18 @@ export class FileSystemService{
 
     }
 
-    private async _loadFile(localPath: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
+    private async _loadFile(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
         type: 'asset',
-        asset: ProjectFileDbAsset
+        asset: ProjectFileDbAsset,
+        localPath: string
     } | {
         type: 'workspace',
-        workspace: ProjectFileDbWorkspace
+        workspace: ProjectFileDbWorkspace,
+        localPath: string
     } | null>{
     
-        const local_name = node_path.basename(localPath);
+        const local_path = node_path.relative(this.db.localPath, absolutePath)
+        const local_name = node_path.basename(absolutePath);
         const extname = node_path.extname(local_name);
         
         if (extname !== '.json' && extname !== '.md'){
@@ -52,7 +60,7 @@ export class FileSystemService{
 
         let file_info: fs.Stats;
         try {
-            file_info = await fs.promises.stat(localPath);
+            file_info = await fs.promises.stat(absolutePath);
         }
         catch (err: any){
             if (err.code === 'ENOENT'){
@@ -64,7 +72,7 @@ export class FileSystemService{
         const created_at = file_info.birthtime.toISOString();
         const updated_at = file_info.mtime.toISOString();
 
-        const file = await fs.promises.readFile(localPath, { encoding: 'utf8' });
+        const file = await fs.promises.readFile(absolutePath, { encoding: 'utf8' });
         if (extname === '.json') {
             if (/\.ima[ \d\(\)\[\]_]*\.json$/i.test(local_name)) {
                 const asset = JSON.parse(file) as ProjectFileDbAsset;
@@ -74,6 +82,7 @@ export class FileSystemService{
                 asset.updatedAt = updated_at;
                 return {
                     type: 'asset',
+                    localPath: local_path,
                     asset
                 }
             }
@@ -85,13 +94,14 @@ export class FileSystemService{
                 workspace_info.updatedAt = updated_at;
                 return {
                     type: 'workspace',
+                    localPath: local_path,
                     workspace: workspace_info
                 };
             }
         }
         else if(extname === '.md'){
             const asset_full: ProjectFileDbAsset = {
-                id: absolutePathToUuid(localPath, rootPath),
+                id: absolutePathToUuid(absolutePath, rootPath),
                 projectId: this.db.project.db.info.id ?? '',
                 workspaceId: parentWorkspaceId,
                 name: null,
@@ -153,6 +163,7 @@ export class FileSystemService{
             };
             return {
                 type: 'asset',
+                localPath: local_path,
                 asset: asset_full
             };
         }
@@ -160,11 +171,11 @@ export class FileSystemService{
     }
 
     private async _loadFileItems(items: fs.Dirent[], path: string, parentWorkspaceId: string, rootPath: string): Promise<{
-        assets: Map<string, ProjectFileDbAsset>,
-        workspaces: Map<string, ProjectFileDbWorkspace>,
+        assets: Map<string, FileSystemEntryWithLocalPath<ProjectFileDbAsset>>,
+        workspaces: Map<string, FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>>,
     }>{
-        const assets = new Map<string, ProjectFileDbAsset>();
-        const workspaces = new Map<string, ProjectFileDbWorkspace>();
+        const assets = new Map<string, FileSystemEntryWithLocalPath<ProjectFileDbAsset>>();
+        const workspaces = new Map<string, FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>>();
         for (const item of items) {
             if (item.name.startsWith('.')){
                 continue;
@@ -178,10 +189,16 @@ export class FileSystemService{
                     )
                     if (loaded){
                         if (loaded.type === 'asset'){
-                            assets.set(item.name, loaded.asset)
+                            assets.set(item.name, {
+                                entry: loaded.asset,
+                                localPath: loaded.localPath
+                            })
                         }
                         else if (loaded.type === 'workspace'){
-                            workspaces.set(item.name, loaded.workspace)
+                            workspaces.set(item.name, {
+                                entry: loaded.workspace,
+                                localPath: loaded.localPath
+                            })
                         }
                     }
                 }
@@ -196,13 +213,14 @@ export class FileSystemService{
         }
     }
 
-    async loadFolderAsWorkspace(path: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
+    async loadFolderAsWorkspace(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
         workspace: ProjectFileDbWorkspace,
+        localPath: string,
         content: FileSystemWorkspaceContent
     }>{
-        return this._loadFolderAsWorkspaceImpl(path, parentWorkspaceId, async () => {
-            const local_path = path + WORKSPACE_EXT;
-            const file = await this._loadFile(local_path, parentWorkspaceId, rootPath);
+        return this._loadFolderAsWorkspaceImpl(absolutePath, parentWorkspaceId, async () => {
+            const abs_path = absolutePath + WORKSPACE_EXT;
+            const file = await this._loadFile(abs_path, parentWorkspaceId, rootPath);
             if (file?.type ==='workspace'){
                 return file.workspace
             }
@@ -211,19 +229,21 @@ export class FileSystemService{
     }
     
 
-    async _loadFolderAsWorkspaceImpl(path: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
+    async _loadFolderAsWorkspaceImpl(absolutePath: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
         workspace: ProjectFileDbWorkspace,
+        localPath: string,
         content: FileSystemWorkspaceContent
     }>{
+        const local_path = node_path.relative(this.db.localPath, absolutePath) + WORKSPACE_EXT
         let workspace = await getWorkspaceMeta();
         if(!workspace){
-            const file_info = await fs.promises.stat(path);
+            const file_info = await fs.promises.stat(absolutePath);
             const created_at = file_info.birthtime.toISOString();
             const updated_at = file_info.mtime.toISOString();
-            const title = node_path.basename(path);
+            const title = node_path.basename(absolutePath);
             const local_name = title + WORKSPACE_EXT;
             workspace = {
-                id: absolutePathToUuid(path, root_path),
+                id: absolutePathToUuid(absolutePath, root_path),
                 title: title,
                 name: null,
                 parentId: parentWorkspaceId,
@@ -237,43 +257,45 @@ export class FileSystemService{
             }
         }
         const content = await this.loadWorkspaceContentFromPath(
-            path,
+            absolutePath,
             workspace.id,
             root_path
         )
         return {
             workspace, 
+            localPath: local_path,
             content
         }
     }
 
-    async loadWorkspaceContentFromPath(path: string, parentWorkspaceId: string, root_path: string): Promise<FileSystemWorkspaceContent>{
-        const items = await fs.promises.readdir(path, {
+    async loadWorkspaceContentFromPath(absolutePath: string, parentWorkspaceId: string, root_path: string): Promise<FileSystemWorkspaceContent>{
+        const items = await fs.promises.readdir(absolutePath, {
             withFileTypes: true,
         });
-        const { assets, workspaces } = await this._loadFileItems(items, path, parentWorkspaceId, root_path);
+        const { assets, workspaces } = await this._loadFileItems(items, absolutePath, parentWorkspaceId, root_path);
         const res_assets = [...assets.values()]
         const res_workspaces = [...workspaces.values()]
         for (const item of items) {
             if (item.isDirectory()) {
-                if (root_path === path && (item.name.startsWith('.') || item.name === 'attachments')){
+                if (root_path === absolutePath && (item.name.startsWith('.') || item.name === 'attachments')){
                     continue; // Ignore service folders
                 }
 
-        // if (item.name === 'Story'){
-        // debugger;
-        // }
+                const local_path = node_path.relative(this.db.localPath, node_path.join(absolutePath, item.name))
                 const local_name = item.name + WORKSPACE_EXT
-                const folder = node_path.join(path, item.name);
+                const folder = node_path.join(absolutePath, item.name);
                 const exist_workspace = workspaces.get(local_name) ?? null
                 const loaded_workspace = await this._loadFolderAsWorkspaceImpl(
                     folder,
                     parentWorkspaceId,
-                    async () => exist_workspace,
+                    async () => exist_workspace?.entry ?? null,
                     root_path
                 );
                 if (!exist_workspace){
-                    res_workspaces.push(loaded_workspace.workspace);
+                    res_workspaces.push({
+                        entry: loaded_workspace.workspace,
+                        localPath: local_path
+                    });
                 }
                 res_assets.push(...loaded_workspace.content.assets);
                 res_workspaces.push(...loaded_workspace.content.workspaces);
@@ -291,73 +313,34 @@ export class FileSystemService{
         ]
     }
 
-    private async _createWorkspacesWithAssetsOne(
-        loaded_new_dir: {
-            workspace: ProjectFileDbWorkspace;
-            content: FileSystemWorkspaceContent;
-        },
-        created_workspace_ids: Set<string>,
-        workspaceId: string
-    ){
-        if(created_workspace_ids.has(workspaceId)) {
-            return;
-        }
-        let workspace = loaded_new_dir.content.workspaces.find(w => w.id === workspaceId);
-        if (!workspace) {
-            if(loaded_new_dir.workspace.id === workspaceId) {
-                workspace = loaded_new_dir.workspace;
-            }
-            else {
-                return null;
-            }
-        }
-        if(workspace.parentId && loaded_new_dir.workspace.id !== workspaceId){
-            await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.parentId)
-        }
-        await this.db.workspace.workspacesCreate(
-        {
-            ...workspace,
-            ...(workspace.parentId ? {} : {
-                parentId: loaded_new_dir.workspace.id
-            }),
-        },
-        {
-            fsProcessed: true
-        })
-        for(const content_asset of loaded_new_dir.content.assets){
-            if(workspaceId !== content_asset.workspaceId) {
-                continue;
-            }
-            const asset = this.db.sync.prepareAssetToServer(content_asset);
-            await this.db.asset.assetsCreate(
-            {
-                set: asset,
-                localName: content_asset.localName,
-                id: content_asset.id,
-            }, {
-                fsProcessed: true,
-            })
-        }
-        created_workspace_ids.add(workspace.id);
-    }
+    private _findExistentEntryByLocalPath(localPath: string): {
+        type: 'asset',
+        asset: ProjectFileDbAsset,
+    } | {
+        type: 'workspace',
+        workspace: ProjectFileDbWorkspace,
+    } | null {
+        const has_workspace_meta_suffix = localPath.substring(localPath.length - WORKSPACE_EXT.length, localPath.length) === WORKSPACE_EXT
 
-    private async _createWorkspacesWithAssets(
-        loaded_new_dir: {
-            workspace: ProjectFileDbWorkspace;
-            content: FileSystemWorkspaceContent;
-        },
-        created_workspace_ids: Set<string>,
-    ){
-        await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, loaded_new_dir.workspace.id);
-        for(const workspace of loaded_new_dir.content.workspaces){
-            if(created_workspace_ids.has(workspace.id)) {
-                continue;
+        const exists_asset = !has_workspace_meta_suffix ? this.db.asset.findByLocalPath(localPath) : null
+        if (exists_asset){
+            return {
+                type: 'asset',
+                asset: exists_asset
             }
-            if(workspace.parentId && !created_workspace_ids.has(workspace.parentId)){
-                await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.parentId)
-            }
-            await this._createWorkspacesWithAssetsOne(loaded_new_dir, created_workspace_ids, workspace.id);
         }
+
+        let workspace_meta_local_path = has_workspace_meta_suffix ? localPath.substring(0, localPath.length - WORKSPACE_EXT.length) : localPath;
+        const exists_workspace = this.db.workspace.findByLocalDirPath(workspace_meta_local_path);
+
+        if (exists_workspace){
+            return {
+                type: 'workspace',
+                workspace: exists_workspace
+            }
+        }
+
+        return null;
     }
 
     private async _handlePendingFSEvents(){
@@ -375,106 +358,105 @@ export class FileSystemService{
             const root_path = this.db.localPath;
             const deleting_assets = new Map<string, ProjectFileDbAsset>()
             const deleting_workspaces = new Map<string, ProjectFileDbWorkspace>();
+            const upserting_assets = new Map<string, ProjectFileDbAsset>()
+            const upserting_workspaces = new Map<string, ProjectFileDbWorkspace>()
 
             for (const event of events){
                 const local_path = event.path.substring(this.db.localPath.length + 1);
-                const has_workspace_meta_suffix = /\.imw\.json$/.test(local_path);
-                    
-                // Find exists entities
-                let exists_workspace: ProjectFileDbWorkspace | null = null
-                const exists_asset = !has_workspace_meta_suffix ? this.db.asset.findByLocalPath(local_path) : null;
-                if (!exists_asset) {
-                    let workspace_meta_local_path = has_workspace_meta_suffix ? local_path.substring(0, local_path.length - WORKSPACE_EXT.length) : local_path;
-                    exists_workspace = this.db.workspace.findByLocalDirPath(workspace_meta_local_path);
-                }
-
-                // Apply changes
-                if (event.type === 'delete'){
-                    if (exists_asset){
-                        deleting_assets.set(exists_asset.id, exists_asset);
-                    }
-                    else if (exists_workspace){
-                        deleting_workspaces.set(exists_workspace.id, exists_workspace);
-                    }
-                }
-                else if (event.type === 'create' || event.type === 'update'){
+                if (event.type === 'create' || event.type === 'update'){
                     const parent_workspace_local_path = node_path.dirname(local_path);
                     const parent_workspace = this.db.workspace.findByLocalDirPath(parent_workspace_local_path);
-                    if (!parent_workspace){
-                        continue; // Parent workspace not found;
-                    }
+                    const parent_workspace_id = parent_workspace ? parent_workspace.id : this.db.RootGddFolder.id
+
                     const is_dir = await isDir(event.path);
                     if (is_dir){
                         const loaded_new_dir = await this.loadFolderAsWorkspace(
                             event.path,
-                            parent_workspace.id,
+                            parent_workspace_id,
                             root_path
                         )
-                        let created_workspace_ids = new Set<string>();
-                        await this._createWorkspacesWithAssets(loaded_new_dir, created_workspace_ids);
+                        upserting_workspaces.set(
+                            loaded_new_dir.localPath,
+                            loaded_new_dir.workspace
+                        )
+                        for (const e of loaded_new_dir.content.workspaces){
+                            upserting_workspaces.set(e.localPath, e.entry)
+                        }
+                        for (const e of loaded_new_dir.content.assets){
+                            upserting_assets.set(e.localPath, e.entry)
+                        }
                     }
                     else {
-                        const new_entry = await this._loadFile(event.path, parent_workspace.id, root_path)
-                        if (!new_entry){
-                            continue;
+                        const new_entry = await this._loadFile(
+                            event.path, 
+                            parent_workspace_id,
+                            root_path
+                        )
+                        if (new_entry?.type === 'asset') {
+                            upserting_assets.set(new_entry.localPath, new_entry.asset)
                         }
-                        if (new_entry.type === 'asset'){
-                            if (deleting_assets.has(new_entry.asset.id)){
-                                // Asset moved
-                                deleting_assets.delete(new_entry.asset.id)
-                            }
-                            const asset = this.db.sync.prepareAssetToServer(new_entry.asset);
-                            if (exists_asset){
-                                await this.db.asset.assetsChange(
-                                {
-                                    where: {
-                                        id: new_entry.asset.id,
-                                    },
-                                    set: asset,
-                                }, {
-                                    fsProcessed: true
-                                })
-                            } else {
-                                await this.db.asset.assetsCreate(
-                                {
-                                    set: asset,
-                                    id: new_entry.asset.id,
-                                    localName: new_entry.asset.localName
-                                }, {
-                                    fsProcessed: true
-                                })
-                            }
-                        }
-                        else if (new_entry.type === 'workspace'){
-                            if (deleting_workspaces.has(new_entry.workspace.id)){
-                                // Workspace moved
-                                deleting_workspaces.delete(new_entry.workspace.id)
-                            }
-                            const local_name_with_ext = path.basename(local_path)
-                            if (exists_workspace){
-                                await this.db.workspace.workspacesChange(
-                                    new_entry.workspace.id,
-                                    new_entry.workspace,
-                                    {
-                                        fsProcessed: true
-                                    }
-                                )
-                            } else {
-                                await this.db.workspace.workspacesCreate(
-                                    new_entry.workspace, 
-                                    {
-                                        fsProcessed: true
-                                    })
-                            }
+                        else if (new_entry?.type === 'workspace'){
+                            upserting_workspaces.set(new_entry.localPath, new_entry.workspace)
                         }
                     }
+                }
+                else {
+                    const exist = this._findExistentEntryByLocalPath(local_path);
+                    if (exist?.type === 'asset') deleting_assets.set(exist.asset.id, exist.asset)
+                    else if (exist?.type === 'workspace') deleting_workspaces.set(exist.workspace.id, exist.workspace)
+                }
+            }
+
+
+            for (const [local_path, ups_workspace] of upserting_workspaces){
+                const exist = this._findExistentEntryByLocalPath(local_path);
+                deleting_workspaces.delete(ups_workspace.id) // Workspace moved
+                if (exist?.type === 'workspace'){
+                    await this.db.workspace.workspacesChange(
+                        ups_workspace.id,
+                        ups_workspace,
+                        {
+                            fsProcessed: true
+                        }
+                    )
 
                 }
                 else {
-                    log.error('Unexpected fs change type', event.type)
+                    await this.db.workspace.workspacesCreate(
+                        ups_workspace, 
+                        {
+                            fsProcessed: true
+                        })
                 }
             }
-        
+
+            for (const [local_path, ups_asset] of upserting_assets){
+                // TODO: check parent order?
+                const exist = this._findExistentEntryByLocalPath(local_path);
+                const asset = this.db.sync.prepareAssetToServer(ups_asset);
+                deleting_assets.delete(ups_asset.id) // Asset moved
+                if (exist?.type === 'asset'){
+                    await this.db.asset.assetsChange(
+                    {
+                        where: {
+                            id: ups_asset.id,
+                        },
+                        set: asset,
+                    }, {
+                        fsProcessed: true
+                    })
+                } else {
+                    await this.db.asset.assetsCreate(
+                    {
+                        set: asset,
+                        id: ups_asset.id,
+                        localName: ups_asset.localName
+                    }, {
+                        fsProcessed: true
+                    })
+                }
+            }
+
             // Apply delete
             if(deleting_assets.size > 0) {
                 await this.db.asset.assetsDelete(
@@ -608,7 +590,7 @@ export class FileSystemService{
         const user_files = await this.loadWorkspaceContentFromPath(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
         this.db.asset.assets.addMany(user_files.assets.map(asset => {
             const changed_asset: ProjectFileDbAsset = { 
-                ...asset,
+                ...asset.entry,
                 projectId: this.db.info.id,
                 rights: 5
             }
@@ -620,7 +602,7 @@ export class FileSystemService{
         this.db.workspace.workspaces.add(this.db.RootGddFolder)
         this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => {
             const changed_workspace =  {
-                ...workspace, 
+                ...workspace.entry, 
                 projectId: this.db.info.id,
                 rights: 5
             }

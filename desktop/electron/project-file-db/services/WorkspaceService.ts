@@ -137,7 +137,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             return 0;
         });
     }
-    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<Workspace>> {
+    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<ProjectFileDbWorkspace>> {
         let workspaces = await this._searchWorkspaces( query.where ? query.where : {});
         workspaces = await this._sortWorkspaces(workspaces, query.order ?? []);
         const total = workspaces.length;
@@ -186,7 +186,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 (workspace_file_basename ?? 'untitled').replace(forbiddenFilenameCharsRegexp, '_').trim(),
                 (name) => !fs.existsSync(node_path.join(parent_workspace_path, name + '')),
             );
-            const suggest_title_with_ext = suggest_title + '.imw.json'
+            const suggest_title_with_ext = suggest_title + WORKSPACE_EXT
             workspace.localName = suggest_title_with_ext;
             const workspace_local_path_meta = node_path.join(parent_workspace_path, suggest_title_with_ext);
             const workspace_local_path_folder = workspace_local_path_meta.replace(/\.imw\.json$/, '');
@@ -299,7 +299,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         if (!workspace.localName) return;
 
         const local_path_folder = getWorkspaceLocalPath(workspace, this.db)
-        const local_path_meta = local_path_folder + ".imw.json";
+        const local_path_meta = local_path_folder + WORKSPACE_EXT;
 
         await this.db.fileSystem.expectFsChange([
             local_path_folder, local_path_meta
@@ -467,9 +467,9 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 prepareFileBasenameByEntityTitle(workspace.title ?? 'untitled'),
                 (val) => !used_names.has(val),
                 ' - ',
-                 '.imw.json'
+                WORKSPACE_EXT
             );
-            const basename = name.substring(0, name.length - '.imw.json'.length)
+            const basename = name.substring(0, name.length - WORKSPACE_EXT.length)
             used_names.add(name);
             const writeStream = new PassThrough();
             targetZip.file((subfolder ? subfolder + "/" : '') + name, writeStream);
