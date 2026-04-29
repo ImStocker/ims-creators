@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
-import { absolutePathToUuid, isDir, isDirSync } from "../utils/files";
+import { absolutePathToUuid, isDir, isDirSync, prepareFileBasenameByEntityTitle } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
 import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
@@ -30,7 +30,23 @@ type FileSystemWorkspaceContent = {
 
 const PARCEL_WATCHER_DELAY = 100;
 
+export const ASSET_EXT = '.ima.json'
+export const ASSET_EXT_TEST_REGEXP = /\.ima[ \d\(\)\[\]_]*\.json$/i
 export const WORKSPACE_EXT = '.imw.json'
+export const WORKSPACE_EXT_TEST_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i
+
+function prepareEntityTitle(filename: string, title: string | null, ext_regexp: RegExp): string {
+    const title_to_filename = title ? prepareFileBasenameByEntityTitle(title) : '';
+    const filename_without_ext = filename.replace(ext_regexp, '') 
+    const filename_without_index = filename_without_ext.replace(/ - \d+$/, '');  // Remove index if name was used
+    if (title_to_filename === filename_without_index && title){
+        return title
+    }
+    else {
+        return filename_without_ext
+    }
+}
+
 
 export class FileSystemService{
 
@@ -77,8 +93,9 @@ export class FileSystemService{
 
         const file = await fs.promises.readFile(absolutePath, { encoding: 'utf8' });
         if (extname === '.json') {
-            if (/\.ima[ \d\(\)\[\]_]*\.json$/i.test(local_name)) {
+            if (ASSET_EXT_TEST_REGEXP.test(local_name)) {
                 const asset = JSON.parse(file) as ProjectFileDbAsset;
+                asset.title = prepareEntityTitle(local_name, asset.title, ASSET_EXT_TEST_REGEXP)
                 asset.localName = local_name
                 asset.workspaceId = parentWorkspaceId;
                 asset.createdAt = created_at;
@@ -91,8 +108,9 @@ export class FileSystemService{
                     asset
                 }
             }
-            else if (/\.imw[ \d\(\)\[\]_]*\.json$/i.test(local_name)){
+            else if (WORKSPACE_EXT_TEST_REGEXP.test(local_name)){
                 const workspace_info = JSON.parse(file) as ProjectFileDbWorkspace;
+                workspace_info.title = prepareEntityTitle(local_name, workspace_info.title, WORKSPACE_EXT_TEST_REGEXP)
                 workspace_info.localName = local_name
                 workspace_info.parentId = parentWorkspaceId;
                 workspace_info.createdAt = created_at;

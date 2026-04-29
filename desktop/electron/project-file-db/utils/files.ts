@@ -6,7 +6,10 @@ import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUt
 import type { ProjectFileDbWorkspace, ProjectFileDbAsset, ProjectFileDb } from '../ProjectFileDb';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import { WORKSPACE_EXT } from '../services/FileSystemService';
-export const forbiddenFilenameCharsRegexp = new RegExp("[^- А-Яа-яa-zA-Z0-9,@.;'`!)(]+", 'g');
+
+export const forbiddenFilenameCharsRegexp = /[<>:"/\\|?*\x00-\x1f]/;
+export const forbiddenFilenameValuesRegexp = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+export const trailingDotsOrSpaces = /[\s.]$/;
 
 export function getIndexRangeStartAndStep(
   from: number | undefined,
