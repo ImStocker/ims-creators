@@ -789,7 +789,7 @@ export class AssetService implements IProjectDatabaseAsset{
         // Save as ima.json
         const ima_asset  = {
             ...asset_full,
-            localPath: undefined,
+            localName: undefined,
             rights: undefined,
             lastViewedAt: undefined,
             unread: undefined,

@@ -226,7 +226,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
     saveWorkspaceFileToStream(workspace: ProjectFileDbWorkspace, stream: Writable){
         stream.write(JSON.stringify({
             ...workspace,
-            localPath: undefined,
+            localName: undefined,
             rights: undefined
         }, null, 1))
     }
