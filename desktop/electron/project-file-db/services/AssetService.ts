@@ -25,7 +25,6 @@ import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUt
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import { ASSET_BASE_ORDERING } from "../project-db-constants";
 
-import { SQLITE_NOW_STM } from "./SyncService/SyncService";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
@@ -188,7 +187,16 @@ export class AssetService implements IProjectDatabaseAsset{
     private async _getAssetFullById(asset_id: string): Promise<ProjectFileDbAsset | null> {
         const db_asset = this.assets.byId.get(asset_id);
         if(!db_asset) return null;
-        let asset = {...db_asset};
+
+        const asset: ProjectFileDbAsset = {
+            ...db_asset,
+            blocks: db_asset.blocks.map(block => {
+                return {
+                    ...block,
+                    inherited: null
+                }
+            })
+        };
 
         const parent_id = db_asset.parentIds && db_asset.parentIds.length > 0 ? db_asset.parentIds[0] : null
         const parent_asset = parent_id ? await this._getAssetFullById(parent_id) : null;
@@ -203,52 +211,45 @@ export class AssetService implements IProjectDatabaseAsset{
             for(const parent_block of parent_asset.blocks){
                 let ind = -1
                 if (parent_block.name) ind = asset.blocks.findIndex(b => b.name === parent_block.name)
-                if (ind < 0) ind = asset.blocks.findIndex(b => b.id === parent_block.id);
-                let asset_block;
-                if(ind === -1){
-                    asset_block = {
+                else if (ind < 0) ind = asset.blocks.findIndex(b => b.id === parent_block.id);
+                if(ind < 0){
+                    asset.blocks.push({
                         ...parent_block,
                         props: {},
                         inherited: {...parent_block.computed},
-                    }
+                    })
                 }
                 else {
-                    asset_block = {
+                    asset.blocks[ind] = {
                         ...asset.blocks[ind],
                         inherited: {...parent_block.computed},
                     }
                 }
-                const old_block_props = assignPlainValueToAssetProps({}, asset_block.props ?? {});
-                const old_block_inherited = asset_block?.inherited ? assignPlainValueToAssetProps({}, asset_block.inherited ?? {}) : null;
-                const {normalProps, remapParentProps} = extractRemapParentProps(old_block_props);
-                let computed_props: AssetProps = {};
-                if (old_block_inherited) {
-                    if (remapParentProps){
-                        computed_props = remapAssetProps(old_block_inherited, remapParentProps);
-                    }
-                    else {
-                        computed_props = old_block_inherited;
-                    }
-                }
-                computed_props = { ...computed_props, ...normalProps};
-                asset_block.computed = convertAssetPropsToPlainObject(computed_props);
-                if(ind === -1){
-                    asset.blocks.push(asset_block);
-                }
-                else {
-                    asset.blocks[ind] = asset_block;
-                }
             }            
         }
+
         const existing_blocks: ProjectFileDbAssetBlock[] = [];
         for(const block of asset.blocks){
             if(!block.delete){
+
+                const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
+                const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
+
+                let block_computed = block_props;
+                if (block_inherited){
+                    const {normalProps, remapParentProps} = extractRemapParentProps(block_props);
+                    if (remapParentProps){
+                        block_computed = remapAssetProps(block_inherited, remapParentProps);
+                    }
+                    else {
+                        block_computed = block_inherited;
+                    }
+                    block_computed = { ...block_computed, ...normalProps};
+                }
+            
                 existing_blocks.push({
                     ...block,
-                    computed: convertAssetPropsToPlainObject({
-                        ...(block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : {}),
-                        ...assignPlainValueToAssetProps({}, block.props)
-                    })
+                    computed: convertAssetPropsToPlainObject(block_computed)
                 });
             }
         }
