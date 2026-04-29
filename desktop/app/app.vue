@@ -15,7 +15,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { useAppManager, useHead, useLocaleHead } from '#imports';
+import { createError, useAppManager, useHead, useLocaleHead } from '#imports';
 import {
   computed,
   onMounted,
