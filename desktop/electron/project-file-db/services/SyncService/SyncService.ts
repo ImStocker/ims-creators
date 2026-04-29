@@ -53,10 +53,26 @@ export class SyncService {
 
     }
 
-    init(){
-        this._synchronizationTimer = setInterval(() => {
-            this.syncProject();
-        }, 60 * 1000);
+    async changeAutoSynchronization(new_val: number){
+        await this.db.settings.setKey('syncWithCloud', new_val);
+        if(this._synchronizationTimer){
+            clearInterval(this._synchronizationTimer);
+            this._synchronizationTimer = undefined;
+        }
+        if(new_val > 0) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, new_val * 1000);
+        }
+    }
+
+    async init(){
+        const syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
+        if(syncWithCloudTime > 0) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, syncWithCloudTime * 1000);
+        }        
     }
 
     destroy(){
@@ -94,18 +110,16 @@ export class SyncService {
             sync_info.assets =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM assets
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
             
             sync_info.workspaces =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM workspaces
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
         }
         return sync_info;
     }
@@ -120,7 +134,7 @@ export class SyncService {
         error?: string | null
     }){
         let has_changes = false;
-        if(changes.status && changes.status !== this._currentState.status) {
+        if(changes.status !== undefined  && changes.status !== this._currentState.status) {
             this._currentState.status = changes.status;
             has_changes = true;
         }
@@ -128,7 +142,7 @@ export class SyncService {
             this._currentState.hasChanges = changes.hasChanges;
             has_changes = true;
         }
-        if(changes.error && changes.error !== this._currentState.error) {
+        if(changes.error !== undefined && changes.error !== this._currentState.error) {
             this._currentState.error = changes.error;
             has_changes = true;
         }
@@ -174,7 +188,7 @@ export class SyncService {
         try{
             this._syncProcessRunning = true;
             this.changeCurrentState({
-                status: SyncCurrentStateStatus.IN_PROCESS,
+                status: SyncCurrentStateStatus.IN_PROCESS
             });
             const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
                 INSERT INTO sync_logs (sync_start)
@@ -958,7 +972,6 @@ export class SyncService {
             creatorUserId: server_asset.creatorUserId,
             unread: server_asset.unread,
             hasImage: server_asset.hasImage,
-            localName: server_asset.localName
         }
         for(const block of server_asset.blocks){
             const local_block = await this.convertServerPropsToLocal(block);
@@ -981,4 +994,20 @@ export class SyncService {
         }
         return local_workspace; 
     }
+    
+    async markNotSyncedEntities(type: 'workspace' | 'asset', entries: {id: string, title?: string | null}[]){
+        if (entries.length === 0){
+            return;
+        }
+        await this.db.dataSource.createQueryRunner().query(`
+            INSERT INTO ${type === 'workspace' ? 'workspaces' : 'assets'} (id, title, need_sync)
+            VALUES ` + entries.map(i => `(?,?, ${SQLITE_NOW_STM})`).join(',') +
+            ` ON CONFLICT (id) DO UPDATE SET need_sync = ${SQLITE_NOW_STM}, title = COALESCE(EXCLUDED.title, title);
+        `, entries.map(ent => 
+            [ent.id, ent.title ?? null]).flat());
+        this.changeCurrentState({
+            hasChanges: true
+        })
+    }
+
 }

@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import type { ProjectFileDbWorkspace, ProjectFileDbAsset, ProjectFileDb } from '../ProjectFileDb';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { WORKSPACE_EXT } from '../services/FileSystemService';
 export const forbiddenFilenameCharsRegexp = new RegExp("[^- А-Яа-яa-zA-Z0-9,@.;'`!)(]+", 'g');
 
 export function getIndexRangeStartAndStep(
@@ -43,7 +44,7 @@ export function prepareFileBasenameByEntityTitle(title: string){
 }
 
 export function getAssetLocalPath(asset: { localName?: string, workspaceId: string | null}, db: ProjectFileDb): string {
-  const parent_local_path = getWorkspaceLocalPathById(asset.workspaceId, db)
+  const parent_local_path = getWorkspaceLocalPathFolderById(asset.workspaceId, db)
   return path.join(parent_local_path, asset?.localName ?? '');
 }
 
@@ -53,18 +54,18 @@ export function getAssetLocalPathById(asset_id: string, db: ProjectFileDb): stri
   return getAssetLocalPath(asset, db)
 }
 
-export function getWorkspaceLocalPath(workspace: { id: string, localName?: string, parentId: string | null} | null, db: ProjectFileDb): string {
+export function getWorkspaceLocalPathFolder(workspace: { id: string, localName?: string, parentId: string | null} | null, db: ProjectFileDb): string {
   if (!workspace || workspace.id === db.RootGddFolder.id){
     return db.localPath;
   }
   
-  const parent_local_path = getWorkspaceLocalPathById(workspace.parentId, db)
+  const parent_local_path = getWorkspaceLocalPathFolderById(workspace.parentId, db)
   return path.join(parent_local_path, workspace?.localName ?? '').replace(/\.imw\.json$/, '');
 }
 
-export function getWorkspaceLocalPathById(workspace_id: string | null, db: ProjectFileDb): string {
+export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db: ProjectFileDb): string {
   const workspace = workspace_id ? db.workspace.workspaces.byId.get(workspace_id) : null;
-  return getWorkspaceLocalPath(workspace ?? null, db)
+  return getWorkspaceLocalPathFolder(workspace ?? null, db)
 }
 
   export async function applyImsFileLocationChange(file: ProjectFileDbWorkspace | ProjectFileDbAsset, old_local_path: string, db: ProjectFileDb): Promise<string> {
@@ -80,7 +81,7 @@ export function getWorkspaceLocalPathById(workspace_id: string | null, db: Proje
     }
     assert(file.localName);
     const file_local_ext = getImsExtname(file.localName);
-    parent_path = getWorkspaceLocalPathById(parent_id, db);
+    parent_path = getWorkspaceLocalPathFolderById(parent_id, db);
     const suggest_title_with_ext = generateNextUniqueNameNumber(
         prepareFileBasenameByEntityTitle(file.title ?? 'untitled'),
         (name) => !fs.existsSync(path.join(parent_path, name )),
@@ -88,7 +89,7 @@ export function getWorkspaceLocalPathById(workspace_id: string | null, db: Proje
         file_local_ext
     );
     const new_w_file_path = path.join(parent_path, suggest_title_with_ext)
-    const old_w_file_path = old_local_path + (is_workspace ? '.imw.json' : '');
+    const old_w_file_path = old_local_path + (is_workspace ? WORKSPACE_EXT: '');
     // перемещаю информацию о файле (.im(a|w).json)
 
 

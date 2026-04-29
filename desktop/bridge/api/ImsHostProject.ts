@@ -176,7 +176,7 @@ export class ImsHostProject extends ImsHostBase {
         workspace_id: string,
     ): Promise<string> {
         const project_db = requestProjectDb(projectPath, this._window);
-        return project_db.workspace.getWorkspaceLocalPath(workspace_id);
+        return project_db.workspace.getWorkspaceLocalPathFolder(workspace_id);
     }
 
     async workspacesChange(

@@ -22,10 +22,6 @@ export default class DesktopAuthManager extends AuthManager{
     }
 
     async init() {
-        const user_info = this._apiManager.getTokenInfo();
-        if (user_info) {
-            await this._apiManager.ensureValidTokenInfo();
-        }
         this._avatarsCache = new EntityCache<AvatarEntity>({
             key: 'id',
             ttl: 1000 * 60 * 10,

@@ -33,4 +33,9 @@ export class ImsHostSync extends ImsHostBase {
         const project_db = requestProjectDb(projectPath, this._window);
         return await project_db.sync.resumeSyncProject();
     }
+
+    async changeAutoSynchronization(projectPath: string, new_val: number){
+        const project_db = requestProjectDb(projectPath, this._window);
+        return await project_db.sync.changeAutoSynchronization(new_val);
+    }
 }

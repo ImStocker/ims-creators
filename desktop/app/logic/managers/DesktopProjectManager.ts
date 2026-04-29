@@ -27,6 +27,18 @@ export default class DesktopProjectManager extends ProjectManager{
         };
     }
 
+    async createCloudProject(project_title: string){
+        return await this.createProject({
+                title: project_title,
+                template_ids: [],
+                menu_settings: {
+                  'menu-about': false,
+                  'menu-gamedesign': true,
+                  'menu-team': true,
+                },
+              })
+    }
+
     async createProject({
         title,
         template_ids,

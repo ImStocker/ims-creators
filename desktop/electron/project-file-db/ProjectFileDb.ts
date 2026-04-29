@@ -15,9 +15,11 @@ import { PROJECT_META_FOLDER, PROJECT_META_INDEX } from "./project-db-constants"
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import type { DataSource } from "typeorm";
 import { getProjectDataSource } from "./project-data-source";
-import { SyncService, type SyncCurrentState } from "./services/SyncService/SyncService";
+import { SyncService } from "./services/SyncService/SyncService";
 import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import { sendEventToProjectDbWindows } from "./project-registry";
+import { SettingsService } from "./services/SettingsService";
+import type { SyncCurrentState } from "#bridge/types/SyncTypes";
 
 export type ProjectFileDbAssetBlock = {
     id: string;
@@ -36,7 +38,7 @@ export type ProjectFileDbAssetBlock = {
 }
 
 export type ProjectFileDbAsset = AssetShort & {
-    localPath?: string;    
+    localName?: string;
     typeIds: string[];   
     parentIds: string[];
     ownTitle: string | null;
@@ -46,7 +48,18 @@ export type ProjectFileDbAsset = AssetShort & {
     references: AssetReferenceEntity[];
     lastViewedAt?: string | null;
 };
-export type ProjectFileDbWorkspace = Workspace & {
+export type ProjectFileDbWorkspace = {
+    id: string;
+    title: string;
+    name: string | null;
+    parentId: string | null;
+    projectId: string;
+    createdAt: string;
+    updatedAt: string;
+    rights: number;
+    index: number | null;    
+    props: AssetPropsPlainObject;
+    unread?: number;
     localName?: string;
 };
 
@@ -91,6 +104,7 @@ export class ProjectFileDb  {
     public project = new ProjectService(this);
     public api = new ApiService(this);
     public sync = new SyncService(this);
+    public settings = new SettingsService(this);
 
     public localPath: string; // Path to root of project. No slash at the end
 
@@ -160,7 +174,8 @@ export class ProjectFileDb  {
         await this._dataSource.runMigrations({
             transaction: 'all',
         });
-        this.sync.init();
+        await this.sync.init();
+        this.settings.init();
     }
 
     async init(initParams?: ProjectFileDbInitParams){
@@ -188,6 +203,7 @@ export class ProjectFileDb  {
         }
         await this.fileSystem.destroy();
         this.sync.destroy();
+        this.settings.destroy();
         this._info = null;
     }
 
@@ -216,9 +232,6 @@ export class ProjectFileDb  {
     }
 
     sendProjectChange(changes: ProjectContentChangeEventArg){
-        this.sync.changeCurrentState({
-            hasChanges: [...changes.aDelIds, ...changes.aUpsIds,...changes.wDelIds, ...changes.wUpsIds, ...changes.wTchIds].length > 0,
-        })
         sendEventToProjectDbWindows(this.localPath, 'contentChange', [changes])
     }
 

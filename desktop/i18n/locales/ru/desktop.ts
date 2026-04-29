@@ -8,6 +8,7 @@ export default {
     password: 'Пароль',
     signInHeader: 'Вход',
     newConfirmationCodeSent: 'Новый код подтверждения отправлен на почту',
+    needLoginForAction: 'Пожалуйста, войдите, чтобы выполнить это действие',
   },
   desktop: {
     fsSync: {
@@ -23,6 +24,7 @@ export default {
         syncWithCloud: 'Синхронизировать с облаком',
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
         openInCloud: 'Открыть в облаке',
+        repeat: 'Повторить',
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',
@@ -30,6 +32,8 @@ export default {
       notSyncedAssets: 'Несинхронизированные элементы',
       notSyncedWorkspaces: 'Несинхронизированные папки',
       noErrors: 'Нет ошибок',
+      createNew: 'Создать новый',
+      selectExist: 'Выбрать существующий'
     },
     welcome: {
       begin: 'Добро пожаловать в',
@@ -49,6 +53,7 @@ export default {
       typeTooltip: 'Тип',
       local: 'Локальный',
       localProject: 'Локальный проект',
+      cloudProject: 'Облачный проект',
       cloud: 'Облачный',
       name: 'Название',
       nameTooltip: 'Название',
@@ -71,7 +76,7 @@ export default {
       goToSite: 'Перейти на сайт',
       help: 'Справка',
       feedback: 'Обратная связь',
-      openOtherProject: 'Открыть другой проект',
+      openAnotherProject: 'Открыть другой проект',
       changeUser: 'Сменить пользователя',
       closeWindow: 'Закрыть окно',
       newWindow: 'Новое окно',
@@ -109,6 +114,13 @@ export default {
         maintenance: 'Сервис',
         openLogsFolder: 'Открыть папку с логами',
         autoUpdate: 'Проверять обновления при запуске приложения',
+        syncWithCloud: 'Автосинхронизация с облаком',
+        syncWithCloudTime: {
+          every30: 'Каждые 30 секунд',
+          every60: 'Каждую минуту',
+          every300: 'Каждые 5 минут',
+          'every-1': 'Нет'
+        }
       },
       close: 'Закрыть',
       plugins: {

@@ -7,6 +7,8 @@ export default {
     signUpHereLink: 'Sign up here',
     password: 'Password',
     signInHeader: 'Sign in',
+    needLoginForAction: 'Please, log in to perform this action',
+    newConfirmationCodeSent: 'New confirmation code has been sent to the mail',
   },
   desktop: {
     fsSync: {
@@ -22,6 +24,7 @@ export default {
         syncWithCloud: 'Synchronize with cloud',
         syncWithCloudEnd: 'Synchronization with cloud is completed',
         openInCloud: 'Open in cloud',
+        repeat: 'Repeat',
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',
@@ -29,6 +32,8 @@ export default {
       notSyncedAssets: 'Not synced assets',
       notSyncedWorkspaces: 'Not synced workspaces',
       noErrors: 'No errors',
+      createNew: 'Create new',
+      selectExist: 'Select existing'
     },
     welcome: {
       begin: 'Welcome to',
@@ -48,6 +53,7 @@ export default {
       typeTooltip: 'Type',
       local: 'Local',
       localProject: 'Local project',
+      cloudProject: 'Cloud project',
       cloud: 'Cloud',
       name: 'Name',
       nameTooltip: 'Name',
@@ -71,7 +77,7 @@ export default {
       help: 'Help',
       feedback: 'Feedback',
       changeUser: 'Change user',
-      openOtherProject: 'Open other project',
+      openAnotherProject: 'Open another project',
       closeWindow: 'Close window',
       newWindow: 'New window',
       website: 'Website',
@@ -108,6 +114,13 @@ export default {
         maintenance: 'Maintenance',
         openLogsFolder: 'Open folder with logs',
         autoUpdate: 'Check for updates when the app starts',
+        syncWithCloud: 'Auto syncing with the cloud',
+        syncWithCloudTime: {
+          every30: 'Every 30 sec',
+          every60: 'Every minute',
+          every300: 'Every 5 minutes',
+          'every-1': 'No'
+        }
       },
       close: 'Close',
       plugins: {

@@ -227,12 +227,16 @@ export default defineComponent({
   methods: {
     async checkExistsProject(val: string){
       this.hasWarning = await window.imshost.fs.exists(val);
+      return this.hasWarning;
     },
     buyLicense(){
       window.location.replace(`https://ims.cr5.space/app/prices`)
     },
     async createProject() {
       this.loading = true;
+      if(await this.checkExistsProject(this.projectPath)) {
+        return;
+      }
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
