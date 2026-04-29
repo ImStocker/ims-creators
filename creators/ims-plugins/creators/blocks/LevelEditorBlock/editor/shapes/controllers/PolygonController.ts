@@ -8,44 +8,15 @@ import {
 } from '../shapePropertyDescriptors';
 import type LevelEditorCanvasController from '../../LevelEditorCanvasController';
 
-function distanceToSegment(pointer, a, b) {
-  const ax = a.x,
-    ay = a.y;
-  const bx = b.x,
-    by = b.y;
-  const px = pointer.x,
-    py = pointer.y;
+function distanceToSegment(pointer: fabric.XY, A: fabric.XY, B: fabric.XY) {
+  const midX = (A.x + B.x) / 2;
+  const midY = (A.y + B.y) / 2;
 
-  const abx = bx - ax;
-  const aby = by - ay;
-  const len2 = abx * abx + aby * aby;
+  const dx = pointer.x - midX;
+  const dy = pointer.y - midY;
 
-  // Если отрезок вырожден в точку
-  if (len2 === 0) {
-    return Math.hypot(px - ax, py - ay);
-  }
-
-  // Проекция точки на прямую (параметр t)
-  let t = ((px - ax) * abx + (py - ay) * aby) / len2;
-
-  // Ограничиваем t отрезком [0, 1]
-  t = Math.max(0, Math.min(1, t));
-
-  // Ближайшая точка на отрезке
-  const closestX = ax + t * abx;
-  const closestY = ay + t * aby;
-
-  // Расстояние до ближайшей точки
-  return Math.hypot(px - closestX, py - closestY);
+  return Math.sqrt(dx * dx + dy * dy);
 }
-
-// function distanceToSegment(pointer: fabric.XY, a: fabric.XY, b: fabric.XY) {
-//   const num = Math.abs(
-//     (b.y - a.y) * pointer.x - (b.x - a.x) * pointer.y + b.x * a.y - b.y * a.x,
-//   );
-//   const den = Math.hypot(b.x - a.x, b.y - a.y);
-//   return den === 0 ? 0 : num / den;
-// }
 
 function findNearestEdge(
   points: fabric.XY[],
@@ -111,7 +82,9 @@ export default class PolygonController extends BaseShapeController<PolygonShape>
       if (editing) {
         polygon.cornerStyle = 'circle';
         polygon.hasBorders = false;
-        polygon.controls = fabric.controlsUtils.createPolyControls(polygon);
+        polygon.controls = fabric.controlsUtils.createPolyControls(polygon, {
+          mouseUpHandler: (_eventData, _transform) => {},
+        });
       } else {
         polygon.cornerStyle = 'rect';
         polygon.hasBorders = true;
@@ -122,6 +95,7 @@ export default class PolygonController extends BaseShapeController<PolygonShape>
     });
 
     let tempVertexIndex: number | null = null;
+
     let isModifying = false;
 
     polygon.on('added', () => {
@@ -157,8 +131,13 @@ export default class PolygonController extends BaseShapeController<PolygonShape>
         if (tempVertexIndex) {
           original_points.splice(tempVertexIndex, 1);
         }
-
-        const result = findNearestEdge(original_points, e.scenePoint, 15);
+        const transformed_points = original_points.map((p) =>
+          new fabric.Point(
+            p.x - polygon.pathOffset.x,
+            p.y - polygon.pathOffset.y,
+          ).transform(polygon.calcTransformMatrix()),
+        );
+        const result = findNearestEdge(transformed_points, e.scenePoint, 15);
         removeTempVertexIfExists();
         if (!result) return;
 
