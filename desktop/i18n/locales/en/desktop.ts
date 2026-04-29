@@ -7,6 +7,8 @@ export default {
     signUpHereLink: 'Sign up here',
     password: 'Password',
     signInHeader: 'Sign in',
+    needLoginForAction: 'Please, log in to perform this action',
+    newConfirmationCodeSent: 'New confirmation code has been sent to the mail',
   },
   desktop: {
     fsSync: {
@@ -22,6 +24,7 @@ export default {
         syncWithCloud: 'Synchronize with cloud',
         syncWithCloudEnd: 'Synchronization with cloud is completed',
         openInCloud: 'Open in cloud',
+        repeat: 'Repeat',
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',

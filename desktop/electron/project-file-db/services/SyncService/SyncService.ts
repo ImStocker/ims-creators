@@ -110,18 +110,16 @@ export class SyncService {
             sync_info.assets =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM assets
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
             
             sync_info.workspaces =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM workspaces
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
         }
         return sync_info;
     }
@@ -136,7 +134,7 @@ export class SyncService {
         error?: string | null
     }){
         let has_changes = false;
-        if(changes.status && changes.status !== this._currentState.status) {
+        if(changes.status !== undefined  && changes.status !== this._currentState.status) {
             this._currentState.status = changes.status;
             has_changes = true;
         }
@@ -144,7 +142,7 @@ export class SyncService {
             this._currentState.hasChanges = changes.hasChanges;
             has_changes = true;
         }
-        if(changes.error && changes.error !== this._currentState.error) {
+        if(changes.error !== undefined && changes.error !== this._currentState.error) {
             this._currentState.error = changes.error;
             has_changes = true;
         }
@@ -190,7 +188,7 @@ export class SyncService {
         try{
             this._syncProcessRunning = true;
             this.changeCurrentState({
-                status: SyncCurrentStateStatus.IN_PROCESS,
+                status: SyncCurrentStateStatus.IN_PROCESS
             });
             const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
                 INSERT INTO sync_logs (sync_start)

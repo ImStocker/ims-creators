@@ -12,7 +12,7 @@
                 class="ri-loop-right-line"
               ></i>
           </button>
-          <i v-if="hasSyncError" 
+          <i v-if="hasSyncError && !inProcess" 
             class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
             :title="'Error: ' + hasSyncError"
           ></i>
@@ -137,19 +137,24 @@ export default defineComponent({
           .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
       }
       else {
-        const user_licenses = await this.$getAppManager()
-          .get<DesktopAuthManager>(AuthManager)
-          .getUserLicense();
-        const has_license = user_licenses.list.find(license => license.features.desktopSync);
-        const project_info = this.projectInfo;
-        if(project_info && (project_info.license?.features.desktopSync || has_license)){
-          const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
-          if(res){
-            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
+        try {
+          const user_licenses = await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .getUserLicense();
+          const has_license = user_licenses.list.find(license => license.features.desktopSync);
+          const project_info = this.projectInfo;
+          if(project_info && (project_info.license?.features.desktopSync || has_license)){
+            const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
+            if(res){
+              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
+            }
+          }
+          else {
+            await this.$getAppManager().get(DialogManager).show(BuyLicenseDialog, {});
           }
         }
-        else {
-          await this.$getAppManager().get(DialogManager).show(BuyLicenseDialog, {});
+        catch(err: any) {
+          this.$getAppManager().get(UiManager).showError(err.message);
         }
       }
     },

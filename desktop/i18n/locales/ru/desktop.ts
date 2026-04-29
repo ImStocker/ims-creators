@@ -8,6 +8,7 @@ export default {
     password: 'Пароль',
     signInHeader: 'Вход',
     newConfirmationCodeSent: 'Новый код подтверждения отправлен на почту',
+    needLoginForAction: 'Пожалуйста, войдите, чтобы выполнить это действие',
   },
   desktop: {
     fsSync: {
@@ -23,6 +24,7 @@ export default {
         syncWithCloud: 'Синхронизировать с облаком',
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
         openInCloud: 'Открыть в облаке',
+        repeat: 'Повторить',
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',

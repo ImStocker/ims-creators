@@ -146,6 +146,7 @@ export default defineComponent({
   },
   async mounted() {
     this.isLoading = true;
+    this.projectTitle = this.projectInfo?.title ?? '';
     try {
       this.projects = await this.$getAppManager()
               .get(ApiManager)

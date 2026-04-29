@@ -16,12 +16,21 @@
           <ul>
             <li v-for="asset of syncErrors.assets"
                 :key="asset.id">
-              <div class="SyncManageDialog-content-item">
-                {{asset.title ?? asset.id}}
-                <div v-if="asset.conflict || asset.conflict_message"> 
-                  ({{ asset.conflict_message ? asset.conflict_message : asset.conflict }})
+                <div class="SyncManageDialog-content-item">
+                  <div>
+                    {{asset.title ?? asset.id}}
+                    <div v-if="asset.conflict || asset.conflict_message" class="SyncManageDialog-content-item-error"> 
+                      ({{ asset.conflict_message ? asset.conflict_message : asset.conflict }})
+                    </div>
+                  </div>
+                  <button class="is-button is-button-icon"
+                    @click="repeatAssetSync(asset.id)"
+                    :class="{ loading: repeatingAssetIds.find(id => id === asset.id)}"
+                    :disabled="!!repeatingAssetIds.find(id => id === asset.id)"
+                    :title="$t('desktop.fsSync.menu.repeat')">
+                    <i class="ri-loop-right-line"></i>
+                  </button>
                 </div>
-              </div>
             </li>
           </ul>
         </div>
@@ -33,12 +42,23 @@
             <li v-for="workspace of syncErrors.workspaces"
               :key="workspace.id"
             >
-              <div class="SyncManageDialog-content-item">
-                {{workspace.title ?? workspace.id}}
-                <div v-if="workspace.conflict || workspace.conflict_message"> 
-                  ({{ workspace.conflict_message ? workspace.conflict_message : workspace.conflict }})
+                <div class="SyncManageDialog-content-item">
+                  <div>
+                    {{workspace.title ?? workspace.id}}
+                    <div v-if="workspace.conflict || workspace.conflict_message" class="SyncManageDialog-content-item-error"> 
+                      ({{ workspace.conflict_message ? workspace.conflict_message : workspace.conflict }})
+                    </div>
+                  </div>
+                  <button
+                    class="is-button is-button-icon"
+                    @click="repeatWorkspaceSync(workspace.id)"
+                    :class="{ loading: repeatingWorkspaceIds.find(id => id === workspace.id)}"
+                    :disabled="!!repeatingWorkspaceIds.find(id => id === workspace.id)"
+                    :title="$t('desktop.fsSync.menu.repeat')"
+                  >
+                    <i class="ri-loop-right-line"></i>
+                  </button>
                 </div>
-              </div>
             </li>
           </ul>
         </div>
@@ -86,6 +106,8 @@ export default defineComponent({
     return {
       isLoading: true,
       syncErrors: undefined as SyncInfo | undefined,
+      repeatingAssetIds: [] as string[],
+      repeatingWorkspaceIds: [] as string[],
     }
   },
   async mounted() {
@@ -110,8 +132,21 @@ export default defineComponent({
       this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
       this.close();
     },
-    async resyncAssetsAndWorkspaces(){
-      //await this.$getAppManager().get(DesktopSyncManager).resyncAssetsAndWorkspaces();
+    async repeatAssetSync(asset_id: string){
+      this.repeatingAssetIds.push(asset_id)
+      await this.$getAppManager().get(DesktopSyncManager).resyncAssetsAndWorkspaces([asset_id], []);
+      let ind = this.repeatingAssetIds.findIndex(id => id === asset_id)
+      if(ind > -1){
+        this.repeatingAssetIds.splice(ind , 1);
+      }
+    },
+    async repeatWorkspaceSync(workspace_id: string){
+      this.repeatingWorkspaceIds.push(workspace_id)
+      await this.$getAppManager().get(DesktopSyncManager).resyncAssetsAndWorkspaces([], [workspace_id]);
+            let ind = this.repeatingWorkspaceIds.findIndex(id => id === workspace_id)
+      if(ind > -1){
+        this.repeatingWorkspaceIds.splice(ind , 1);
+      }
     },
   }
 })
@@ -129,6 +164,12 @@ export default defineComponent({
 }
 .SyncManageDialog-content-item{
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.SyncManageDialog-content-item-error{
+  color: var(--color-main-error);
+  display: inline;
 }
 .Dialog-buttons {
   display: flex;
