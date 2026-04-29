@@ -37,9 +37,7 @@ export default defineComponent({
       return this.$getAppManager().$appConfiguration.isDesktop;
     },
     menuAdditionalOptions(): MenuListItem[] {
-      const project_info = this.$getAppManager()
-        .get(ProjectManager)
-        .getProjectInfo();
+      const project_info = this.projectInfo;
       if (!project_info) return [];
       const user_role = this.$getAppManager()
         .get(ProjectManager)
@@ -62,17 +60,6 @@ export default defineComponent({
             }
           : null,
         ...this.getImportExportMenuItems(),
-        user_role && !this.isDesktop
-          ? {
-              title: this.$t('mainMenu.sync'),
-              action: () => {
-                openProjectLink(this.$getAppManager(), project_info, {
-                  name: 'project-sync',
-                });
-              },
-              icon: 'ri-link',
-            }
-          : null,
       ].filter((x) => x) as MenuListItem[];
     },
     gddWorkspace() {
@@ -123,6 +110,24 @@ export default defineComponent({
                       .get(ProjectContentManager)
                       .exportWorkspaceToJSON(gdd_workspace),
                 },
+                {
+                  title: this.$t('gddPage.exportWithCustomFormat'),
+                  action: () =>
+                    this.$getAppManager()
+                      .get(ProjectContentManager)
+                      .exportCollectionWithCustomFormat(gdd_workspace)
+                },
+                {
+                  type: 'separator'
+                },
+                {
+                  title: this.$t('autoExport.setupAutoExport'),
+                  action: () => {
+                    openProjectLink(this.$getAppManager(), this.projectInfo!, {
+                      name: 'project-autoexport',
+                    })
+                  },
+                }
               ],
             }
           : null,

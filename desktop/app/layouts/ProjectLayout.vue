@@ -295,6 +295,8 @@ $header-height: 60px;
   background-color: var(--local-bg-color);
   --local-bg-color: var(--editor-bg-color);
   --local-box-color: var(--editor-box-color);
+
+  --panel-bg-color: var(--local-box-color);
 }
 .switcherButton:disabled{
   cursor: default;
