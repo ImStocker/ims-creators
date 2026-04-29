@@ -20,6 +20,8 @@ import { WORKSPACE_BASE_ORDERING } from "../project-db-constants";
 import { WORKSPACE_EXT } from "./FileSystemService";
 import { SQLITE_NOW_STM, type WorkspaceEntity } from "./SyncService/SyncService";
    
+export type WorkspaceServiceChangeWorkspaceRequest = ChangeWorkspaceRequest & { localName?: string }
+
 export class WorkspaceService implements IProjectDatabaseWorkspace{
 
     workspaces = new ProjectFileDbCollection<ProjectFileDbWorkspace>();
@@ -135,7 +137,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             return 0;
         });
     }
-    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<Workspace>> {
+    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<ProjectFileDbWorkspace>> {
         let workspaces = await this._searchWorkspaces( query.where ? query.where : {});
         workspaces = await this._sortWorkspaces(workspaces, query.order ?? []);
         const total = workspaces.length;
@@ -155,20 +157,10 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         } 
         return res;
     }
-    async workspacesCreate(params: ChangeWorkspaceRequest, options?: {fsProcessed?: true}): Promise<Workspace> {
+    async workspacesCreate(params: WorkspaceServiceChangeWorkspaceRequest, options?: {fsProcessed?: true}): Promise<Workspace> {
         const workspace_id = params.id ?? uuidv4();
         const workspace_props = assignPlainValueToAssetProps({}, params.props ?? {})
-        const workspace_file_basename = params.title ? params.title : workspace_id;
-        let parent_workspace_path = this.db.localPath;
-        if(params.parentId) {
-            parent_workspace_path = getWorkspaceLocalPathById(params.parentId, this.db)
-        }
-        const suggest_title = generateNextUniqueNameNumber(
-            (workspace_file_basename ?? 'untitled').replace(forbiddenFilenameCharsRegexp, '_').trim(),
-            (name) => !fs.existsSync(node_path.join(parent_workspace_path, name + '')),
-        );
-        const suggest_title_with_ext = suggest_title + '.imw.json'
-        const workspace_local_path_meta = node_path.join(parent_workspace_path, suggest_title_with_ext);
+
         const workspace: ProjectFileDbWorkspace = {
             id: workspace_id,
             title: params.title ?? '',
@@ -180,10 +172,23 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             rights: AssetRights.FULL_ACCESS,
             index: params.index ?? null,
             props: workspace_props,
-            localName: suggest_title_with_ext,
+            localName: params.localName
         };
         this.workspaces.add(workspace);
+
         if(!options?.fsProcessed){
+            const workspace_file_basename = params.title ? params.title : workspace_id;
+            let parent_workspace_path = this.db.localPath;
+            if(params.parentId) {
+                parent_workspace_path = getWorkspaceLocalPathById(params.parentId, this.db)
+            }
+            const suggest_title = generateNextUniqueNameNumber(
+                (workspace_file_basename ?? 'untitled').replace(forbiddenFilenameCharsRegexp, '_').trim(),
+                (name) => !fs.existsSync(node_path.join(parent_workspace_path, name + '')),
+            );
+            const suggest_title_with_ext = suggest_title + WORKSPACE_EXT
+            workspace.localName = suggest_title_with_ext;
+            const workspace_local_path_meta = node_path.join(parent_workspace_path, suggest_title_with_ext);
             const workspace_local_path_folder = workspace_local_path_meta.replace(/\.imw\.json$/, '');
             await this.db.fileSystem.expectFsChange([
                 workspace_local_path_meta,
@@ -193,6 +198,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 await fs.promises.mkdir(workspace_local_path_folder);
             })
         }
+
         await this.markNotSyncedWorkspace(workspace_id);
         
         this.db.sendProjectChange({
@@ -293,7 +299,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         if (!workspace.localName) return;
 
         const local_path_folder = getWorkspaceLocalPath(workspace, this.db)
-        const local_path_meta = local_path_folder + ".imw.json";
+        const local_path_meta = local_path_folder + WORKSPACE_EXT;
 
         await this.db.fileSystem.expectFsChange([
             local_path_folder, local_path_meta
@@ -461,9 +467,9 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 prepareFileBasenameByEntityTitle(workspace.title ?? 'untitled'),
                 (val) => !used_names.has(val),
                 ' - ',
-                 '.imw.json'
+                WORKSPACE_EXT
             );
-            const basename = name.substring(0, name.length - '.imw.json'.length)
+            const basename = name.substring(0, name.length - WORKSPACE_EXT.length)
             used_names.add(name);
             const writeStream = new PassThrough();
             targetZip.file((subfolder ? subfolder + "/" : '') + name, writeStream);

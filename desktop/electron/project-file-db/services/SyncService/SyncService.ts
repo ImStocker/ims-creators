@@ -972,7 +972,6 @@ export class SyncService {
             creatorUserId: server_asset.creatorUserId,
             unread: server_asset.unread,
             hasImage: server_asset.hasImage,
-            localName: server_asset.localName
         }
         for(const block of server_asset.blocks){
             const local_block = await this.convertServerPropsToLocal(block);

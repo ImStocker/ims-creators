@@ -9,6 +9,7 @@ import * as node_path from 'path';
 import path from 'node:path';
 import log from 'electron-log/main';
 import { PROJECT_META_SETTINGS } from '../project-db-constants';
+import { WORKSPACE_EXT } from "./FileSystemService";
 
 function saveStreamToTempFile(stream: Readable,){
     return new Promise<{
@@ -45,7 +46,7 @@ async function unzipArchive(path_from: string, path_to: string) {
     const data = await fs.promises.readFile(path_from);
     const zip = await JSZip.loadAsync(data)
     for (const filename of Object.keys(zip.files)){
-        if (['gdd.imw.json'].includes(filename)) continue;
+        if (['gdd' + WORKSPACE_EXT].includes(filename)) continue;
         const content = zip.files[filename];
         const new_filename = filename.replace(/^gdd\//, '');
         const dest = node_path.join(path_to, new_filename);

@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import type { ProjectFileDbWorkspace, ProjectFileDbAsset, ProjectFileDb } from '../ProjectFileDb';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { WORKSPACE_EXT } from '../services/FileSystemService';
 export const forbiddenFilenameCharsRegexp = new RegExp("[^- А-Яа-яa-zA-Z0-9,@.;'`!)(]+", 'g');
 
 export function getIndexRangeStartAndStep(
@@ -88,7 +89,7 @@ export function getWorkspaceLocalPathById(workspace_id: string | null, db: Proje
         file_local_ext
     );
     const new_w_file_path = path.join(parent_path, suggest_title_with_ext)
-    const old_w_file_path = old_local_path + (is_workspace ? '.imw.json' : '');
+    const old_w_file_path = old_local_path + (is_workspace ? WORKSPACE_EXT: '');
     // перемещаю информацию о файле (.im(a|w).json)
 
 

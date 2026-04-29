@@ -38,7 +38,7 @@ export type ProjectFileDbAssetBlock = {
 }
 
 export type ProjectFileDbAsset = AssetShort & {
-    localPath?: string;    
+    localName?: string;
     typeIds: string[];   
     parentIds: string[];
     ownTitle: string | null;

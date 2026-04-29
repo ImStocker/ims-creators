@@ -60,7 +60,7 @@ async function initApp(){
       log.log("App ready")
 
       initImsHostApi();
-      initMainTokenStorage();
+      await initMainTokenStorage();
 
       protocol.handle('localfile', async (request) => {
         try {
