@@ -48,7 +48,18 @@ export type ProjectFileDbAsset = AssetShort & {
     references: AssetReferenceEntity[];
     lastViewedAt?: string | null;
 };
-export type ProjectFileDbWorkspace = Workspace & {
+export type ProjectFileDbWorkspace = {
+    id: string;
+    title: string;
+    name: string | null;
+    parentId: string | null;
+    projectId: string;
+    createdAt: string;
+    updatedAt: string;
+    rights: number;
+    index: number | null;    
+    props: AssetPropsPlainObject;
+    unread?: number;
     localName?: string;
 };
 
@@ -221,9 +232,6 @@ export class ProjectFileDb  {
     }
 
     sendProjectChange(changes: ProjectContentChangeEventArg){
-        this.sync.changeCurrentState({
-            hasChanges: [...changes.aDelIds, ...changes.aUpsIds,...changes.wDelIds, ...changes.wUpsIds, ...changes.wTchIds].length > 0,
-        })
         sendEventToProjectDbWindows(this.localPath, 'contentChange', [changes])
     }
 

@@ -10,6 +10,9 @@ import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
 import path from "node:path";
 import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../project-db-constants";
 import log from 'electron-log/main';
+import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
+import { mergeProjectContentChangeEventArgs } from "~ims-app-base/logic/types/mergeProjectContentChangeEventArgs";
+import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
 type FileSystemExpectChange = {
     filepaths: string[]
@@ -80,6 +83,8 @@ export class FileSystemService{
                 asset.workspaceId = parentWorkspaceId;
                 asset.createdAt = created_at;
                 asset.updatedAt = updated_at;
+                asset.projectId = this.db.info.id ?? '';
+                asset.rights = AssetRights.FULL_ACCESS;
                 return {
                     type: 'asset',
                     localPath: local_path,
@@ -92,6 +97,8 @@ export class FileSystemService{
                 workspace_info.parentId = parentWorkspaceId;
                 workspace_info.createdAt = created_at;
                 workspace_info.updatedAt = updated_at;
+                workspace_info.projectId = this.db.info.id ?? '';
+                workspace_info.rights = AssetRights.FULL_ACCESS;
                 return {
                     type: 'workspace',
                     localPath: local_path,
@@ -358,8 +365,27 @@ export class FileSystemService{
             const root_path = this.db.localPath;
             const deleting_assets = new Map<string, ProjectFileDbAsset>()
             const deleting_workspaces = new Map<string, ProjectFileDbWorkspace>();
-            const upserting_assets = new Map<string, ProjectFileDbAsset>()
-            const upserting_workspaces = new Map<string, ProjectFileDbWorkspace>()
+
+            const tx = new ProjectFileDbTransaction(this.db)
+            const upsertWorkspace = async (localPath: string, workspace: ProjectFileDbWorkspace) => {
+                const exist = this._findExistentEntryByLocalPath(localPath);
+                deleting_workspaces.delete(workspace.id) // Workspace moved
+                tx.changeWorkspace(
+                    exist?.type === 'workspace' ? exist.workspace : null,
+                    workspace
+                )
+                await tx.flush({
+                    fsProcessed: true
+                })
+            }
+            const upsertAsset = async (localPath: string, asset: ProjectFileDbAsset) => {
+                const exist = this._findExistentEntryByLocalPath(localPath);
+                deleting_assets.delete(asset.id) // Asset moved
+                tx.changeAsset(
+                    exist?.type === 'asset' ? exist.asset : null,
+                    asset,
+                )
+            }
 
             for (const event of events){
                 const local_path = event.path.substring(this.db.localPath.length + 1);
@@ -375,15 +401,15 @@ export class FileSystemService{
                             parent_workspace_id,
                             root_path
                         )
-                        upserting_workspaces.set(
+                        await upsertWorkspace(
                             loaded_new_dir.localPath,
                             loaded_new_dir.workspace
                         )
                         for (const e of loaded_new_dir.content.workspaces){
-                            upserting_workspaces.set(e.localPath, e.entry)
+                            await upsertWorkspace(e.localPath, e.entry)
                         }
                         for (const e of loaded_new_dir.content.assets){
-                            upserting_assets.set(e.localPath, e.entry)
+                            await upsertAsset(e.localPath, e.entry)
                         }
                     }
                     else {
@@ -393,10 +419,10 @@ export class FileSystemService{
                             root_path
                         )
                         if (new_entry?.type === 'asset') {
-                            upserting_assets.set(new_entry.localPath, new_entry.asset)
+                            await upsertAsset(new_entry.localPath, new_entry.asset)
                         }
                         else if (new_entry?.type === 'workspace'){
-                            upserting_workspaces.set(new_entry.localPath, new_entry.workspace)
+                            await upsertWorkspace(new_entry.localPath, new_entry.workspace)
                         }
                     }
                 }
@@ -407,73 +433,17 @@ export class FileSystemService{
                 }
             }
 
-
-            for (const [local_path, ups_workspace] of upserting_workspaces){
-                const exist = this._findExistentEntryByLocalPath(local_path);
-                deleting_workspaces.delete(ups_workspace.id) // Workspace moved
-                if (exist?.type === 'workspace'){
-                    await this.db.workspace.workspacesChange(
-                        ups_workspace.id,
-                        ups_workspace,
-                        {
-                            fsProcessed: true
-                        }
-                    )
-
-                }
-                else {
-                    await this.db.workspace.workspacesCreate(
-                        ups_workspace, 
-                        {
-                            fsProcessed: true
-                        })
-                }
-            }
-
-            for (const [local_path, ups_asset] of upserting_assets){
-                // TODO: check parent order?
-                const exist = this._findExistentEntryByLocalPath(local_path);
-                const asset = this.db.sync.prepareAssetToServer(ups_asset);
-                deleting_assets.delete(ups_asset.id) // Asset moved
-                if (exist?.type === 'asset'){
-                    await this.db.asset.assetsChange(
-                    {
-                        where: {
-                            id: ups_asset.id,
-                        },
-                        set: asset,
-                    }, {
-                        fsProcessed: true
-                    })
-                } else {
-                    await this.db.asset.assetsCreate(
-                    {
-                        set: asset,
-                        id: ups_asset.id,
-                        localName: ups_asset.localName
-                    }, {
-                        fsProcessed: true
-                    })
-                }
-            }
-
             // Apply delete
-            if(deleting_assets.size > 0) {
-                await this.db.asset.assetsDelete(
-                    {
-                        id: [...deleting_assets.keys()],
-                    },
-                    {
-                        pid: this.db.info.id,
-                        fsProcessed: true
-                    }
-                )
+            for (const deleting_asset of deleting_assets.values()){
+                tx.changeAsset(deleting_asset, null)
             }
-            for (const deleting_workspace_id of deleting_workspaces.keys()){
-                await this.db.workspace.workspacesDelete(deleting_workspace_id, {
-                    fsProcessed: true
-                });
+            for (const deleting_workspace of deleting_workspaces.values()){
+                tx.changeWorkspace(deleting_workspace, null)
             }
+
+            await tx.commit({
+                fsProcessed: true
+            })
         }
         catch (err: any){
             log.error('FileSystemService: handling fs events', err.message, err.stack)
@@ -584,33 +554,10 @@ export class FileSystemService{
             return {...workspace, rights: 1}
         }));
 
-        // User
-        // await new Promise((res) => setTimeout(res, 5000))
-        // debugger;
         const user_files = await this.loadWorkspaceContentFromPath(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
-        this.db.asset.assets.addMany(user_files.assets.map(asset => {
-            const changed_asset: ProjectFileDbAsset = { 
-                ...asset.entry,
-                projectId: this.db.info.id,
-                rights: 5
-            }
-            if (!changed_asset.workspaceId){
-                changed_asset.workspaceId = this.db.RootGddFolder.id;
-            }
-            return changed_asset
-        }));
+        this.db.asset.assets.addMany(user_files.assets.map(asset => asset.entry));
         this.db.workspace.workspaces.add(this.db.RootGddFolder)
-        this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => {
-            const changed_workspace =  {
-                ...workspace.entry, 
-                projectId: this.db.info.id,
-                rights: 5
-            }
-            if (!changed_workspace.parentId){
-                changed_workspace.parentId = this.db.RootGddFolder.id;
-            }
-            return changed_workspace
-        }));
+        this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
         
         this._initWatcher();
     }

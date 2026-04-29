@@ -996,4 +996,20 @@ export class SyncService {
         }
         return local_workspace; 
     }
+    
+    async markNotSyncedEntities(type: 'workspace' | 'asset', entries: {id: string, title?: string | null}[]){
+        if (entries.length === 0){
+            return;
+        }
+        await this.db.dataSource.createQueryRunner().query(`
+            INSERT INTO ${type === 'workspace' ? 'workspaces' : 'assets'} (id, title, need_sync)
+            VALUES ` + entries.map(i => `(?,?, ${SQLITE_NOW_STM})`).join(',') +
+            ` ON CONFLICT (id) DO UPDATE SET need_sync = ${SQLITE_NOW_STM}, title = COALESCE(EXCLUDED.title, title);
+        `, entries.map(ent => 
+            [ent.id, ent.title ?? null]).flat());
+        this.changeCurrentState({
+            hasChanges: true
+        })
+    }
+
 }
