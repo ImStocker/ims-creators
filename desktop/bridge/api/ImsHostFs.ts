@@ -49,6 +49,14 @@ export class ImsHostFs extends ImsHostBase {
       recursive
     })
   }
+  
+  async deleteFile(path: string): Promise<void>{
+    await fs.promises.unlink(path);
+  }
+
+  async deleteFolder(path: string): Promise<void>{
+    await fsExtra.remove(path)
+  }
 
   showSelectDirectoryDialog(
     options?: OpenDialogOptions,
