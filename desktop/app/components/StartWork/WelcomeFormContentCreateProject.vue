@@ -29,9 +29,9 @@
         </ValueSwitcher>
       </div>
       <div v-if="needAuth || needLicense">
-        <div class="WelcomeFormContentCreateProject-message" v-if="userInfo">
-          {{ $t('desktop.welcome.' + (needLicense ? 'needLicense' : 'needAuth')) }}
-          <button v-if="needLicense" 
+        <div class="WelcomeFormContentCreateProject-message">
+          {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
+          <button v-if="needLicense && userInfo" 
             class="is-button accent" 
             @click="buyLicense()">
             {{$t('desktop.welcome.buy')}}
@@ -41,6 +41,12 @@
             class="WelcomeFormContentStart-login"
             :open-external="true"
         />
+        <!-- <button 
+          v-if="userInfo && needLicense"
+          class="is-button accent"
+          @click="logout">
+
+        </button> -->
       </div>
       <template v-else>
         <div class="WelcomeFormContentCreateProject-Action">
@@ -241,7 +247,9 @@ export default defineComponent({
             .getUserLicense();
       }
       catch(err: any){
-        this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+        if(this.params.projectType !== 'cloud'){
+          this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+        }
       }
     },
     async checkExistsProject(val: string){
