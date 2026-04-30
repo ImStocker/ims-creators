@@ -30,7 +30,6 @@ export default class DesktopProjectManager extends ProjectManager{
     async createCloudProject(project_title: string){
         return await this.createProject({
                 title: project_title,
-                template_ids: [],
                 menu_settings: {
                   'menu-about': false,
                   'menu-gamedesign': true,
@@ -41,19 +40,15 @@ export default class DesktopProjectManager extends ProjectManager{
 
     async createProject({
         title,
-        template_ids,
         menu_settings,
-        init_script,
         isPublicTasks,
     }: {
         title: string;
-        template_ids?: string[];
         menu_settings?: {
         'menu-gamedesign': boolean;
         'menu-team': boolean;
         'menu-about': boolean;
         };
-        init_script?: string;
         isPublicTasks?: boolean;
     }): Promise<ProjectFullInfo> {
         const timezone_shift = -new Date().getTimezoneOffset();
@@ -62,9 +57,7 @@ export default class DesktopProjectManager extends ProjectManager{
         const params: any = {
             title,
             timezoneShift: timezone_shift,
-            templateIds: template_ids ?? [],
             lang: userInfo?.language ? userInfo.language : 'en',
-            initScript: init_script,
             isPublicGdd: false,
             isPublicTasks: !!isPublicTasks,
             isPublicAbout: isPublicAbout,

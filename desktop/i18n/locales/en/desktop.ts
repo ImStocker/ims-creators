@@ -68,7 +68,8 @@ export default {
       sameProjectTitle: 'Project at given path already exists',
       needAuth: 'Please enter to your PRO-account to create cloud project',
       needLicense: 'Please buy PRO-license to create cloud project',
-      buy: 'Buy',
+      buy: 'Buy',      
+      dataNotLoad: 'There was problem loading your data',
     },
     mainMenu: {
       settings: 'Settings',

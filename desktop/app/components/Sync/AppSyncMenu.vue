@@ -17,7 +17,7 @@
             :title="'Error: ' + hasSyncError"
           ></i>
           <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
-          <i v-else-if="syncInfo && !inProcess && syncInfo.hasChanges" 
+          <i v-else-if="projectInfo?.id && syncInfo && !inProcess && syncInfo.hasChanges" 
             class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
         </template>
         <menu-list :menu-list="syncMenuList"></menu-list>

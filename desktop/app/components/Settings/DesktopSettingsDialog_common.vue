@@ -42,7 +42,7 @@ export default defineComponent({
   },
   computed: {
     formSchema(): FormSchema {
-        return [
+        const schema = [
             {
                 caption: this.$t('desktop.settings.fields.language'),
                 prop: 'appLanguage',
@@ -89,7 +89,9 @@ export default defineComponent({
                     value: this.needAutoUpdate,
                 },
             },
-            {
+        ]
+        if(this.projectInfo?.id){
+            schema.push({
                 caption: this.$t('desktop.settings.fields.syncWithCloud'),
                 prop: 'syncWithCloud',
                 editor: ImsSelect,
@@ -99,14 +101,15 @@ export default defineComponent({
                     options: [30, 60, 300, -1].map(value => 
                         {
                             return {
-                                value,
+                                value: value as any,
                                 title: this.$t('desktop.settings.fields.syncWithCloudTime.every' + value)
                             }
                         }
                     )
                 }
-            },
-        ]
+            })
+        }
+        return schema;
     },
     formSchemaFiltered(){
         if(this.search)

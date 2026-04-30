@@ -25,10 +25,11 @@
                   </div>
                   <button class="is-button is-button-icon"
                     @click="repeatAssetSync(asset.id)"
-                    :class="{ loading: repeatingAssetIds.find(id => id === asset.id)}"
                     :disabled="!!repeatingAssetIds.find(id => id === asset.id)"
                     :title="$t('desktop.fsSync.menu.repeat')">
-                    <i class="ri-loop-right-line"></i>
+                    <i
+                      class="ri-loop-right-line"
+                      :class="{ 'spinning-icon': repeatingAssetIds.find(id => id === asset.id) }"></i>
                   </button>
                 </div>
             </li>
@@ -183,5 +184,17 @@ export default defineComponent({
   border-radius: 10px;
   padding: 10px 15px;
   margin-bottom: 10px;
+}
+.spinning-icon {
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

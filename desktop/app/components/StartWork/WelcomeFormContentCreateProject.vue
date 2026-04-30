@@ -29,7 +29,7 @@
         </ValueSwitcher>
       </div>
       <div v-if="needAuth || needLicense">
-        <div class="WelcomeFormContentCreateProject-message">
+        <div class="WelcomeFormContentCreateProject-message" v-if="userInfo">
           {{ $t('desktop.welcome.' + (needLicense ? 'needLicense' : 'needAuth')) }}
           <button v-if="needLicense" 
             class="is-button accent" 
@@ -86,7 +86,7 @@
     <AdvancedForm v-if="!needAuth && !needLicense" :project-folder-name="params.projectFolderName" @update:folder-name="params.projectFolderName = $event"></AdvancedForm>
     <div class="WelcomeFormContentCreateProject-create" v-if="!needAuth && !needLicense">
       <button class="is-button accent" 
-        :class="{ loading }" @click="createProject" 
+        :class="{ loading: loading && !hasWarning }" @click="createProject" 
         :disabled="!canCreate || hasWarning">
         {{$t('desktop.welcome.create')}}
       </button>
@@ -167,13 +167,18 @@ export default defineComponent({
     },
     projectName(new_val: string){
       this.params.projectFolderName = new_val.trim().replace(forbiddenFilenameCharsRegexp, '_');
+    },
+    async userInfo(){
+      await this.updateUserLicense();
+    },
+    async params(){
+      if(this.params.projectType === 'cloud'){
+        await this.updateUserLicense();
+      }
     }
   },
   async mounted(){
     this.params.projectLocation = await window.imshost.shell.getDocumentsFolder();
-    this.userLicenses = await this.$getAppManager()
-        .get<DesktopAuthManager>(AuthManager)
-        .getUserLicense();
     this.params = {
       ...this.params,
       ...this.createProjectParams
@@ -225,6 +230,16 @@ export default defineComponent({
     }
   },
   methods: {
+    async updateUserLicense(){
+       try{
+        this.userLicenses = await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .getUserLicense();
+      }
+      catch(err: any){
+        this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+      }
+    },
     async checkExistsProject(val: string){
       this.hasWarning = await window.imshost.fs.exists(val);
       return this.hasWarning;
@@ -248,13 +263,11 @@ export default defineComponent({
             .get(DesktopProjectManager)
             .createProject({
               title: this.params.projectName,
-              template_ids: [this.currentProjectTemplateId],
               menu_settings: {
                 'menu-about': false,
                 'menu-gamedesign': true,
                 'menu-team': true,
               },
-              init_script: 'starter',
             }) : null;
           let rootWorkspaceId = null
           if (new_project_info){

@@ -156,15 +156,27 @@ export class SyncService {
         workspace_ids: string[],
     ){
         await this.db.dataSource.createQueryRunner().query(`
-            UPDATE assets
-            SET need_sync = ${SQLITE_NOW_STM}
-            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
-        `, [...asset_ids]);
-        await this.db.dataSource.createQueryRunner().query(`
             UPDATE workspaces
-            SET need_sync = ${SQLITE_NOW_STM}
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
             WHERE id IN (`+ workspace_ids.map(i => `?`) +`) 
         `, [...workspace_ids]);
+        await this.db.dataSource.createQueryRunner().query(`
+            UPDATE assets
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
+            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
+        `, [...asset_ids]);
+        const db_workspaces: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
+            SELECT id,server_state,server_deleted
+            FROM workspaces
+            WHERE id IN (`+ workspace_ids.map(i => `?`) +`) 
+        `, [...workspace_ids]);
+        await this._syncWorkspaces(db_workspaces);
+        const db_assets: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
+            SELECT id,server_state,server_deleted
+            FROM assets
+            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
+        `, [...asset_ids]);
+        await this._syncAssets(db_assets);
     }
 
     async pauseSyncProject(){
@@ -447,8 +459,7 @@ export class SyncService {
             localLoad: async (id) => {
                 let asset = this.db.asset.assets.byId.get(id) ?? null;
                 if(asset) {
-                    const is_synced_file = await this._getSyncedFile(id);
-                    return is_synced_file ? asset : await this.convertLocalAssetToServer(asset);
+                    return await this.convertLocalAssetToServer(asset);
                 }
                 return null;
             },

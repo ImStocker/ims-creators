@@ -52,7 +52,11 @@
       <AdvancedForm :project-folder-name="projectFolderName"
         @update:folder-name="projectFolderName = $event"></AdvancedForm>
       <div class="WelcomeFormContentSelectProject-create">
-        <button class="is-button accent" @click="downloadProject" :disabled="!canCreate || !!errorMessage">{{$t('desktop.welcome.downloadProject')}}</button>
+        <button class="is-button accent"
+          @click="downloadProject"
+          :class="{loading: projectIsDownloading}"
+          :disabled="!canCreate || !!errorMessage"
+        >{{$t('desktop.welcome.downloadProject')}}</button>
       </div>
   </div>
 </template>
@@ -97,6 +101,7 @@ export default defineComponent({
         total: 0,
       },
       loading: false,
+      projectIsDownloading: false
     }
   },
   async mounted(){
@@ -157,22 +162,33 @@ export default defineComponent({
     },
     async downloadProject() {
       if(this.canCreate && this.project){
-        let rootWorkspaceId = null
-        if (this.project.id){
-          const projectInfo: ProjectFullInfo = await this.$getAppManager()
-            .get(ApiManager)
-            .call(Service.CREATORS, HttpMethods.GET, 'project/info', {
-              pid: this.project.id,
-            });
-          rootWorkspaceId = projectInfo.rootWorkspaces.find((w) => w.name === 'gdd')?.id ?? null;
-        }
+        try{
+          this.projectIsDownloading = true;
+          let rootWorkspaceId = null
+          if (this.project.id){
+            const projectInfo: ProjectFullInfo = await this.$getAppManager()
+              .get(ApiManager)
+              .call(Service.CREATORS, HttpMethods.GET, 'project/info', {
+                pid: this.project.id,
+              });
+            rootWorkspaceId = projectInfo.rootWorkspaces.find((w) => w.name === 'gdd')?.id ?? null;
+          }
 
-        await this.$getAppManager().get(DesktopProjectManager).initializeLocalProject(this.projectPath, {
-          id: this.project.id ?? null,
-          title: this.project.title,
-          rootWorkspaceId,
-        });
-        await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(path.join(this.projectLocation, this.projectFolderName));
+          await this.$getAppManager().get(DesktopProjectManager).initializeLocalProject(this.projectPath, {
+            id: this.project.id ?? null,
+            title: this.project.title,
+            rootWorkspaceId,
+          });
+          await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(path.join(this.projectLocation, this.projectFolderName));
+        }
+        catch(err: any){
+          this.$getAppManager()
+          .get(UiManager)
+          .showError(err.message);
+        }
+        finally {
+          this.projectIsDownloading = false;
+        }
       }
       else {
         this.$getAppManager()
