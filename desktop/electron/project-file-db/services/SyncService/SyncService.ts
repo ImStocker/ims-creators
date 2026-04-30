@@ -20,23 +20,36 @@ const SYNC_CHUNK_SIZE = 50;
 export const SQLITE_NOW_STM = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 const ATTACHMENTS_DIR = 'attachments';
 
-export type WorkspaceEntity = {
-    id: string;
-    projectId: string;
-    title: string;
-    name: string | null;
-    parentId: string;
-    createdAt: string;
-    updatedAt: string;
-    deletedAt?: string;
-    index: number | null;
-    props: AssetProps | null;
-}
-
 export type ProjectDbFile = {
     server_file_id: string,
     local_path: string,
     server_store: string
+}
+
+type ServerAssetToCheckChange = {
+    title: AssetFull['title'],
+    name: AssetFull['name'],
+    index: AssetFull['index'],
+    ownIcon: AssetFull['ownIcon'],
+    isAbstract: AssetFull['isAbstract'],
+    parentIds: AssetFull['parentIds'],
+    workspaceId: AssetFull['workspaceId'],
+    blocks: {
+        id: AssetFull['blocks'][0]['id'],
+        title: AssetFull['blocks'][0]['title'],
+        name: AssetFull['blocks'][0]['name'],
+        type: AssetFull['blocks'][0]['type'],
+        index: AssetFull['blocks'][0]['index'],
+        props: AssetFull['blocks'][0]['props'],
+    }[]
+}
+
+type ServerWorkspaceToCheckChange = {
+    title: Workspace['title'],
+    name: Workspace['name'],
+    index: Workspace['index'],
+    parentId: Workspace['parentId'],
+    props: Workspace['props'],
 }
 
 export class SyncService {
@@ -426,7 +439,7 @@ export class SyncService {
     }
 
     private async _syncAsset(db_asset: SyncTableRow){
-        await syncEntity<ProjectFileDbAsset, AssetSetDTO>(db_asset, {
+        await syncEntity<ProjectFileDbAsset, AssetFull, AssetSetDTO, AssetSetDTO>(db_asset, {
             db: this.db, 
             entityTable: 'assets',
             serverLoad: (id) => this._loadFromServerAsset(id),
@@ -445,9 +458,7 @@ export class SyncService {
                 if (!server_asset_full.objects.assetFulls[id]){
                     return null;
                 }
-                return await this.convertServerAssetToLocal(
-                    server_asset_full.objects.assetFulls[id]
-                );
+                return server_asset_full.objects.assetFulls[id]
             },
             serverDelete: async (id) => {
                 await this.db.api.call(Service.CREATORS, HttpMethods.POST, `assets/delete`, {
@@ -456,12 +467,10 @@ export class SyncService {
                     }
                 });
             },
+            serverGetChanges: (source, target) => this._getAssetsChangesServer(source, target),
+            serverToLocal: (state) => this.convertServerAssetToLocal(state),
             localLoad: async (id) => {
-                let asset = this.db.asset.assets.byId.get(id) ?? null;
-                if(asset) {
-                    return await this.convertLocalAssetToServer(asset);
-                }
-                return null;
+                return this.db.asset.assets.byId.get(id) ?? null;
             },
             localPut: async (id, change, create) => {
                 let res: AssetsFullResult;
@@ -485,7 +494,8 @@ export class SyncService {
                     id: [id],
                 })
             },
-            getChanges: (source, target) => this.getAssetsChanges(source, target),
+            localGetChanges: (source, target) => this._getAssetsChangesLocal(source, target),
+            localToServer: (state) => this.convertLocalAssetToServer(state)
         })
     }
 
@@ -496,12 +506,12 @@ export class SyncService {
     }
 
     private async _syncWorkspace(db_workspace: SyncTableRow){
-        await syncEntity<ProjectFileDbWorkspace, ChangeWorkspaceDTO>(db_workspace, {
+        await syncEntity<ProjectFileDbWorkspace, Workspace, ChangeWorkspaceDTO, ChangeWorkspaceDTO>(db_workspace, {
             db: this.db, 
             entityTable: 'workspaces',
             serverLoad: (id) => this._loadFromServerWorkspace(id),
             serverPut: async (id, change, create) => {
-                const server_workspace_full: WorkspaceEntity =  create ? 
+                const server_workspace_full: Workspace =  create ? 
                     await this.db.api.call(Service.CREATORS, HttpMethods.POST, `workspaces`, {
                         id,
                         ...change
@@ -510,11 +520,13 @@ export class SyncService {
                 if (!server_workspace_full){
                     return null;
                 }
-                return await this.convertServerWorkspaceToLocal(server_workspace_full)
+                return server_workspace_full
             },
+            serverToLocal: (state) => this.convertServerWorkspaceToLocal(state),
             serverDelete: async (id) => {
                 await this.db.api.call(Service.CREATORS, HttpMethods.DELETE, `workspaces/${id}`);
             },
+            serverGetChanges: (source, target) => this.getWorkspacesChangesServer(source, target),
             localLoad: async (id) => {
                 let workspace = this.db.workspace.workspaces.byId.get(id) ?? null;
                 if(workspace) {
@@ -537,7 +549,8 @@ export class SyncService {
             localDelete: async (id) => {
                 await this.db.workspace.workspacesDelete(id)
             },
-            getChanges: (source, target) => this.getWorkspacesChanges(source, target),
+            localToServer: state => this.convertLocalWorkspaceToServer(state),
+            localGetChanges: (source, target) => this.getWorkspacesChangesLocal(source, target),
         });
     }
 
@@ -549,37 +562,47 @@ export class SyncService {
     }
 
     
-    private async _loadFromServerAsset(db_asset_id: string): Promise<ProjectFileDbAsset | null>{
+    private async _loadFromServerAsset(db_asset_id: string): Promise<AssetFull | null>{
         const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
             where: JSON.stringify({
                 id: [db_asset_id],
             })
         });
-        const server_asset = server_asset_full.objects.assetFulls[db_asset_id]
-        if(server_asset){
-            return await this.convertServerAssetToLocal(server_asset)
-        }
-        else {
-            return null;
-        }
+        return server_asset_full.objects.assetFulls[db_asset_id]
     }
 
-    private async _loadFromServerWorkspace(db_workspace_id: string): Promise<ProjectFileDbWorkspace | null>{
+    private async _loadFromServerWorkspace(db_workspace_id: string): Promise<Workspace | null>{
         const server_workspaces: ApiResultListWithTotal<Workspace> = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `workspaces`, {
             where: JSON.stringify({
                 ids: [db_workspace_id],
             })
         });
-        const server_workspace = server_workspaces.list[0]
-        if(server_workspace){
-            return await this.convertServerWorkspaceToLocal(server_workspace as any)
-        }
-        else {
-            return null;
-        }
+        return server_workspaces.list[0] ?? null
+    }
+    private _getAssetsChangesLocal(source_asset: ProjectFileDbAsset, target_asset: ProjectFileDbAsset | null): AssetSetDTO {
+        return this._getAssetsChangesServer(
+            {
+                ...source_asset,
+                blocks: source_asset.blocks.map(b => {
+                    return {
+                        ...b,
+                        props: assignPlainValueToAssetProps({}, b.props),
+                    }
+                })
+            },
+            target_asset ? {
+                ...target_asset,
+                blocks: target_asset.blocks.map(b => {
+                    return {
+                        ...b,
+                        props: assignPlainValueToAssetProps({}, b.props),
+                    }
+                })
+            } : null
+        )
     }
 
-    getAssetsChanges(source_asset: ProjectFileDbAsset, target_asset: ProjectFileDbAsset | null): AssetSetDTO {
+    private _getAssetsChangesServer(source_asset: ServerAssetToCheckChange, target_asset: ServerAssetToCheckChange | null): AssetSetDTO {
         const changes: AssetSetDTO = {};
         if(!target_asset || source_asset.title !== target_asset.title) {
             changes.title = source_asset.title;
@@ -590,11 +613,8 @@ export class SyncService {
         if(!target_asset || source_asset.index !== target_asset.index) {
             changes.index = source_asset.index;
         }
-        if(!target_asset || source_asset.creatorUserId !== target_asset.creatorUserId) {
-            changes.creatorUserId = source_asset.creatorUserId ?? undefined;
-        }
-        if(!target_asset || source_asset.icon !== target_asset.icon) {
-            changes.icon = source_asset.icon;
+        if(!target_asset || source_asset.ownIcon !== target_asset.ownIcon) {
+            changes.icon = source_asset.ownIcon;
         }
         if(!target_asset || source_asset.isAbstract !== target_asset.isAbstract) {
             changes.isAbstract = source_asset.isAbstract;
@@ -629,11 +649,8 @@ export class SyncService {
                 any_block_change = true;
             }
             const change_asset_props: AssetProps[] = target_block ? 
-                diffAssetPropObjects(
-                    assignPlainValueToAssetProps({}, source_block.props ?? {}),
-                    assignPlainValueToAssetProps({}, target_block.props ?? {})
-                ) :
-                [assignPlainValueToAssetProps({}, source_block.props ?? {})]
+                diffAssetPropObjects(source_block.props ?? {}, target_block.props ?? {}) :
+                [{}, source_block.props ?? {}]
             if(change_asset_props.length > 0){
                 block_change.props = change_asset_props
                 any_block_change = true;
@@ -664,7 +681,18 @@ export class SyncService {
         return changes;
     }
 
-    getWorkspacesChanges(source_workspace: ProjectFileDbWorkspace, target_workspace: ProjectFileDbWorkspace | null): ChangeWorkspaceDTO {
+    getWorkspacesChangesLocal(source_workspace: ProjectFileDbWorkspace, target_workspace: ProjectFileDbWorkspace | null): ChangeWorkspaceDTO {
+        return this.getWorkspacesChangesServer({
+            ...source_workspace,
+            props: assignPlainValueToAssetProps({}, source_workspace.props)
+        },
+        target_workspace ? {
+            ...target_workspace,
+            props: assignPlainValueToAssetProps({}, target_workspace.props)
+        } : null)
+    }
+
+    getWorkspacesChangesServer(source_workspace: ServerWorkspaceToCheckChange, target_workspace: ServerWorkspaceToCheckChange | null): ChangeWorkspaceDTO {
         const changes: ChangeWorkspaceDTO = {};
         if(!target_workspace || source_workspace.title !== target_workspace.title) {
             changes.title = source_workspace.title;
@@ -678,10 +706,10 @@ export class SyncService {
         if(!target_workspace || source_workspace.parentId !== target_workspace.parentId) {
             changes.parentId = source_workspace.parentId ?? undefined;
         }
-        const source_props = assignPlainValueToAssetProps({}, source_workspace.props ?? {})
+        const source_props = source_workspace.props ?? {}
         const change_props: AssetProps[] = target_workspace ? diffAssetPropObjects(
                     source_props,
-                    assignPlainValueToAssetProps({}, target_workspace.props ?? {}) 
+                    target_workspace.props
                 ) :
                     [source_props]
         if(change_props.length > 0){
@@ -871,24 +899,27 @@ export class SyncService {
         }
     }
     
-    async convertLocalAssetToServer(asset: ProjectFileDbAsset): Promise<ProjectFileDbAsset>{
-        let new_asset: ProjectFileDbAsset = {...asset};
+    async convertLocalAssetToServer(asset: ProjectFileDbAsset): Promise<AssetFull>{
+        let new_asset: AssetFull = {...asset, blocks: []};
         new_asset.blocks = [];
         for(const block of asset.blocks){
-            const new_block = {...block};
-            new_block.props = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_block.props));
-            new_block.computed = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_block.computed));
-            if(block.inherited) {
-                new_block.inherited = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(block.inherited));
-            }
+            const new_block: AssetBlockEntity = {
+                ...block,
+                props: await this.convertLocalPropsToServer(block.props),
+                computed: await this.convertLocalPropsToServer(block.computed),
+                inherited: block.inherited ? await this.convertLocalPropsToServer(block.inherited) : null,
+                rights: 5
+            };
             new_asset.blocks.push(new_block);
         }
         return new_asset;
     }
 
-    async convertLocalWorkspaceToServer(workspace: ProjectFileDbWorkspace): Promise<ProjectFileDbWorkspace>{
-        let new_workspace: ProjectFileDbWorkspace = {...workspace};
-        new_workspace.props = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_workspace.props));
+    async convertLocalWorkspaceToServer(workspace: ProjectFileDbWorkspace): Promise<Workspace>{
+        const new_workspace: Workspace = {
+            ...workspace,
+            props: await this.convertLocalPropsToServer(workspace.props)
+        };
         return new_workspace;
     }
 
@@ -996,7 +1027,7 @@ export class SyncService {
         return local_asset; 
     }
     
-    async convertServerWorkspaceToLocal (server_workspace: WorkspaceEntity): Promise<ProjectFileDbWorkspace> {
+    async convertServerWorkspaceToLocal (server_workspace: Workspace): Promise<ProjectFileDbWorkspace> {
         const local_block = await this.convertServerFileToLocal(server_workspace.props ?? {});
         const local_workspace: ProjectFileDbWorkspace = {
             ...server_workspace,
