@@ -34,6 +34,7 @@ import DesktopAuthManager from './DesktopAuthManager';
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
 import DesktopProjectSettingsManager from './DesktopProjectSettingsManager';
 import DesktopSyncManager from './DesktopSyncManager';
+import DesktopLocalFsSyncManager from './DesktopLocalFsSyncManager';
 import { DesktopCreatorAssetManager } from './DesktopCreatorAssetManager';
 
 export function createApiTokenStorage(
@@ -61,7 +62,7 @@ export default function createDesktopAppManager(
   app_manager.register(UiPreferenceManager, new UiPreferenceManager(app_manager));
   app_manager.register(new DialogManager(app_manager));
   app_manager.register(new CommentManager(app_manager));
-  app_manager.register(new LocalFsSyncManager(app_manager));
+  app_manager.register(LocalFsSyncManager, new DesktopLocalFsSyncManager(app_manager));
   app_manager.register(PluginManager, new DesktopPluginManager(app_manager));
   app_manager.register(EditorManager, new DesktopEditorManager(app_manager));
   app_manager.register(new DesktopUpdateManager(app_manager));
