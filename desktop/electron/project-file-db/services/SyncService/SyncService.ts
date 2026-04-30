@@ -489,9 +489,37 @@ export class SyncService {
         })
     }
 
+    private async _checkParentAssetNeedSyncAndSync(need_sync_assets_map: Map<string, SyncTableRow>, asset_id: string){
+        const db_asset = need_sync_assets_map.get(asset_id)
+        if(!db_asset) return;
+        
+        const local_asset = this.db.asset.assets.byId.get(db_asset.id);
+        if(local_asset?.parentIds) {
+            for(const parent_id of local_asset.parentIds) {
+                await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
+            }
+        }
+        else {
+            const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
+                where: JSON.stringify({
+                    id: [db_asset.id],
+                })
+            });
+            const server_asset = server_asset_full.objects.assetFulls[db_asset.id];
+            if(server_asset?.parentIds) {
+                for(const parent_id of server_asset.parentIds) {
+                    await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
+                }
+            }
+        }
+        await this._syncAsset(db_asset);
+        need_sync_assets_map.delete(db_asset.id);
+    }
+
     private async _syncAssets(db_assets: SyncTableRow[]){
+        const need_sync_assets_map = new Map(db_assets.map(a => [a.id, a]));
         for(const db_asset of db_assets){
-            await this._syncAsset(db_asset);
+            await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, db_asset.id);
         }
     }
 

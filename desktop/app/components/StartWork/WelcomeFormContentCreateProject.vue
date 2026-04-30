@@ -252,6 +252,10 @@ export default defineComponent({
       if(await this.checkExistsProject(this.projectPath)) {
         return;
       }
+      await this.updateUserLicense();
+      if(this.needLicense) {
+        return;
+      }
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {

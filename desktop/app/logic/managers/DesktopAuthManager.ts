@@ -7,6 +7,7 @@ import type { IAppManager } from "~ims-app-base/logic/managers/IAppManager";
 import { EntityCache } from "~ims-app-base/logic/types/EntityCache";
 import assert from 'assert';
 import type { ProjectLicense } from "~ims-app-base/logic/types/ProjectTypes";
+import DesktopSyncManager from "./DesktopSyncManager";
 
 
 
@@ -91,6 +92,7 @@ export default class DesktopAuthManager extends AuthManager{
             await this._apiManager.setToken(undefined, undefined, remember);
         } finally {
             await this._apiManager.removeToken();
+            await this.appManager.get(DesktopSyncManager).pauseSyncProject();
         }
     }
 
