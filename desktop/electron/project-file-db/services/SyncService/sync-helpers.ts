@@ -14,24 +14,30 @@ export enum SyncConflict {
     ERROR = 'ERROR',
 }
 
-export type SyncEntityOptions<T, C extends Record<string, any>> = {
+export type SyncEntityOptions<TLocal, TServer, CLocal extends Record<string, any>, CServer extends Record<string, any>> = {
     db: ProjectFileDb, 
     entityTable: string,
-    serverLoad: (id: string) => Promise<T | null>,
-    serverPut: (id: string, change: C, create: boolean) => Promise<T | null>,
+    serverLoad: (id: string) => Promise<TServer | null>,
+    serverPut: (id: string, change: CServer, create: boolean) => Promise<TServer | null>,
     serverDelete: (id: string) => Promise<void>,
-    localLoad: (id: string) => Promise<T | null>,
-    localPut: (id: string, change: C, create: boolean) => Promise<void>,
+    serverGetChanges: (source: TServer, target: TServer | null) => CServer
+    serverToLocal: (state: TServer) => Promise<TLocal>
+    localLoad: (id: string) => Promise<TLocal | null>,
+    localPut: (id: string, change: CLocal, create: boolean) => Promise<void>,
     localDelete: (id: string) => Promise<void>,
-    getChanges: (source: T, target: T | null) => C
+    localGetChanges: (source: TLocal, target: TLocal | null) => CLocal
+    localToServer: (state: TLocal) => Promise<TServer>
 }
 
-export async function syncEntity<T, C extends Record<string, any>>(entity: SyncTableRow, options: SyncEntityOptions<T, C>){
+export async function syncEntity<TLocal, TServer, CLocal extends Record<string, any>, CServer extends Record<string, any>>(
+    entity: SyncTableRow, 
+    options: SyncEntityOptions<TLocal, TServer, CLocal, CServer>
+){
     let conflict: SyncConflict | null = null;
     let conflict_message: string | null = null;
-    let old_server_state: T | null = entity.server_state ? JSON.parse(entity.server_state) : null;
-    let new_server_state: T | null;
-    let local_state: T | null | undefined = undefined
+    let old_server_state: TServer | null = entity.server_state ? JSON.parse(entity.server_state) : null;
+    let new_server_state: TServer | null;
+    let local_state: TLocal | null | undefined = undefined
     try {
 
         const was_synced_before = !!old_server_state
@@ -43,11 +49,12 @@ export async function syncEntity<T, C extends Record<string, any>>(entity: SyncT
         }
 
         local_state = await options.localLoad(entity.id) ?? null
+        const local_state_as_server = local_state ? await options.localToServer(local_state) : null;
 
         if(old_server_state) {
-            if(local_state) {
-                const changes_from_local = options.getChanges(local_state, old_server_state)
-                const has_local_changes = Object.keys(changes_from_local).length > 0
+            if(local_state_as_server) {
+                const server_changes_from_local = options.serverGetChanges(local_state_as_server, old_server_state)
+                const has_local_changes = Object.keys(server_changes_from_local).length > 0
     
                 if(entity.server_deleted) {
                     new_server_state = null
@@ -60,7 +67,7 @@ export async function syncEntity<T, C extends Record<string, any>>(entity: SyncT
                     }
                 }
                 else if (has_local_changes){
-                    new_server_state = await options.serverPut(entity.id, changes_from_local, false);
+                    new_server_state = await options.serverPut(entity.id, server_changes_from_local, false);
                     if (!new_server_state){
                         conflict = SyncConflict.NO_ACCESS
                         return;
@@ -86,10 +93,10 @@ export async function syncEntity<T, C extends Record<string, any>>(entity: SyncT
         }
         else { 
             // Server has no file
-            if (local_state){
+            if (local_state_as_server){
                 try {
-                    const save_changes = options.getChanges(local_state, null)
-                    new_server_state = await options.serverPut(entity.id,save_changes, true);
+                    const save_server_changes = options.serverGetChanges(local_state_as_server, null)
+                    new_server_state = await options.serverPut(entity.id,save_server_changes, true);
                     if (!new_server_state){
                         conflict = SyncConflict.NO_ACCESS
                         return;
@@ -109,9 +116,10 @@ export async function syncEntity<T, C extends Record<string, any>>(entity: SyncT
             }
         }
         if (new_server_state){
-            const changes_from_server = options.getChanges(new_server_state, local_state)
-            if(Object.keys(changes_from_server).length > 0) {     
-                await options.localPut(entity.id, changes_from_server, !local_state)         
+            const new_server_state_as_local = await options.serverToLocal(new_server_state)
+            const local_changes_from_server = options.localGetChanges(new_server_state_as_local, local_state)
+            if(Object.keys(local_changes_from_server).length > 0) {     
+                await options.localPut(entity.id, local_changes_from_server, !local_state)         
             }
         }  
     }
