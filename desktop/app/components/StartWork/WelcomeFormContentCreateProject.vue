@@ -111,10 +111,9 @@ import LoginForm from './LoginForm.vue';
 import type { Workspace } from '~ims-app-base/logic/types/Workspaces';
 import { forbiddenFilenameCharsRegexp } from '#bridge/utils/regex';
 import { debounceForThis } from '~ims-app-base/components/utils/ComponentUtils';
-import ApiManager from '~ims-app-base/logic/managers/ApiManager';
-import { HttpMethods, Service } from '~ims-app-base/logic/managers/ApiWorker';
 import type { ProjectLicense } from '~ims-app-base/logic/types/ProjectTypes';
 import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
+import DesktopSyncManager from '#logic/managers/DesktopSyncManager';
 
 export type CreateProjectParams = {
   projectLocation?: string,
@@ -171,14 +170,19 @@ export default defineComponent({
     async userInfo(){
       await this.updateUserLicense();
     },
-    async params(){
-      if(this.params.projectType === 'cloud'){
-        await this.updateUserLicense();
-      }
+    'params.projectType': {
+      handler(newVal) {
+        if (newVal === 'cloud') {
+          this.updateUserLicense();
+        }
+      },
     }
   },
   async mounted(){
     this.params.projectLocation = await window.imshost.shell.getDocumentsFolder();
+    if(this.params.projectType === 'cloud'){
+      await this.updateUserLicense();
+    }
     this.params = {
       ...this.params,
       ...this.createProjectParams
@@ -285,6 +289,9 @@ export default defineComponent({
           });
           if(this.currentProjectTemplateId){
             await this.$getAppManager().get(DesktopProjectManager).importTemplateProject(this.currentProjectTemplateId);
+            if(this.params.projectType === 'cloud'){
+              await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
+            }
           }
           await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(this.projectPath);          
         })

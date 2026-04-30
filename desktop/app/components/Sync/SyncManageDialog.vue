@@ -112,9 +112,7 @@ export default defineComponent({
     }
   },
   async mounted() {
-    this.isLoading = true;
-    this.syncErrors = await this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
-    this.isLoading = false;
+    await this.loadErrors();
   },
   computed: {
     noErrors(){
@@ -125,6 +123,11 @@ export default defineComponent({
     }
   },
   methods: {
+    async loadErrors(){
+      this.isLoading = true;
+      this.syncErrors = await this.$getAppManager().get(DesktopSyncManager).getSyncErrors();
+      this.isLoading = false;
+    },
     close(){
       this.dialog.close();
     },
@@ -140,6 +143,7 @@ export default defineComponent({
       if(ind > -1){
         this.repeatingAssetIds.splice(ind , 1);
       }
+      await this.loadErrors();
     },
     async repeatWorkspaceSync(workspace_id: string){
       this.repeatingWorkspaceIds.push(workspace_id)
@@ -148,6 +152,7 @@ export default defineComponent({
       if(ind > -1){
         this.repeatingWorkspaceIds.splice(ind , 1);
       }
+      await this.loadErrors();
     },
   }
 })

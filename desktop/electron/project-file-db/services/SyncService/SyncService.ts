@@ -973,6 +973,9 @@ export class SyncService {
     }
 
     async convertLocalFileToServer(file: AssetPropValueFile): Promise<AssetPropValueFile>{
+        if (!/^loc-/.test(file.Store)) {
+           return file;
+        }
         const formData = new FormData();
         const project_root = this.db.localPath;
         const attachment_path = node_path.join(project_root ?? '', ATTACHMENTS_DIR, file.Title);
