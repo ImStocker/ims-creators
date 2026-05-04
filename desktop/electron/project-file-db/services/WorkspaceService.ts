@@ -1,5 +1,5 @@
 import type { AssetQueryWhere } from "~ims-app-base/logic/types/AssetsType";
-import type { IProjectDatabaseWorkspace, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
+import type { IProjectDatabaseWorkspace } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal } from "~ims-app-base/logic/types/ProjectTypes";
 import { compareAssetPropValues, assignPlainValueToAssetProps, convertAssetPropsToPlainObject } from "~ims-app-base/logic/types/Props";
 import type { AssetPropsSelectionOrder } from "~ims-app-base/logic/types/PropsSelection";
@@ -8,17 +8,14 @@ import { type ProjectFileDb, type ProjectFileDbWorkspace } from "../ProjectFileD
 import { ProjectFileDbCollection } from "../logic/ProjectFileDbCollection";
 import fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
-import * as node_path from 'path';
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
-import { applyImsFileLocationChange, forbiddenFilenameCharsRegexp, getIndexRangeStartAndStep, getWorkspaceLocalPathFolder, getWorkspaceLocalPathFolderById, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, prepareFileBasenameByEntityTitle } from "../utils/files";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
 import JSZip from "jszip";
 import { once } from "node:events";
 import { PassThrough, type Writable } from "node:stream";
-import { shell, ipcMain } from 'electron'
 import { WORKSPACE_BASE_ORDERING } from "../project-db-constants";
 import { WORKSPACE_EXT } from "./FileSystemService";
-import { SQLITE_NOW_STM, type WorkspaceEntity } from "./SyncService/SyncService";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
 export type WorkspaceServiceChangeWorkspaceRequest = ChangeWorkspaceRequest & { localName?: string }
