@@ -16,6 +16,7 @@ import type { Workspace } from "~ims-app-base/logic/types/Workspaces";
 import { DesktopCreatorAssetManager } from "./DesktopCreatorAssetManager";
 import DesktopUiManager from "./DesktopUiManager";
 import UiManager from "~ims-app-base/logic/managers/UiManager";
+import DesktopSyncManager from "./DesktopSyncManager";
 
 const PROJECT_META_INDEX = '.imsc/index.json';
 
@@ -125,6 +126,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             .updateWorkspacesCache(appInfo.project.rootWorkspaces);
         }
         this.appManager.get(CreatorAssetManager).initForProject(appInfo.project);
+        this.appManager.get(DesktopSyncManager).initForProject(appInfo.project);
         this.appManager
           .get(ProjectSettingsManager)
           .setCurrentProjectSettings(appInfo.project?.settings ?? null);

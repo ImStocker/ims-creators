@@ -61,38 +61,38 @@ export class SyncService {
         hasChanges: false,
         error: null
     };
+    private _syncWithCloudTime: number = 60;
 
     constructor(public db: ProjectFileDb){
 
     }
 
     async changeAutoSynchronization(new_val: number){
+        this._syncWithCloudTime = new_val;
         await this.db.settings.setKey('syncWithCloud', new_val);
+        this._resetSyncTimer(true);
+    }
+
+    private _resetSyncTimer(restart: boolean){
         if(this._synchronizationTimer){
             clearInterval(this._synchronizationTimer);
             this._synchronizationTimer = undefined;
         }
-        if(new_val > 0) {
+        if(restart && this._syncWithCloudTime > 0 && this._currentState.status !== SyncCurrentStateStatus.PAUSE) {
             this._synchronizationTimer = setInterval(() => {
                 this.syncProject();
-            }, new_val * 1000);
+            }, this._syncWithCloudTime * 1000);
         }
     }
 
     async init(){
-        const syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
-        if(syncWithCloudTime > 0) {
-            this._synchronizationTimer = setInterval(() => {
-                this.syncProject();
-            }, syncWithCloudTime * 1000);
-        }        
+        this._currentState.status = (await this.db.settings.getKey('syncOnPause', false) ? SyncCurrentStateStatus.PAUSE : SyncCurrentStateStatus.FREE );
+        this._syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
+        this._resetSyncTimer(true);
     }
 
-    destroy(){
-        if(this._synchronizationTimer){
-           clearInterval(this._synchronizationTimer); 
-           this._synchronizationTimer = undefined
-        }
+    destroy(){        
+        this._resetSyncTimer(false);
     }
 
     async getSyncErrors(): Promise<SyncInfo> {
@@ -137,11 +137,11 @@ export class SyncService {
         return sync_info;
     }
 
-    getCurrentSyncState(){
+    async getCurrentSyncState(){
         return {...this._currentState};
     }
 
-    changeCurrentState(changes: {
+    async changeCurrentState(changes: {
         status?: SyncCurrentStateStatus,
         hasChanges?: boolean,
         error?: string | null
@@ -193,20 +193,20 @@ export class SyncService {
     }
 
     async pauseSyncProject(){
-        this._synchronizationTimer = undefined;
+        await this.db.settings.setKey('syncOnPause', true)
         this.changeCurrentState({
             status: SyncCurrentStateStatus.PAUSE,
         });
+        this._resetSyncTimer(true);
     }
     
     async resumeSyncProject(){
+        await this.db.settings.setKey('syncOnPause', false)
+        this.changeCurrentState({
+            status: SyncCurrentStateStatus.FREE,
+        });
+        this._resetSyncTimer(true);
         await this.syncProject();
-        const syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
-        if(syncWithCloudTime > 0) {
-            this._synchronizationTimer = setInterval(() => {
-                this.syncProject();
-            }, syncWithCloudTime * 1000);
-        } 
     }
 
     async syncProject(){

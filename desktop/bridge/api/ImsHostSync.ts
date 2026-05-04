@@ -9,9 +9,9 @@ export class ImsHostSync extends ImsHostBase {
         return await project_db.sync.syncProject();
     }
     
-    getCurrentSyncState(projectPath: string){
+    async getCurrentSyncState(projectPath: string){
         const project_db = requestProjectDb(projectPath, this._window);
-        return project_db.sync.getCurrentSyncState();
+        return await project_db.sync.getCurrentSyncState();
     }
 
     async getSyncErrors(projectPath: string){

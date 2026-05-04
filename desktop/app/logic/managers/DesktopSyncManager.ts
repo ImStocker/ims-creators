@@ -3,6 +3,7 @@ import type { SyncInfo } from "#logic/types/SyncTypes";
 import { AppSubManagerBase } from "~ims-app-base/logic/managers/IAppManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
 import UiPreferenceManager from "~ims-app-base/logic/managers/UiPreferenceManager";
+import type { ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default class DesktopSyncManager extends AppSubManagerBase {
@@ -16,11 +17,9 @@ export default class DesktopSyncManager extends AppSubManagerBase {
         window.subscribeSyncState((val: SyncCurrentState) => {
             this._currentSyncState = val;
         });
-        this._currentSyncState.status = this.appManager.get(UiPreferenceManager).getPreference('settings.syncStatus', SyncCurrentStateStatus.FREE);
     }
 
     destroy(){
-        this.appManager.get(UiPreferenceManager).setPreference('settings.syncStatus', this._currentSyncState.status);
     }
 
     get autoSyncingTime(){
@@ -31,6 +30,11 @@ export default class DesktopSyncManager extends AppSubManagerBase {
 
     getCurrentSyncState(): SyncCurrentState  {
         return this._currentSyncState;
+    }
+
+    async initForProject(project: ProjectFullInfo | null) {
+        assert(project?.localPath, 'project local path is not set');
+        this._currentSyncState = await window.imshost.sync.getCurrentSyncState(project.localPath);
     }
 
     async getSyncErrors(): Promise<SyncInfo> {
