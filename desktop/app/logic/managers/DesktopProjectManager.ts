@@ -99,13 +99,9 @@ export default class DesktopProjectManager extends ProjectManager{
         const res = await window.imshost.project.initProject(localPath, initParams);
         this._projectLocalPath = localPath;
         if(initParams?.id){
-            await window.imshost.sync.syncProject(this._projectLocalPath);
+            window.imshost.sync.syncProject(this._projectLocalPath); // Do await sync
         }
         return res;
-    }
-
-    async connectLocalProject(localProject: LocalProjectInitInfo, pid: string){
-
     }
     
     override getAllowAnonymUsers() {

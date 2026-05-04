@@ -559,11 +559,7 @@ export class SyncService {
             },
             serverGetChanges: (source, target) => this.getWorkspacesChangesServer(source, target),
             localLoad: async (id) => {
-                let workspace = this.db.workspace.workspaces.byId.get(id) ?? null;
-                if(workspace) {
-                    return await this.convertLocalWorkspaceToServer(workspace);
-                }
-                return null;
+                return this.db.workspace.workspaces.byId.get(id) ?? null;
             },
             localPut: async (id, change, create) => {
                 if (create){

@@ -25,6 +25,7 @@ export default {
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
         openInCloud: 'Открыть в облаке',
         repeat: 'Повторить',
+        pauseSyncing: 'Приостановить синхронизацию',
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',
@@ -70,6 +71,7 @@ export default {
       needLicense: 'Пожалуйста, приобретите PRO лицензию, чтобы создать облачный проект',
       buy: 'Купить',
       dataNotLoad: 'Не удалось загрузить ваши данные',
+      loginToAnotherAccount: 'Войти в другой аккаунт',
     },
     mainMenu: {
       settings: 'Настройки',

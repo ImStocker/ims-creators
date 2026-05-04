@@ -16,9 +16,11 @@ export default class DesktopSyncManager extends AppSubManagerBase {
         window.subscribeSyncState((val: SyncCurrentState) => {
             this._currentSyncState = val;
         });
+        this._currentSyncState.status = this.appManager.get(UiPreferenceManager).getPreference('settings.syncStatus', SyncCurrentStateStatus.FREE);
     }
 
     destroy(){
+        this.appManager.get(UiPreferenceManager).setPreference('settings.syncStatus', this._currentSyncState.status);
     }
 
     get autoSyncingTime(){

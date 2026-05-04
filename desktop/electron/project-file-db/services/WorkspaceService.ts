@@ -377,7 +377,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
     
     findByLocalDirPath(localDirPath: string): ProjectFileDbWorkspace | null {
         if (!localDirPath || localDirPath === '.') return this.db.RootGddFolder;
-        const segments = localDirPath.split(/\\\//);
+        const segments = localDirPath.split(/[\\\/]/g);
         let current_workspace = this.db.RootGddFolder;
         for (const segment of segments){
             const next = this.workspaces.iterate().find(x => x.localName === segment + WORKSPACE_EXT && x.parentId === current_workspace.id);

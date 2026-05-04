@@ -34,6 +34,7 @@ import DesktopAuthManager from './DesktopAuthManager';
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
 import DesktopProjectSettingsManager from './DesktopProjectSettingsManager';
 import DesktopSyncManager from './DesktopSyncManager';
+import { DesktopCreatorAssetManager } from './DesktopCreatorAssetManager';
 
 export function createApiTokenStorage(
   context: AppManagerContext,
@@ -50,7 +51,7 @@ export default function createDesktopAppManager(
   app_manager.register(apiManager);
   app_manager.register(AuthManager, new DesktopAuthManager(app_manager));
   app_manager.register(DesktopCreatorManager, new DesktopCreatorManager(app_manager));
-  app_manager.register(new CreatorAssetManager(app_manager));
+  app_manager.register(CreatorAssetManager, new DesktopCreatorAssetManager(app_manager));
   const desktopProjectManager = new DesktopProjectManager(app_manager);
   app_manager.register(ProjectManager, desktopProjectManager);
   app_manager.register(DesktopProjectManager, desktopProjectManager);
@@ -82,7 +83,7 @@ export default function createDesktopAppManager(
     await app_manager.get<DesktopAuthManager>(AuthManager).init();
     await app_manager.get(DesktopCreatorManager).init();
     await app_manager.get(ProjectManager).init();
-    await app_manager.get(CreatorAssetManager).init(project_database, true);
+    await app_manager.get<DesktopCreatorAssetManager>(CreatorAssetManager).init(project_database, true);
     await app_manager.get(ExportFormatManager).init();
     await app_manager.get(DesktopSyncManager).init();
     await app_manager.get(PluginManager).init();

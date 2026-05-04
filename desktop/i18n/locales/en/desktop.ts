@@ -25,6 +25,7 @@ export default {
         syncWithCloudEnd: 'Synchronization with cloud is completed',
         openInCloud: 'Open in cloud',
         repeat: 'Repeat',
+        pauseSyncing: 'Pause syncing',
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',
@@ -70,6 +71,7 @@ export default {
       needLicense: 'Please buy PRO-license to create cloud project',
       buy: 'Buy',      
       dataNotLoad: 'There was problem loading your data',
+      loginToAnotherAccount: 'Login to another account'
     },
     mainMenu: {
       settings: 'Settings',

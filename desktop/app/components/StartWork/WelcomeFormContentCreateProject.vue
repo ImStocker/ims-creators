@@ -41,12 +41,14 @@
             class="WelcomeFormContentStart-login"
             :open-external="true"
         />
-        <!-- <button 
-          v-if="userInfo && needLicense"
-          class="is-button accent"
-          @click="logout">
-
-        </button> -->
+        <div class="WelcomeFormContentCreateProject-create" v-if="userInfo">
+          <button 
+            v-if="userInfo && needLicense"
+            class="is-button accent"
+            @click="logout">
+              {{ $t('desktop.welcome.loginToAnotherAccount') }}
+          </button>
+        </div>
       </div>
       <template v-else>
         <div class="WelcomeFormContentCreateProject-Action">
@@ -240,8 +242,18 @@ export default defineComponent({
     }
   },
   methods: {
+    async logout(){
+      try{
+        await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .logout();
+      }
+      catch(err: any){
+        this.$getAppManager().get(UiManager).showError(err.message);
+      }
+    },
     async updateUserLicense(){
-       try{
+      try{
         this.userLicenses = await this.$getAppManager()
             .get<DesktopAuthManager>(AuthManager)
             .getUserLicense();

@@ -13,6 +13,9 @@ import CreatorAssetManager from "~ims-app-base/logic/managers/CreatorAssetManage
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
 import type { Workspace } from "~ims-app-base/logic/types/Workspaces";
+import { DesktopCreatorAssetManager } from "./DesktopCreatorAssetManager";
+import DesktopUiManager from "./DesktopUiManager";
+import UiManager from "~ims-app-base/logic/managers/UiManager";
 
 const PROJECT_META_INDEX = '.imsc/index.json';
 
@@ -239,7 +242,9 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         assert(project_info)
         Object.assign(project_info, new_project_info, {
             localPath: project_info.localPath
-        })
+        })      
+        this.appManager.get<DesktopCreatorAssetManager>(CreatorAssetManager).setProjectIdToFiles(project_info.id);
+        await this.appManager.get(UiManager).reloadPage();
     }
 }
 

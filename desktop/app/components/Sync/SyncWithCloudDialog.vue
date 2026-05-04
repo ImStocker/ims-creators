@@ -2,7 +2,7 @@
   <dialog-content class="SyncWithCloudDialog" :loading="isLoading">
     <div class="Form">
       <div class="Dialog-header">
-        {{ $t('desktop.fsSync.menu.openInCloud') }}
+        {{ $t('desktop.fsSync.menu.syncWithCloud') }}
       </div>
       <div class="Dialog-message SyncWithCloudDialog-roles">
         <ValueSwitcher
@@ -178,7 +178,7 @@ export default defineComponent({
                 if(!project_info.localPath) {
                     throw Error('localPath is not set') ;
                 }
-                await this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(new_project_info);
+                this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(new_project_info);
             }
             else {
                 if(!this.project){
@@ -192,9 +192,8 @@ export default defineComponent({
                 if(!selected_project_full_info){
                     throw Error('Project is not founded');
                 }
-                await this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(selected_project_full_info);
+                this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(selected_project_full_info);
             }
-            await this.$getAppManager().get(DesktopSyncManager).runSync();
             this.dialog.close(true);
         }
         catch(err: any) {
