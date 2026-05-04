@@ -201,9 +201,12 @@ export class SyncService {
     
     async resumeSyncProject(){
         await this.syncProject();
-        this._synchronizationTimer = setInterval(() => {
-            this.syncProject();
-        }, 60 * 1000);
+        const syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
+        if(syncWithCloudTime > 0) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, syncWithCloudTime * 1000);
+        } 
     }
 
     async syncProject(){

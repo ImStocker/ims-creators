@@ -85,7 +85,12 @@ export default defineComponent({
           list.push({
             title: this.$t('desktop.fsSync.menu.syncNow'),
             action: async () => {
-                await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
+                if(!this.userInfo){
+                  await this.$getAppManager()
+                    .get(AuthManager)
+                    .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+                }
+                await this.$getAppManager().get(DesktopSyncManager).runSync()
                 const sync_status = this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
                 if(sync_status?.error){
                   this.$getAppManager().get(UiManager).showError(this.$t('desktop.fsSync.menu.syncNowEndWithErrors'));
