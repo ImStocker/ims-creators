@@ -9,7 +9,6 @@ import * as node_path from 'path';
 import path from 'node:path';
 import log from 'electron-log/main';
 import { PROJECT_META_SETTINGS } from '../project-db-constants';
-import { WORKSPACE_EXT } from "./FileSystemService";
 
 function saveStreamToTempFile(stream: Readable,){
     return new Promise<{
@@ -46,9 +45,8 @@ async function unzipArchive(path_from: string, path_to: string) {
     const data = await fs.promises.readFile(path_from);
     const zip = await JSZip.loadAsync(data)
     for (const filename of Object.keys(zip.files)){
-        if (['gdd' + WORKSPACE_EXT].includes(filename)) continue;
         const content = zip.files[filename];
-        const new_filename = filename.replace(/^gdd\//, '');
+        const new_filename = filename
         const dest = node_path.join(path_to, new_filename);
         if (content.dir) {
             if (!fs.existsSync(dest)) {
@@ -159,6 +157,9 @@ export class ProjectService {
                 },
             });
         const gdd_workspace = workspace.data.list[0];
+        if (!gdd_workspace){
+            throw new Error('Failed to find root gdd folder in project')
+        }
         const response = await axios.get(`${process.env.CREATORS_API_HOST}project/export`, {
             responseType: 'stream',
             timeout: 0,
@@ -169,6 +170,7 @@ export class ProjectService {
                 }),
                 save_structure:true,
                 name_mode: 'title',
+                skip_itself: true
             },
         });
         // Создаём write stream и подключаем к нему
