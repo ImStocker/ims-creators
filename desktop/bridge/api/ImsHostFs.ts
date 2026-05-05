@@ -29,6 +29,10 @@ export class ImsHostFs extends ImsHostBase {
   async readTextFile(path: string): Promise<string> {
     return await fs.promises.readFile(path, 'utf-8');
   }
+
+  async readDir(path: string) {
+    return await fs.promises.readdir(path);
+  }
   
   async stat(path: string): Promise<fs.Stats> {
     return await fs.promises.stat(path);

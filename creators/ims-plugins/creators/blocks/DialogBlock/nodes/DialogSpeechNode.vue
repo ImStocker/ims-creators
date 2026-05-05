@@ -77,11 +77,7 @@
             "
           ></DataField>
           <button
-            v-if="
-              !readonly &&
-              variable.default !== undefined &&
-              variable.default !== null
-            "
+            v-if="shouldShowRestoreVariableButton(variable)"
             class="is-button is-button-icon DialogSpeechNode-prop-restore"
             :title="$t('imsDialogEditor.speech.restoreValues')"
             @click="nodeDataController.deleteValue(variable.name)"
@@ -184,11 +180,7 @@
                   "
                 ></DataField>
                 <button
-                  v-if="
-                    !readonly &&
-                    variable.default !== undefined &&
-                    variable.default !== null
-                  "
+                  v-if="shouldShowRestoreOptionButton(variable, option_index)"
                   class="is-button is-button-icon DialogSpeechNode-prop-restore"
                   :title="$t('imsDialogEditor.speech.restoreValues')"
                   @click="
@@ -258,6 +250,8 @@ import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue
 import DataField from '../parts/DataField.vue';
 import {
   AssetPropType,
+  sameAssetPropValues,
+  type AssetPropValue,
   type AssetPropValueFile,
 } from '~ims-app-base/logic/types/Props';
 import { convertTranslatedTitle } from '~ims-app-base/logic/utils/assets';
@@ -265,7 +259,10 @@ import { generateDataPinId } from '../editor/DialogEditor';
 import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import type { DialogBlockController } from '../editor/DialogBlockController';
+import type {
+  DialogBlockController,
+  DialogVariable,
+} from '../editor/DialogBlockController';
 import SpeechParametersDialog from '../dialogs/SpeechParametersDialog.vue';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
@@ -377,6 +374,48 @@ export default defineComponent({
     this.updatePins();
   },
   methods: {
+    shouldShowRestoreVariableButton(variable: DialogVariable) {
+      let variable_value = this.nodeDataController.values[variable.name];
+      if (variable_value === undefined || variable_value === null) {
+        variable_value = variable.default;
+      }
+      if (
+        variable_value?.hasOwnProperty('get') ||
+        variable_value?.hasOwnProperty('param')
+      ) {
+        return false;
+      }
+      return (
+        !this.readonly &&
+        variable.default !== undefined &&
+        variable.default !== null &&
+        !sameAssetPropValues(variable.default, variable_value as AssetPropValue)
+      );
+    },
+    shouldShowRestoreOptionButton(
+      variable: DialogVariable,
+      option_index: number,
+    ) {
+      let variable_value = this.nodeDataController.getOptionValue(
+        option_index,
+        variable.name,
+      );
+      if (variable_value === undefined || variable_value === null) {
+        variable_value = variable.default;
+      }
+      if (
+        variable_value?.hasOwnProperty('get') ||
+        variable_value?.hasOwnProperty('param')
+      ) {
+        return false;
+      }
+      return (
+        !this.readonly &&
+        variable.default !== undefined &&
+        variable.default !== null &&
+        !sameAssetPropValues(variable.default, variable_value as AssetPropValue)
+      );
+    },
     async deleteCover() {
       const confirm = await this.$getAppManager()
         .get(DialogManager)
@@ -562,6 +601,7 @@ export default defineComponent({
       }
       return option.values.condition === undefined || option.values.condition;
     },
+    sameAssetPropValues,
   },
 });
 </script>
