@@ -26,6 +26,7 @@ export default {
         openInCloud: 'Open in cloud',
         repeat: 'Repeat',
         pauseSyncing: 'Pause syncing',
+        loginToSync: "Please, log in to sync your project with cloud"
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',

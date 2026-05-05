@@ -26,6 +26,7 @@ export default {
         openInCloud: 'Открыть в облаке',
         repeat: 'Повторить',
         pauseSyncing: 'Приостановить синхронизацию',
+        loginToSync: "Пожалуйста, войдите, чтобы синхронизировать проект"
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',

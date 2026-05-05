@@ -12,13 +12,15 @@
                 class="ri-loop-right-line"
               ></i>
           </button>
-          <i v-if="hasSyncError && !inProcess" 
-            class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
-            :title="'Error: ' + hasSyncError"
-          ></i>
-          <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
-          <i v-else-if="projectInfo?.id && syncInfo && !inProcess && syncInfo.hasChanges" 
-            class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
+          <template v-if="isCloudProject">
+            <i v-if="hasSyncError && !inProcess" 
+              class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
+              :title="'Error: ' + hasSyncError"
+            ></i>
+            <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
+            <i v-else-if="projectInfo?.id && syncInfo && !inProcess && syncInfo.hasChanges" 
+              class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
+          </template>
         </template>
         <menu-list :menu-list="syncMenuList"></menu-list>
       </menu-button>
@@ -59,7 +61,7 @@ export default defineComponent({
       return this.syncInfo ? this.syncInfo.status === SyncCurrentStateStatus.IN_PROCESS : false;
     },
     onPause(){
-      return this.syncInfo ? this.syncInfo.status === SyncCurrentStateStatus.PAUSE : false;
+      return !this.userInfo || (this.syncInfo ? this.syncInfo.status === SyncCurrentStateStatus.PAUSE : false);
     },
     syncInfo(): SyncCurrentState | undefined {
       return this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
@@ -70,15 +72,32 @@ export default defineComponent({
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
     },
+    isCloudProject(){
+      return !!this.projectInfo?.id
+    },
     syncMenuList() {
       const list: MenuListItem[] = [];
-      if(!this.projectInfo?.id){
+      if(!this.isCloudProject){
         list.push({
           title: this.$t('desktop.fsSync.menu.syncWithCloud'),
           action: async () => {
               await this.syncWithCloud();
             }
         });
+      }
+      else if (!this.userInfo){
+        list.push({
+          title: this.$t('desktop.fsSync.menu.resume'),
+          action: async () => {
+              const logged = await this.$getAppManager()
+                .get(AuthManager)
+                .ensureLoggedInDialog(this.$t('desktop.fsSync.menu.loginToSync'));
+              if (!logged){
+                return;
+              }
+              await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
+            }
+        });        
       }
       else {
         if(this.projectInfo?.id && !this.inProcess && !this.onPause){
@@ -88,7 +107,7 @@ export default defineComponent({
                 if(!this.userInfo){
                   await this.$getAppManager()
                     .get(AuthManager)
-                    .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+                    .ensureLoggedInDialog(this.$t('desktop.fsSync.menu.loginToSync'));
                 }
                 await this.$getAppManager().get(DesktopSyncManager).runSync()
                 const sync_status = this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
@@ -136,31 +155,31 @@ export default defineComponent({
   },
   methods: {
     async syncWithCloud(){
-      if(!this.userInfo){
-        await this.$getAppManager()
-          .get(AuthManager)
-          .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+      const logged_in = await this.$getAppManager()
+        .get(AuthManager)
+        .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+      if (!logged_in){
+        return;
       }
-      else {
-        try {
-          const user_licenses = await this.$getAppManager()
-            .get<DesktopAuthManager>(AuthManager)
-            .getUserLicense();
-          const has_license = user_licenses.list.find(license => license.features.desktopSync);
-          const project_info = this.projectInfo;
-          if(project_info && (project_info.license?.features.desktopSync || has_license)){
-            const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
-            if(res){
-              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
-            }
-          }
-          else {
-            await this.$getAppManager().get(DialogManager).show(BuyLicenseDialog, {});
+    
+      try {
+        const user_licenses = await this.$getAppManager()
+          .get<DesktopAuthManager>(AuthManager)
+          .getUserLicense();
+        const has_license = user_licenses.list.find(license => license.features.desktopSync);
+        const project_info = this.projectInfo;
+        if(project_info && (project_info.license?.features.desktopSync || has_license)){
+          const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
+          if(res){
+            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
           }
         }
-        catch(err: any) {
-          this.$getAppManager().get(UiManager).showError(err.message);
+        else {
+          await this.$getAppManager().get(DialogManager).show(BuyLicenseDialog, {});
         }
+      }
+      catch(err: any) {
+        this.$getAppManager().get(UiManager).showError(err.message);
       }
     },
     async openSyncManageDialog() {
