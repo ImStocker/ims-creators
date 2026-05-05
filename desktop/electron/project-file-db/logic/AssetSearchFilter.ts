@@ -119,7 +119,10 @@ export class AssetSearchFilter{
 
         this._filterIsSystem = this.where.isSystem !== undefined ? this.where.isSystem : (this.where.issystem !== undefined ? this.where.issystem : null );
         this._filterQuery = this.where.query ? new RegExp('.*' + escapeRegExp(this.where.query) + '.*' , 'i') : null;
-
+        
+        if (!this._filterQuery && this.where.search && this.where.search.v){
+           this._filterQuery = this.where.search.v.length > 0 ? new RegExp('.*' + escapeRegExp(this.where.search.v[0].query) + '.*' , 'i') : null;
+        }
 
 
         for (const [where_key, where_cond] of Object.entries(this.where)){
