@@ -168,7 +168,7 @@ export class ProjectService {
                     workspace_id: gdd_workspace.id,
                 }),
                 save_structure:true,
-                use_names:true,
+                name_mode: 'title',
             },
         });
         // Создаём write stream и подключаем к нему
