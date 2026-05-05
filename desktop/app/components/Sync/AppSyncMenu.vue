@@ -157,7 +157,7 @@ export default defineComponent({
     async syncWithCloud(){
       const logged_in = await this.$getAppManager()
         .get(AuthManager)
-        .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+        .ensureLoggedInDialog(this.$t('desktop.fsSync.menu.loginToSync'));
       if (!logged_in){
         return;
       }
