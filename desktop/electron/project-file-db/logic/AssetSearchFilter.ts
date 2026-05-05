@@ -130,7 +130,7 @@ export class AssetSearchFilter{
             if(where_cond && typeof where_cond === 'object'){
                 if ((where_cond as AssetPropWhereOp).op === AssetPropWhereOpKind.AND){
                     for (const v of (where_cond as AssetPropWhereOpAnd).v){
-                        this._subFiltersAnds.push(new AssetSearchFilter(v, this.db))
+                        this._subFiltersAnds.push(await AssetSearchFilter.Create(v, this.db))
                     }
                     handled = true;
                 }
