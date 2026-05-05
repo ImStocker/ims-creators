@@ -15,16 +15,26 @@ export class SettingsService{
 
     async getKey(key: string, default_value?: any){
         const settings: {
-            [key: string]: any
+            [path: string]: {
+                [key: string]: any
+            }
         } = await storageGetKey('settings') ?? {};
-        return settings[key] ?? default_value;
+        const project_settings = settings[this.db.localPath] ?? {};
+        return project_settings[key] ?? default_value;
     }
 
     async setKey(key: string, value: any){
         let settings: {
-            [key: string]: any
+            [path: string]: {
+                [key: string]: any
+            }
         } = await storageGetKey('settings') ?? {};
-        settings[key] = value;
+        let project_settings = settings[this.db.localPath] 
+        if (!project_settings){
+            project_settings = {}
+            settings[this.db.localPath] = project_settings;
+        }
+        project_settings[key] = value;
         await storageSetKey('settings', settings);
     }
 }
