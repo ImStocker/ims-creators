@@ -5,20 +5,21 @@ import { compareAssetPropValues, assignPlainValueToAssetProps, convertAssetProps
 import type { AssetPropsSelectionOrder } from "~ims-app-base/logic/types/PropsSelection";
 import type { WorkspaceQueryDTOWhere, Workspace, ChangeWorkspaceRequest, WorkspaceMoveParams, WorkspaceMoveResult } from "~ims-app-base/logic/types/Workspaces";
 import { type ProjectFileDb, type ProjectFileDbWorkspace } from "../ProjectFileDb";
-import { ProjectFileDbCollection } from "../ProjectFileDbCollection";
+import { ProjectFileDbCollection } from "../logic/ProjectFileDbCollection";
 import fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
-import * as node_path from 'path';
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
-import { applyImsFileLocationChange, forbiddenFilenameCharsRegexp, getIndexRangeStartAndStep, getWorkspaceLocalPath, getWorkspaceLocalPathById, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, prepareFileBasenameByEntityTitle } from "../utils/files";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
 import JSZip from "jszip";
 import { once } from "node:events";
 import { PassThrough, type Writable } from "node:stream";
-import { shell } from 'electron'
 import { WORKSPACE_BASE_ORDERING } from "../project-db-constants";
-import { SQLITE_NOW_STM, type WorkspaceEntity } from "./SyncService/SyncService";
+import { WORKSPACE_EXT } from "./FileSystemService";
+import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
+export type WorkspaceServiceChangeWorkspaceRequest = ChangeWorkspaceRequest & { localName?: string }
+
 export class WorkspaceService implements IProjectDatabaseWorkspace{
 
     workspaces = new ProjectFileDbCollection<ProjectFileDbWorkspace>();
@@ -134,7 +135,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             return 0;
         });
     }
-    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<Workspace>> {
+    private async _workspacesGetDb(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<ProjectFileDbWorkspace>> {
         let workspaces = await this._searchWorkspaces( query.where ? query.where : {});
         workspaces = await this._sortWorkspaces(workspaces, query.order ?? []);
         const total = workspaces.length;
@@ -142,32 +143,29 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
            workspaces = workspaces.slice(query.offset ?? 0, query.count);
         }
         const res = {
-            list: workspaces.map((workspace) => {
-                    const props = assignPlainValueToAssetProps({}, workspace.props)
-                    return {
-                        ...workspace,
-                        unread: 0,
-                        props: props
-                    }
-                }),
+            list: workspaces,
             total,
         } 
         return res;
     }
-    async workspacesCreate(params: ChangeWorkspaceRequest): Promise<Workspace> {
-        const workspace_id = params.id ?? uuidv4();
-        const workspace_props = assignPlainValueToAssetProps({}, params.props ?? {})
-        const workspace_file_basename = params.title ? params.title : workspace_id;
-        let parent_workspace_path = this.db.localPath;
-        if(params.parentId) {
-            parent_workspace_path = getWorkspaceLocalPathById(params.parentId, this.db)
+    async workspacesGet(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<Workspace>> {
+        const res = await this._workspacesGetDb(query);
+        return {
+            list: res.list.map((workspace) => {
+                    const props = assignPlainValueToAssetProps({}, workspace.props)
+                    return {
+                        ...workspace,
+                        unread: 0,
+                        props
+                    }
+                }),
+            total: res.total
         }
-        const suggest_title = generateNextUniqueNameNumber(
-            (workspace_file_basename ?? 'untitled').replace(forbiddenFilenameCharsRegexp, '_').trim(),
-            (name) => !fs.existsSync(node_path.join(parent_workspace_path, name + '')),
-        );
-        const suggest_title_with_ext = suggest_title + '.imw.json'
-        const workspace_local_path = node_path.join(parent_workspace_path, suggest_title_with_ext);
+    }
+    async workspacesCreate(params: WorkspaceServiceChangeWorkspaceRequest): Promise<Workspace> {
+        const workspace_id = params.id ?? uuidv4();
+        const workspace_props = params.props ? convertAssetPropsToPlainObject(params.props) : {}
+
         const workspace: ProjectFileDbWorkspace = {
             id: workspace_id,
             title: params.title ?? '',
@@ -179,58 +177,53 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             rights: AssetRights.FULL_ACCESS,
             index: params.index ?? null,
             props: workspace_props,
-            localName: suggest_title_with_ext,
+            localName: params.localName
         };
-        this.workspaces.add(workspace);
-        await fs.promises.writeFile(workspace_local_path, JSON.stringify(workspace, null, 1));
-        const folder_local_path = workspace_local_path.replace(/\.imw\.json$/, '');
-        await fs.promises.mkdir(folder_local_path);
-        await this.markNotSyncedWorkspace(workspace_id);
-        return workspace;
-    }
-    private async markNotSyncedWorkspace(id: string){
-        await this.db.dataSource.createQueryRunner().query(`
-            INSERT INTO workspaces (id, need_sync)
-            VALUES (?,${SQLITE_NOW_STM}) ON CONFLICT (id) DO UPDATE SET need_sync = ${SQLITE_NOW_STM};
-        `, [id]);
+        const tx = new ProjectFileDbTransaction(this.db)
+        tx.changeWorkspace(null, workspace);    
+        await tx.commit();
+
+        return {
+            ...workspace,
+            props: params.props ? params.props : {}
+        };
     }
     async workspacesChange(workspace_id: string, params: ChangeWorkspaceRequest): Promise<Workspace> {
         const workspace = this.workspaces.byId.get(workspace_id);
         if(!workspace) {
             throw new Error("Workspace doesn't exist");
         }
-        const props = params.props ? assignPlainValueToAssetProps({}, params.props) : {};
+        const props = params.props ? convertAssetPropsToPlainObject(params.props) : {};
         const new_workspace_info: ProjectFileDbWorkspace = {
             ...workspace,
             ...params,
             props,
             id: workspace.id,
         }
+        const tx = new ProjectFileDbTransaction(this.db)
+        tx.changeWorkspace(workspace, new_workspace_info);    
+        await tx.commit();
         
-        const old_path = getWorkspaceLocalPath(workspace, this.db);
-        let local_path = old_path;
-        if(params.parentId !== undefined || params.title !== undefined) {
-            local_path = await applyImsFileLocationChange(new_workspace_info, old_path, this.db);
-            new_workspace_info.localName = node_path.basename(local_path);
-        }
-        // сохраняю информацию о файле
-        await fs.promises.writeFile(local_path, JSON.stringify(new_workspace_info, null, 1));
-        this.workspaces.replace(new_workspace_info);
-        await this.markNotSyncedWorkspace(workspace_id);
-        return new_workspace_info;
+        return {
+            ...new_workspace_info,
+            props: assignPlainValueToAssetProps({}, new_workspace_info.props)
+        };
     }
 
-    async saveWorkspaceFileToFile(workspace: ProjectFileDbWorkspace, file_path: string){      
-        const writableStream = fs.createWriteStream(file_path);
-        this.saveWorkspaceFileToStream(workspace, writableStream);
-        writableStream.end();
-        await once(writableStream, 'finish');
+
+    async saveWorkspaceFileToFile(workspace: ProjectFileDbWorkspace, file_path: string){   
+        await this.db.fileSystem.expectFsChange([file_path], async () => {    
+            const writableStream = fs.createWriteStream(file_path);
+            this.saveWorkspaceFileToStream(workspace, writableStream);
+            writableStream.end();
+            await once(writableStream, 'finish');
+        })
     }
 
     saveWorkspaceFileToStream(workspace: ProjectFileDbWorkspace, stream: Writable){
         stream.write(JSON.stringify({
             ...workspace,
-            localPath: undefined,
+            localName: undefined,
             rights: undefined
         }, null, 1))
     }
@@ -247,31 +240,8 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         return res;
     }
     
-    async getWorkspaceLocalPath(workspace_id: string){
-        return getWorkspaceLocalPathById(workspace_id, this.db);
-    }
-
-    private async _deleteWorkspaceFileFromFilesystem(workspace: ProjectFileDbWorkspace){
-        if (!workspace.localName) return;
-
-        const local_path_folder = getWorkspaceLocalPath(workspace, this.db)
-        const local_path_meta = local_path_folder + ".imw.json";
-
-        // 1. Delete meta file
-        try {
-            await shell.trashItem(local_path_meta);
-        }
-        catch (err: any){
-            // Ignore error
-        }
-        
-        // 2. Delete entire folder
-        try {
-            await shell.trashItem(local_path_folder);
-        }
-        catch (err: any){
-            // Ignore error
-        }
+    async getWorkspaceLocalPathFolder(workspace_id: string){
+        return getWorkspaceLocalPathFolderById(workspace_id, this.db);
     }
 
     async workspacesDelete(workspace_id: string): Promise<void> {
@@ -280,31 +250,19 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             console.warn('Workspace not found');
             return;
         }
-        const nested_workspaces = this.getNestedWorkspaces(workspace_id);
-        const nested_assets = await this.db.asset.searchAssets({
-            workspaceids: workspace_id
-        })
-        if(workspace.localName) {
-            await this._deleteWorkspaceFileFromFilesystem(workspace);
-        }
-        this.workspaces.delete(workspace_id);
-        for (const nested_workspace of nested_workspaces){
-            this.workspaces.delete(workspace_id)
-        }
-        for (const nested_asset of nested_assets){
-            this.db.asset.deleteOwnAssetFromCollectionOnly(nested_asset.id);
-        }
-        await this.markNotSyncedWorkspace(workspace_id);
-        
+        const tx = new ProjectFileDbTransaction(this.db)
+        tx.changeWorkspace(workspace, null);    
+        await tx.commit();
     }
     
     async workspacesMove(params: WorkspaceMoveParams): Promise<WorkspaceMoveResult> {
-        const avail_workspaces = await this.workspacesGet({
+        const avail_workspaces = await this._workspacesGetDb({
             where: {
                 ids: params.ids,
             }
         });
-        const touchedWIds: string[] = [];
+        
+        const tx = new ProjectFileDbTransaction(this.db)
 
         const generated_indexes = new Map<string, number>();
         if (params.indexFrom !== undefined || params.indexTo !== undefined){
@@ -314,57 +272,52 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             let index_step: number = 0;
             if (params.indexFrom !== undefined || params.indexTo !== undefined){
                 if (params.indexFrom === null){
-                cur_index = null
+                    cur_index = null
                 }
                 else if (params.indexTo === null){
-                cur_index = params.indexFrom;
+                    cur_index = params.indexFrom;
                 }
                 else {
-                const start_and_step = getIndexRangeStartAndStep(
-                    params.indexFrom, params.indexTo, avail_ids.size
-                )
-                cur_index = start_and_step.start;
-                index_step = start_and_step.step;
+                    const start_and_step = getIndexRangeStartAndStep(
+                        params.indexFrom, params.indexTo, avail_ids.size
+                    )
+                    cur_index = start_and_step.start;
+                    index_step = start_and_step.step;
                 }
             }
 
-            const affected_ids: string[] = [];
             if (avail_ids.size > 0 && cur_index !== null && cur_index !== undefined) {
                 for (const workspace_id of params.ids) {
                     if (avail_ids.has(workspace_id)) {
                         generated_indexes.set(workspace_id, cur_index);
                         const workspace_info = avail_workspaces.list.find(w => w.id);
-                        if(workspace_info && workspace_info.localName){
-                            workspace_info.index = cur_index;
-                            await fs.promises.writeFile(workspace_info.localName, JSON.stringify(workspace_info, null, 1));
-                            this.workspaces.replace(workspace_info);
+                        if (!workspace_info){
+                            continue;
                         }
+                        const new_workspace_info = {
+                            ...workspace_info,
+                            index: cur_index
+                        }
+                        tx.changeWorkspace(workspace_info, new_workspace_info)
                         cur_index += index_step;
-                        affected_ids.push(workspace_id);
                     }
                 }
             }
         }
 
         if (params.parentId !== undefined){
-            if (params.parentId){
-                touchedWIds.push(params.parentId)
-            }
             for (const workspace of avail_workspaces.list){
                 if (workspace.parentId !== params.parentId){
-                    if (workspace.parentId){
-                        touchedWIds.push(workspace.parentId)
+                    const new_workspace_info = {
+                        ...workspace, 
+                        parentId: params.parentId
                     }
-                    const new_workspace_info = {...workspace, parentId: params.parentId}
-                    const old_path = getWorkspaceLocalPath(workspace, this.db);
-                    const local_path = await applyImsFileLocationChange(new_workspace_info, old_path, this.db);
-                    new_workspace_info.localName = node_path.basename(local_path);
-                    await fs.promises.writeFile(local_path, JSON.stringify(new_workspace_info, null, 1));
-                    this.workspaces.replace(new_workspace_info);
+                    tx.changeWorkspace(workspace, new_workspace_info)
                 }
             }
         }
 
+        await tx.commit()        
         return {
             list: avail_workspaces.list.map(w => {
                 const generated_index = generated_indexes.get(w.id);
@@ -374,7 +327,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                     index: generated_index !== undefined ? generated_index : w.index
                 }
             }),
-            touchedWIds: [...new Set(touchedWIds)]
+            touchedWIds: tx.touchedWIds
         };  
     }
 
@@ -401,9 +354,9 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 prepareFileBasenameByEntityTitle(workspace.title ?? 'untitled'),
                 (val) => !used_names.has(val),
                 ' - ',
-                 '.imw.json'
+                WORKSPACE_EXT
             );
-            const basename = name.substring(0, name.length - '.imw.json'.length)
+            const basename = name.substring(0, name.length - WORKSPACE_EXT.length)
             used_names.add(name);
             const writeStream = new PassThrough();
             targetZip.file((subfolder ? subfolder + "/" : '') + name, writeStream);
@@ -420,5 +373,17 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         const zip_stream = zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
             .pipe(fs.createWriteStream(targetPath));
         await once(zip_stream, 'finish');
+    }
+    
+    findByLocalDirPath(localDirPath: string): ProjectFileDbWorkspace | null {
+        if (!localDirPath || localDirPath === '.') return this.db.RootGddFolder;
+        const segments = localDirPath.split(/[\\\/]/g);
+        let current_workspace = this.db.RootGddFolder;
+        for (const segment of segments){
+            const next = this.workspaces.iterate().find(x => x.localName === segment + WORKSPACE_EXT && x.parentId === current_workspace.id);
+            if (!next) return null;
+            current_workspace = next;
+        }
+        return current_workspace;
     }
 }

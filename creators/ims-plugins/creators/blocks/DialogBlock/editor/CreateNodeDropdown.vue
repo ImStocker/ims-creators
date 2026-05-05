@@ -12,7 +12,10 @@ import type { PropType } from 'vue';
 import { defineComponent } from 'vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptiors';
 import type { NodeDescriptor, NodeType } from '../nodes/NodeDescriptor';
-import type { AssetPropValueType } from '~ims-app-base/logic/types/Props';
+import {
+  AssetPropType,
+  type AssetPropValueType,
+} from '~ims-app-base/logic/types/Props';
 import NodeDescriptorsDropdown from './NodeDescriptorsDropdown.vue';
 
 export default defineComponent({
@@ -48,6 +51,13 @@ export default defineComponent({
         ? new Set(this.needDataOut.map((t) => t.Type))
         : null;
       return getNodeDescriptors().filter((option) => {
+        if (
+          need_data_in_set?.size === 1 &&
+          need_data_in_set.has(AssetPropType.BOOLEAN) &&
+          option.name === 'branch'
+        ) {
+          return true;
+        }
         if (this.allowedTypes && !this.allowedTypes.includes(option.type)) {
           return false;
         }

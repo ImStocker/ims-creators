@@ -16,6 +16,10 @@ import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import type { DataSource } from "typeorm";
 import { getProjectDataSource } from "./project-data-source";
 import { SyncService } from "./services/SyncService/SyncService";
+import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
+import { sendEventToProjectDbWindows } from "./project-registry";
+import { SettingsService } from "./services/SettingsService";
+import type { SyncCurrentState } from "#bridge/types/SyncTypes";
 
 export type ProjectFileDbAssetBlock = {
     id: string;
@@ -34,7 +38,7 @@ export type ProjectFileDbAssetBlock = {
 }
 
 export type ProjectFileDbAsset = AssetShort & {
-    localPath?: string;    
+    localName?: string;
     typeIds: string[];   
     parentIds: string[];
     ownTitle: string | null;
@@ -44,7 +48,18 @@ export type ProjectFileDbAsset = AssetShort & {
     references: AssetReferenceEntity[];
     lastViewedAt?: string | null;
 };
-export type ProjectFileDbWorkspace = Workspace & {
+export type ProjectFileDbWorkspace = {
+    id: string;
+    title: string;
+    name: string | null;
+    parentId: string | null;
+    projectId: string;
+    createdAt: string;
+    updatedAt: string;
+    rights: number;
+    index: number | null;    
+    props: AssetPropsPlainObject;
+    unread?: number;
     localName?: string;
 };
 
@@ -73,7 +88,8 @@ export type ProjectFileDbInfo = {
 export type ProjectFileDbInitParams = { 
     title: string, 
     id: string | null, 
-    rootWorkspaceId: string | null
+    rootWorkspaceId: string | null,
+    recreate?: true
 }
 
 export class ProjectFileDb  {
@@ -88,11 +104,17 @@ export class ProjectFileDb  {
     public project = new ProjectService(this);
     public api = new ApiService(this);
     public sync = new SyncService(this);
+    public settings = new SettingsService(this);
+
+    public localPath: string; // Path to root of project. No slash at the end
 
     public RootGddFolder =  {...RootGddFolder}
 
-    constructor(public localPath: string){
-
+    constructor(localPath: string){
+        this.localPath = path.normalize(localPath);
+        if (this.localPath[this.localPath.length - 1] === '/' || this.localPath[this.localPath.length - 1] === '\\'){
+            this.localPath = this.localPath.substring(0, this.localPath.length - 1);
+        }
     }
 
     get isDestroying(){
@@ -104,20 +126,26 @@ export class ProjectFileDb  {
           recursive: true
         });
 
-        try {
-          const projectInfoText = await fs.promises.readFile(path.join(this.localPath, PROJECT_META_INDEX), 'utf-8')
-          const projectInfo = JSON.parse(projectInfoText);
-          this._info = {
-              id: projectInfo.id ?? '',
-              title:projectInfo.title,
-              inited: projectInfo.inited,
-              rootWorkspaceId: projectInfo.rootWorkspaceId
-          }
-        } catch (err: any) {
-          if (!/^ENOENT:/.test(err.message)){
-            throw err;
-          }
+        let need_recreate = !!initParams?.recreate;
+        if (!need_recreate){
+            try {
+            const projectInfoText = await fs.promises.readFile(path.join(this.localPath, PROJECT_META_INDEX), 'utf-8')
+            const projectInfo = JSON.parse(projectInfoText);
+            this._info = {
+                id: projectInfo.id ?? '',
+                title:projectInfo.title,
+                inited: projectInfo.inited,
+                rootWorkspaceId: projectInfo.rootWorkspaceId
+            }
+            } catch (err: any) {
+                if (!/^ENOENT:/.test(err.message)){
+                    throw err;
+                }
+                need_recreate = true;
+            }
+        }
 
+        if (need_recreate){
           const title = initParams?.title ?? this.localPath.split(/[\\/]/).pop() ?? '';
           this._info = {
             id: initParams?.id ?? '',
@@ -127,7 +155,7 @@ export class ProjectFileDb  {
           }
           await fs.promises.writeFile(path.join(this.localPath, PROJECT_META_INDEX), JSON.stringify(this._info), 'utf-8')
         }
-
+        assert(this._info);
         
         this.api.init(getMainTokenStorage())
         if (this._info.id){
@@ -146,12 +174,18 @@ export class ProjectFileDb  {
         await this._dataSource.runMigrations({
             transaction: 'all',
         });
-        this.sync.init();
+        await this.sync.init();
+        this.settings.init();
     }
 
-    init(initParams?: ProjectFileDbInitParams){
+    async init(initParams?: ProjectFileDbInitParams){
         if (this.isDestroying){
             throw new Error('Cannot init destroying ProjectFileDb');
+        }
+        if(initParams?.recreate) {
+            await this.destroy();
+            this._destroying = null;
+            this._initing = null;
         }
         if (!this._initing){
             this._initing = this._initImpl(initParams).catch(err => {
@@ -169,6 +203,7 @@ export class ProjectFileDb  {
         }
         await this.fileSystem.destroy();
         this.sync.destroy();
+        this.settings.destroy();
         this._info = null;
     }
 
@@ -192,9 +227,15 @@ export class ProjectFileDb  {
         return this._dataSource;
     }
 
-    export(workpsaceId: string, targetPath: string){
+    export(workspaceId: string, targetPath: string){
         
     }
 
+    sendProjectChange(changes: ProjectContentChangeEventArg){
+        sendEventToProjectDbWindows(this.localPath, 'contentChange', [changes])
+    }
 
+    sendSyncState(changes: SyncCurrentState){
+        sendEventToProjectDbWindows(this.localPath, 'syncState', [changes])
+    }
 }

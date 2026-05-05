@@ -3,71 +3,132 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
-import { absolutePathToUuid } from "../utils/files";
+import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
-import watcher, { type AsyncSubscription } from "@parcel/watcher"
+import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
 import path from "node:path";
 import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../project-db-constants";
 import log from 'electron-log/main';
+import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
+type FileSystemExpectChange = {
+    filepaths: string[]
+}
+
+type FileSystemEntryWithLocalPath<T> = {
+    entry: T,
+    localPath: string
+}
+
+type FileSystemWorkspaceContent = {
+    assets: FileSystemEntryWithLocalPath<ProjectFileDbAsset>[],
+    workspaces: FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>[],
+}
+
+const PARCEL_WATCHER_DELAY = 100;
+
+export const ASSET_EXT = '.ima.json'
+export const ASSET_EXT_TEST_REGEXP = /\.ima[ \d\(\)\[\]_]*\.json$/i
+export const WORKSPACE_EXT = '.imw.json'
+export const WORKSPACE_EXT_TEST_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i
+
+export const ATTACHMENTS_FOLDER = 'attachments'
+
+function prepareEntityTitle(filename: string, title: string | null, ext_regexp: RegExp): string {
+    const title_to_filename = title ? prepareFileBasenameByEntityTitle(title) : '';
+    const filename_without_ext = filename.replace(ext_regexp, '') 
+    const filename_without_index = filename_without_ext.replace(/ - \d+$/, '');  // Remove index if name was used
+    if (title_to_filename === filename_without_index && title){
+        return title
+    }
+    else {
+        return filename_without_ext
+    }
+}
+
+
 export class FileSystemService{
 
     private _fsWatcherSubscription: AsyncSubscription | null = null;
+    private _fsExpectChanges: FileSystemExpectChange[] = []
+    private _fsPendingFSEvents: Event[] = []
+    private _fsPendingFSInWork = false
 
     constructor(public db: ProjectFileDb){
 
     }
 
-    async loadFile(local_path: string, workspace_id: string, root_path: string): Promise<{
+    private async _loadFile(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
         type: 'asset',
-        asset: ProjectFileDbAsset
+        asset: ProjectFileDbAsset,
+        localPath: string
     } | {
         type: 'workspace',
-        workspace: ProjectFileDbWorkspace
+        workspace: ProjectFileDbWorkspace,
+        localPath: string
     } | null>{
     
-        const local_name = node_path.basename(local_path);
+        const local_path = node_path.relative(this.db.localPath, absolutePath)
+        const local_name = node_path.basename(absolutePath);
         const extname = node_path.extname(local_name);
         
         if (extname !== '.json' && extname !== '.md'){
             return null
         }
 
-        const file_info = await fs.promises.stat(local_path);
+        let file_info: fs.Stats;
+        try {
+            file_info = await fs.promises.stat(absolutePath);
+        }
+        catch (err: any){
+            if (err.code === 'ENOENT'){
+                return null;
+            }
+            throw err;
+        }
+
         const created_at = file_info.birthtime.toISOString();
         const updated_at = file_info.mtime.toISOString();
 
-        const file = await fs.promises.readFile(local_path, { encoding: 'utf8' });
+        const file = await fs.promises.readFile(absolutePath, { encoding: 'utf8' });
         if (extname === '.json') {
-            if (/\.ima[ \d\(\)\[\]_]*\.json$/i.test(local_name)) {
+            if (ASSET_EXT_TEST_REGEXP.test(local_name)) {
                 const asset = JSON.parse(file) as ProjectFileDbAsset;
+                asset.title = prepareEntityTitle(local_name, asset.title, ASSET_EXT_TEST_REGEXP)
                 asset.localName = local_name
-                asset.workspaceId = workspace_id;
+                asset.workspaceId = parentWorkspaceId;
                 asset.createdAt = created_at;
                 asset.updatedAt = updated_at;
+                asset.projectId = this.db.info.id ?? '';
+                asset.rights = AssetRights.FULL_ACCESS;
                 return {
                     type: 'asset',
+                    localPath: local_path,
                     asset
                 }
             }
-            else if (/\.imw[ \d\(\)\[\]_]*\.json$/i.test(local_name)){
+            else if (WORKSPACE_EXT_TEST_REGEXP.test(local_name)){
                 const workspace_info = JSON.parse(file) as ProjectFileDbWorkspace;
+                workspace_info.title = prepareEntityTitle(local_name, workspace_info.title, WORKSPACE_EXT_TEST_REGEXP)
                 workspace_info.localName = local_name
-                workspace_info.parentId = workspace_id;
+                workspace_info.parentId = parentWorkspaceId;
                 workspace_info.createdAt = created_at;
                 workspace_info.updatedAt = updated_at;
+                workspace_info.projectId = this.db.info.id ?? '';
+                workspace_info.rights = AssetRights.FULL_ACCESS;
                 return {
                     type: 'workspace',
+                    localPath: local_path,
                     workspace: workspace_info
                 };
             }
         }
         else if(extname === '.md'){
             const asset_full: ProjectFileDbAsset = {
-                id: absolutePathToUuid(local_path, root_path),
+                id: absolutePathToUuid(absolutePath, rootPath),
                 projectId: this.db.project.db.info.id ?? '',
-                workspaceId: workspace_id,
+                workspaceId: parentWorkspaceId,
                 name: null,
                 title: node_path.basename(local_name, extname),
                 icon: 'markdown-fill',
@@ -127,35 +188,42 @@ export class FileSystemService{
             };
             return {
                 type: 'asset',
+                localPath: local_path,
                 asset: asset_full
             };
         }
         return null;
     }
 
-    private async _loadFiles(items: fs.Dirent[], path: string, workspace_id: string, root_path: string): Promise<{
-        assets: Map<string, ProjectFileDbAsset>,
-        workspaces: Map<string, ProjectFileDbWorkspace>,
+    private async _loadFileItems(items: fs.Dirent[], path: string, parentWorkspaceId: string, rootPath: string): Promise<{
+        assets: Map<string, FileSystemEntryWithLocalPath<ProjectFileDbAsset>>,
+        workspaces: Map<string, FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>>,
     }>{
-        const assets = new Map<string, ProjectFileDbAsset>();
-        const workspaces = new Map<string, ProjectFileDbWorkspace>();
+        const assets = new Map<string, FileSystemEntryWithLocalPath<ProjectFileDbAsset>>();
+        const workspaces = new Map<string, FileSystemEntryWithLocalPath<ProjectFileDbWorkspace>>();
         for (const item of items) {
             if (item.name.startsWith('.')){
                 continue;
             }
             if (item.isFile()){
                 try {
-                    const loaded = await this.loadFile(
+                    const loaded = await this._loadFile(
                         node_path.join(path, item.name),
-                        workspace_id,
-                        root_path
+                        parentWorkspaceId,
+                        rootPath
                     )
                     if (loaded){
                         if (loaded.type === 'asset'){
-                            assets.set(item.name, loaded.asset)
+                            assets.set(item.name, {
+                                entry: loaded.asset,
+                                localPath: loaded.localPath
+                            })
                         }
                         else if (loaded.type === 'workspace'){
-                            workspaces.set(item.name, loaded.workspace)
+                            workspaces.set(item.name, {
+                                entry: loaded.workspace,
+                                localPath: loaded.localPath
+                            })
                         }
                     }
                 }
@@ -170,46 +238,92 @@ export class FileSystemService{
         }
     }
 
-    async loadWorkspace(path: string, workspace_id: string, root_path: string): Promise<{
-        assets: ProjectFileDbAsset[],
-        workspaces: ProjectFileDbWorkspace[],
+    async loadFolderAsWorkspace(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<{
+        workspace: ProjectFileDbWorkspace,
+        localPath: string,
+        content: FileSystemWorkspaceContent
     }>{
-        const items = await fs.promises.readdir(path, {
+        return this._loadFolderAsWorkspaceImpl(absolutePath, parentWorkspaceId, async () => {
+            const abs_path = absolutePath + WORKSPACE_EXT;
+            const file = await this._loadFile(abs_path, parentWorkspaceId, rootPath);
+            if (file?.type ==='workspace'){
+                return file.workspace
+            }
+            return null;
+        }, rootPath)        
+    }
+    
+
+    async _loadFolderAsWorkspaceImpl(absolutePath: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
+        workspace: ProjectFileDbWorkspace,
+        localPath: string,
+        content: FileSystemWorkspaceContent
+    }>{
+        const local_path = node_path.relative(this.db.localPath, absolutePath) + WORKSPACE_EXT
+        let workspace = await getWorkspaceMeta();
+        if(!workspace){
+            const file_info = await fs.promises.stat(absolutePath);
+            const created_at = file_info.birthtime.toISOString();
+            const updated_at = file_info.mtime.toISOString();
+            const title = node_path.basename(absolutePath);
+            const local_name = title + WORKSPACE_EXT;
+            workspace = {
+                id: absolutePathToUuid(absolutePath, root_path),
+                title: title,
+                name: null,
+                parentId: parentWorkspaceId,
+                projectId: this.db.project.db.info.id ?? '',
+                createdAt: created_at,
+                updatedAt: updated_at,
+                rights: AssetRights.FULL_ACCESS,
+                index: null,
+                props: {},
+                localName: local_name,
+            }
+        }
+        const content = await this.loadWorkspaceContentFromPath(
+            absolutePath,
+            workspace.id,
+            root_path
+        )
+        return {
+            workspace, 
+            localPath: local_path,
+            content
+        }
+    }
+
+    async loadWorkspaceContentFromPath(absolutePath: string, parentWorkspaceId: string, root_path: string): Promise<FileSystemWorkspaceContent>{
+        const items = await fs.promises.readdir(absolutePath, {
             withFileTypes: true,
         });
-        const { assets, workspaces } = await this._loadFiles(items, path, workspace_id, root_path);
+        const { assets, workspaces } = await this._loadFileItems(items, absolutePath, parentWorkspaceId, root_path);
         const res_assets = [...assets.values()]
         const res_workspaces = [...workspaces.values()]
         for (const item of items) {
             if (item.isDirectory()) {
-                if (root_path === path && (item.name.startsWith('.') || item.name === 'attachments')){
+                if (root_path === absolutePath && (item.name.startsWith('.') || item.name === 'attachments')){
                     continue; // Ignore service folders
                 }
-                const local_name = item.name + ".imw.json";
-                const folder = node_path.join(path, item.name);
-                let workspace: ProjectFileDbWorkspace | undefined = workspaces.get(local_name);
-                if(!workspace){
-                    const file_info = await fs.promises.stat(folder);
-                    const created_at = file_info.birthtime.toISOString();
-                    const updated_at = file_info.mtime.toISOString();
-                    workspace = {
-                        id: absolutePathToUuid(folder, root_path),
-                        title: item.name,
-                        name: null,
-                        parentId: workspace_id,
-                        projectId: this.db.project.db.info.id ?? '',
-                        createdAt: created_at,
-                        updatedAt: updated_at,
-                        rights: AssetRights.FULL_ACCESS,
-                        index: null,
-                        props: {},
-                        localName: local_name,
-                    }
-                    res_workspaces.push(workspace)
+
+                const local_path = node_path.relative(this.db.localPath, node_path.join(absolutePath, item.name))
+                const local_name = item.name + WORKSPACE_EXT
+                const folder = node_path.join(absolutePath, item.name);
+                const exist_workspace = workspaces.get(local_name) ?? null
+                const loaded_workspace = await this._loadFolderAsWorkspaceImpl(
+                    folder,
+                    parentWorkspaceId,
+                    async () => exist_workspace?.entry ?? null,
+                    root_path
+                );
+                if (!exist_workspace){
+                    res_workspaces.push({
+                        entry: loaded_workspace.workspace,
+                        localPath: local_path
+                    });
                 }
-                const res = await this.loadWorkspace(folder, workspace.id, root_path);
-                res_assets.push(...res.assets);
-                res_workspaces.push(...res.workspaces);
+                res_assets.push(...loaded_workspace.content.assets);
+                res_workspaces.push(...loaded_workspace.content.workspaces);
             }
         }
         return {
@@ -224,12 +338,226 @@ export class FileSystemService{
         ]
     }
 
+    private _findExistentEntryByLocalPath(localPath: string): {
+        type: 'asset',
+        asset: ProjectFileDbAsset,
+    } | {
+        type: 'workspace',
+        workspace: ProjectFileDbWorkspace,
+    } | null {
+        const has_workspace_meta_suffix = localPath.substring(localPath.length - WORKSPACE_EXT.length, localPath.length) === WORKSPACE_EXT
+
+        const exists_asset = !has_workspace_meta_suffix ? this.db.asset.findByLocalPath(localPath) : null
+        if (exists_asset){
+            return {
+                type: 'asset',
+                asset: exists_asset
+            }
+        }
+
+        let workspace_meta_local_path = has_workspace_meta_suffix ? localPath.substring(0, localPath.length - WORKSPACE_EXT.length) : localPath;
+        const exists_workspace = this.db.workspace.findByLocalDirPath(workspace_meta_local_path);
+
+        if (exists_workspace){
+            return {
+                type: 'workspace',
+                workspace: exists_workspace
+            }
+        }
+
+        return null;
+    }
+
+    private async _handlePendingFSEvents(){
+        if (this._fsPendingFSInWork){
+            return;
+        }
+        if (this._fsPendingFSEvents.length === 0){
+            return;
+        }
+        this._fsPendingFSInWork = true;
+        try {
+            const events = this._fsPendingFSEvents;
+            this._fsPendingFSEvents = []
+
+            const root_path = this.db.localPath;
+            const deleting_assets = new Map<string, ProjectFileDbAsset>()
+            const deleting_workspaces = new Map<string, ProjectFileDbWorkspace>();
+
+            const tx = new ProjectFileDbTransaction(this.db)
+            const upsertWorkspace = async (localPath: string, workspace: ProjectFileDbWorkspace) => {
+                const exist = this._findExistentEntryByLocalPath(localPath);
+                deleting_workspaces.delete(workspace.id) // Workspace moved
+                tx.changeWorkspace(
+                    exist?.type === 'workspace' ? exist.workspace : null,
+                    workspace
+                )
+                await tx.flush({
+                    fsProcessed: true
+                })
+            }
+            const upsertAsset = async (localPath: string, asset: ProjectFileDbAsset) => {
+                const exist = this._findExistentEntryByLocalPath(localPath);
+                deleting_assets.delete(asset.id) // Asset moved
+                tx.changeAsset(
+                    exist?.type === 'asset' ? exist.asset : null,
+                    asset,
+                )
+            }
+
+            for (const event of events){
+                const local_path = event.path.substring(this.db.localPath.length + 1);
+                if (event.type === 'create' || event.type === 'update'){
+                    const parent_workspace_local_path = node_path.dirname(local_path);
+                    const parent_workspace = this.db.workspace.findByLocalDirPath(parent_workspace_local_path);
+                    const parent_workspace_id = parent_workspace ? parent_workspace.id : this.db.RootGddFolder.id
+
+                    const is_dir = await isDir(event.path);
+                    if (is_dir){
+                        const loaded_new_dir = await this.loadFolderAsWorkspace(
+                            event.path,
+                            parent_workspace_id,
+                            root_path
+                        )
+                        await upsertWorkspace(
+                            loaded_new_dir.localPath,
+                            loaded_new_dir.workspace
+                        )
+                        for (const e of loaded_new_dir.content.workspaces){
+                            await upsertWorkspace(e.localPath, e.entry)
+                        }
+                        for (const e of loaded_new_dir.content.assets){
+                            await upsertAsset(e.localPath, e.entry)
+                        }
+                    }
+                    else {
+                        const new_entry = await this._loadFile(
+                            event.path, 
+                            parent_workspace_id,
+                            root_path
+                        )
+                        if (new_entry?.type === 'asset') {
+                            await upsertAsset(new_entry.localPath, new_entry.asset)
+                        }
+                        else if (new_entry?.type === 'workspace'){
+                            await upsertWorkspace(new_entry.localPath, new_entry.workspace)
+                        }
+                    }
+                }
+                else {
+                    const exist = this._findExistentEntryByLocalPath(local_path);
+                    if (exist?.type === 'asset') deleting_assets.set(exist.asset.id, exist.asset)
+                    else if (exist?.type === 'workspace') deleting_workspaces.set(exist.workspace.id, exist.workspace)
+                }
+            }
+
+            // Apply delete
+            for (const deleting_asset of deleting_assets.values()){
+                tx.changeAsset(deleting_asset, null)
+            }
+            for (const deleting_workspace of deleting_workspaces.values()){
+                tx.changeWorkspace(deleting_workspace, null)
+            }
+
+            await tx.commit({
+                fsProcessed: true
+            })
+        }
+        catch (err: any){
+            log.error('FileSystemService: handling fs events', err.message, err.stack)
+        }
+        finally{
+            this._fsPendingFSInWork = false;
+        }
+        if (this._fsPendingFSEvents.length > 0){
+            this._handlePendingFSEvents() // No await;
+        }
+    }
+
+    private async _resortPendingFSEvents(){
+        let sorted_events: Event[] = [];
+        const event_by_path = new Map<string, Event>()
+
+        for (const event of this._fsPendingFSEvents){
+            const cur = event_by_path.get(event.path)
+            if (!cur || cur.type === 'update') event_by_path.set(event.path, event);
+            else if (cur.type === 'delete' && event.type === 'create'){
+                event_by_path.set(event.path, {
+                    path: cur.path,
+                    type: 'update'
+                })
+            } 
+            else if (cur.type === 'create' && event.type === 'delete'){
+                event_by_path.delete(event.path)
+            }
+        }
+
+        sorted_events = [...event_by_path.values()];
+        sorted_events.sort((a, b) => {
+            const a_index = a.type === 'delete' ? 1 : (a.type === 'create' ? 2 : 3)
+            const b_index = b.type === 'delete' ? 1 : (b.type === 'create' ? 2 : 3)
+            if (a_index !== b_index){
+                return a_index - b_index;
+            }
+            return a.path.localeCompare(b.path);
+        })
+        this._fsPendingFSEvents = sorted_events;
+    }
+
     private async _initWatcher(){
-        this._fsWatcherSubscription = await watcher.subscribe(this.db.localPath, (err, events) => {
-            log.log(err, events);
+        const ignoringPaths = new Set<string>([           
+        ])
+        this._fsWatcherSubscription = await watcher.subscribe(this.db.localPath, async (err, events) => {
+            if (err){
+                log.error('FS Watcher error', err.message);
+                return;
+            }
+
+            let any_added = false;
+            for (const event of events){
+                let ignored = ignoringPaths.has(event.path) || 
+                              this._fsExpectChanges.some(expect => expect.filepaths.some(f => event.path.startsWith(f)));
+                if (ignored){
+                    continue;
+                }
+                const local_path = node_path.relative(this.db.localPath, event.path);
+                if (local_path === ATTACHMENTS_FOLDER){
+                    continue;
+                }
+                const segments = event.path.split(/\/\\/g);
+                const has_hidden_segment = segments.some(s => s.startsWith('.'));
+                if (has_hidden_segment){
+                    continue;
+                }
+
+                this._fsPendingFSEvents.push(event)
+                any_added = true;
+            }
+            
+            if (any_added){
+                this._resortPendingFSEvents();
+                this._handlePendingFSEvents() // No await;
+            }
         }, {
             ignore: this._getWatcherIgnore()
         });
+    }
+
+    public async expectFsChange<T>(filepaths: string[], action: () => Promise<T>): Promise<T>{
+        const expectChange: FileSystemExpectChange = {
+            filepaths: filepaths.map(f => node_path.normalize(f))
+        }
+        this._fsExpectChanges.push(expectChange);
+        try {
+            return await action()
+        }
+        finally {
+            // Additional delay before cleanup, because parcel watcher has internal debounce
+            setTimeout(() => {
+                const ind = this._fsExpectChanges.indexOf(expectChange);
+                if (ind >= 0) this._fsExpectChanges.splice(ind, 1);
+            }, PARCEL_WATCHER_DELAY)
+        }
     }
 
 
@@ -251,31 +579,10 @@ export class FileSystemService{
             return {...workspace, rights: 1}
         }));
 
-        // User
-        const user_files = await this.loadWorkspace(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
-        this.db.asset.assets.addMany(user_files.assets.map(asset => {
-            const changed_asset: ProjectFileDbAsset = { 
-                ...asset,
-                projectId: this.db.info.id,
-                rights: 5
-            }
-            if (!changed_asset.workspaceId){
-                changed_asset.workspaceId = this.db.RootGddFolder.id;
-            }
-            return changed_asset
-        }));
+        const user_files = await this.loadWorkspaceContentFromPath(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
+        this.db.asset.assets.addMany(user_files.assets.map(asset => asset.entry));
         this.db.workspace.workspaces.add(this.db.RootGddFolder)
-        this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => {
-            const changed_workspace =  {
-                ...workspace, 
-                projectId: this.db.info.id,
-                rights: 5
-            }
-            if (!changed_workspace.parentId){
-                changed_workspace.parentId = this.db.RootGddFolder.id;
-            }
-            return changed_workspace
-        }));
+        this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
         
         this._initWatcher();
     }

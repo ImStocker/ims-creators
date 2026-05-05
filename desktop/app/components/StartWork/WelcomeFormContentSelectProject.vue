@@ -9,15 +9,16 @@
       </button>
     </div>
     <div class="WelcomeFormContentSelectProject-Other">
-      <div class="WelcomeFormContentCreateProject-Action" v-if="hasProjects">
+      <div class="WelcomeFormContentCreateProject-Action">
         <div class="WelcomeFormContentStart-Action-left">
           <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.selectProject')}}</div>
           <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.selectProject')}}</div>
         </div>
-        <ims-select
+        <div v-if="loading" class="loaderSpinner"></div>
+        <ims-select v-else
           v-model="project"
           class="WelcomeFormContentCreateProject-Action-ImsSelect"
-          :options="projects"
+          :options="projects.list"
           :label-prop="'title'"
           :clearable="false"
           :placeholder="$t('desktop.welcome.selectProject')"
@@ -44,14 +45,18 @@
           </SelectFolderForm>
         </div>
       </div>
-      <div v-if="project && hasWarning" class="WelcomeFormContentCreateProject-warning">
+      <div v-if="project && errorMessage" class="WelcomeFormContentCreateProject-warning">
         <i class="ri-error-warning-fill"></i>
-        {{ $t('desktop.welcome.sameProjectTitle') }}
+        {{ errorMessage }}
       </div>
       <AdvancedForm :project-folder-name="projectFolderName"
         @update:folder-name="projectFolderName = $event"></AdvancedForm>
       <div class="WelcomeFormContentSelectProject-create">
-        <button class="is-button accent" @click="downloadProject" :disabled="!canCreate || hasWarning">{{$t('desktop.welcome.downloadProject')}}</button>
+        <button class="is-button accent"
+          @click="downloadProject"
+          :class="{loading: projectIsDownloading}"
+          :disabled="!canCreate || !!errorMessage"
+        >{{$t('desktop.welcome.downloadProject')}}</button>
       </div>
   </div>
 </template>
@@ -60,7 +65,7 @@ import { defineComponent } from 'vue';
 import AdvancedForm from './AdvancedForm.vue';
 import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
-import type { ProjectFullInfo, ProjectShortInfo } from '~ims-app-base/logic/types/ProjectTypes';
+import type { ProjectFullInfo, ProjectLicense, ProjectShortInfo } from '~ims-app-base/logic/types/ProjectTypes';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import SelectFolderForm from '../Common/SelectFolderForm.vue';
 import path from 'path';
@@ -69,6 +74,8 @@ import { forbiddenFilenameCharsRegexp } from '#bridge/utils/regex';
 import DesktopProjectManager from '#logic/managers/DesktopProjectManager';
 import ApiManager from '~ims-app-base/logic/managers/ApiManager';
 import { HttpMethods, Service } from '~ims-app-base/logic/managers/ApiWorker';
+import AuthManager from '~ims-app-base/logic/managers/AuthManager';
+import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
 
 export default defineComponent({
   name: 'WelcomeFormContentSelectProject',
@@ -84,18 +91,41 @@ export default defineComponent({
       projectLocation: '',
       project: null as ProjectShortInfo | null,
       projectFolderName: '',
-      hasWarning: false,
+      errorMessage: null as null | string,
+      projects: {
+        list: [] as ProjectShortInfo[],
+        total: 0,
+      },
+      userLicenses: {
+        list: [] as ProjectLicense[],
+        total: 0,
+      },
+      loading: false,
+      projectIsDownloading: false
     }
   },
   async mounted(){
-    this.projectLocation = await window.imshost.shell.getDocumentsFolder();
+    this.loading = true;
+    try {
+      this.projectLocation = await window.imshost.shell.getDocumentsFolder();
+      this.projects = await this.$getAppManager()
+              .get(ApiManager)
+              .call(Service.CREATORS, HttpMethods.GET, 'app/projects', {});
+      this.userLicenses = await this.$getAppManager()
+        .get<DesktopAuthManager>(AuthManager)
+        .getUserLicense();
+      this.errorMessage = null;
+    }
+    catch(err: any){
+      this.errorMessage = err.message;
+    }
+    finally {
+      this.loading = false;
+    }
   },
   computed: {
-    projects() {
-      return this.$getAppManager().get(DesktopCreatorManager).getRecentProjectList();
-    },
     hasProjects(){
-      return this.projects.length > 0;
+      return this.projects.total > 0;
     },
     canCreate(){
       return this.project && this.projectFolderName && this.projectLocation;
@@ -106,26 +136,59 @@ export default defineComponent({
   },
   methods: {
     async checkExistsProject(val: string){
-      this.hasWarning = await window.imshost.fs.exists(val);
+      const project_exists = await window.imshost.fs.exists(val);
+      if(project_exists) {
+        this.errorMessage = this.$t('desktop.welcome.sameProjectTitle');
+      }
+      else {
+        this.errorMessage = null;
+      }
+    },
+    async checkLicense(){
+      if(this.project) {
+        const projectInfo: ProjectFullInfo = await this.$getAppManager()
+          .get(ApiManager)
+          .call(Service.CREATORS, HttpMethods.GET, 'project/info', {
+            pid: this.project?.id,
+          });
+        const has_license = this.userLicenses.list.find(license => license.features.desktopSync)
+        if(projectInfo.license?.features.desktopSync || has_license) {
+          this.errorMessage = null;
+        }
+        else {
+          this.errorMessage = this.$t('desktop.welcome.needLicense');
+        }
+    }
     },
     async downloadProject() {
       if(this.canCreate && this.project){
-        let rootWorkspaceId = null
-        if (this.project.id){
-          const projectInfo: ProjectFullInfo = await this.$getAppManager()
-            .get(ApiManager)
-            .call(Service.CREATORS, HttpMethods.GET, 'project/info', {
-              pid: this.project.id,
-            });
-          rootWorkspaceId = projectInfo.rootWorkspaces.find((w) => w.name === 'gdd')?.id;
-        }
+        try{
+          this.projectIsDownloading = true;
+          let rootWorkspaceId = null
+          if (this.project.id){
+            const projectInfo: ProjectFullInfo = await this.$getAppManager()
+              .get(ApiManager)
+              .call(Service.CREATORS, HttpMethods.GET, 'project/info', {
+                pid: this.project.id,
+              });
+            rootWorkspaceId = projectInfo.rootWorkspaces.find((w) => w.name === 'gdd')?.id ?? null;
+          }
 
-        await this.$getAppManager().get(DesktopProjectManager).initializeLocalProject(this.projectPath, {
-          id: this.project.id ?? null,
-          title: this.project.title,
-          rootWorkspaceId
-        });
-        await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(path.join(this.projectLocation, this.projectFolderName), false);
+          await this.$getAppManager().get(DesktopProjectManager).initializeLocalProject(this.projectPath, {
+            id: this.project.id ?? null,
+            title: this.project.title,
+            rootWorkspaceId,
+          });
+          await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(path.join(this.projectLocation, this.projectFolderName));
+        }
+        catch(err: any){
+          this.$getAppManager()
+          .get(UiManager)
+          .showError(err.message);
+        }
+        finally {
+          this.projectIsDownloading = false;
+        }
       }
       else {
         this.$getAppManager()
@@ -139,12 +202,15 @@ export default defineComponent({
   },
   watch: {
     async projectPath(new_val: string){
-      await this.checkExistsProject(new_val);
+      await this.checkLicense();
+      if(!this.errorMessage) {
+        await this.checkExistsProject(new_val);
+      }
     },
     project(){
       if(this.project){
         this.projectFolderName = this.project.title;
-      }      
+      }
     },
     projectName(new_val: string){
       this.projectFolderName = new_val.trim().replace(forbiddenFilenameCharsRegexp, '_');

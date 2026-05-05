@@ -30,8 +30,8 @@
       </div>
       <div v-if="needAuth || needLicense">
         <div class="WelcomeFormContentCreateProject-message">
-          {{ $t('desktop.welcome.' + (needLicense ? 'needLicense' : 'needAuth')) }}
-          <button v-if="needLicense" 
+          {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
+          <button v-if="needLicense && userInfo" 
             class="is-button accent" 
             @click="buyLicense()">
             {{$t('desktop.welcome.buy')}}
@@ -41,6 +41,14 @@
             class="WelcomeFormContentStart-login"
             :open-external="true"
         />
+        <div class="WelcomeFormContentCreateProject-create" v-if="userInfo">
+          <button 
+            v-if="userInfo && needLicense"
+            class="is-button accent"
+            @click="logout">
+              {{ $t('desktop.welcome.loginToAnotherAccount') }}
+          </button>
+        </div>
       </div>
       <template v-else>
         <div class="WelcomeFormContentCreateProject-Action">
@@ -86,7 +94,7 @@
     <AdvancedForm v-if="!needAuth && !needLicense" :project-folder-name="params.projectFolderName" @update:folder-name="params.projectFolderName = $event"></AdvancedForm>
     <div class="WelcomeFormContentCreateProject-create" v-if="!needAuth && !needLicense">
       <button class="is-button accent" 
-        :class="{ loading }" @click="createProject" 
+        :class="{ loading: loading && !hasWarning }" @click="createProject" 
         :disabled="!canCreate || hasWarning">
         {{$t('desktop.welcome.create')}}
       </button>
@@ -110,6 +118,10 @@ import AuthManager from '~ims-app-base/logic/managers/AuthManager';
 import LoginForm from './LoginForm.vue';
 import type { Workspace } from '~ims-app-base/logic/types/Workspaces';
 import { forbiddenFilenameCharsRegexp } from '#bridge/utils/regex';
+import { debounceForThis } from '~ims-app-base/components/utils/ComponentUtils';
+import type { ProjectLicense } from '~ims-app-base/logic/types/ProjectTypes';
+import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
+import DesktopSyncManager from '#logic/managers/DesktopSyncManager';
 
 export type CreateProjectParams = {
   projectLocation?: string,
@@ -147,18 +159,38 @@ export default defineComponent({
       currentProjectTemplateId: '',
       loading: false,
       hasWarning: false,
+      checkPathDebounce: null as any,
+      userLicenses: {
+        list: [] as ProjectLicense[],
+        total: 0,
+      }
     };
   },
   watch: {
     async projectPath(new_val: string){
-      await this.checkExistsProject(new_val);
+      if(this.checkPathDebounce){
+        this.checkPathDebounce(this);
+      }
     },
     projectName(new_val: string){
       this.params.projectFolderName = new_val.trim().replace(forbiddenFilenameCharsRegexp, '_');
+    },
+    async userInfo(){
+      await this.updateUserLicense();
+    },
+    'params.projectType': {
+      handler(newVal) {
+        if (newVal === 'cloud') {
+          this.updateUserLicense();
+        }
+      },
     }
   },
   async mounted(){
     this.params.projectLocation = await window.imshost.shell.getDocumentsFolder();
+    if(this.params.projectType === 'cloud'){
+      await this.updateUserLicense();
+    }
     this.params = {
       ...this.params,
       ...this.createProjectParams
@@ -166,13 +198,16 @@ export default defineComponent({
     if (this.$refs['inputName']) {
       (this.$refs['inputName'] as HTMLButtonElement).focus();
     }
+    this.checkPathDebounce = debounceForThis(async function (this: any) {
+      await this.checkExistsProject(this.projectPath);
+    }, 200);
   },
   computed: {
     needAuth(){
       return this.params.projectType === 'cloud' && !this.userInfo;
     },
     needLicense(){
-      return this.params.projectType === 'cloud' && !this.userInfo.licenses.find((l: { productName: string | string[]; }) => l.productName.includes('pro'));
+      return this.params.projectType === 'cloud' && !this.userLicenses.list.find(license => license.features.desktopSync);
     },
     userInfo(){
       return this.$getAppManager().get(AuthManager).getUserInfo();
@@ -207,14 +242,44 @@ export default defineComponent({
     }
   },
   methods: {
+    async logout(){
+      try{
+        await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .logout();
+      }
+      catch(err: any){
+        this.$getAppManager().get(UiManager).showError(err.message);
+      }
+    },
+    async updateUserLicense(){
+      try{
+        this.userLicenses = await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .getUserLicense();
+      }
+      catch(err: any){
+        if(this.params.projectType !== 'cloud'){
+          this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+        }
+      }
+    },
     async checkExistsProject(val: string){
       this.hasWarning = await window.imshost.fs.exists(val);
+      return this.hasWarning;
     },
     buyLicense(){
       window.location.replace(`https://ims.cr5.space/app/prices`)
     },
     async createProject() {
       this.loading = true;
+      if(await this.checkExistsProject(this.projectPath)) {
+        return;
+      }
+      await this.updateUserLicense();
+      if(this.needLicense) {
+        return;
+      }
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
@@ -226,13 +291,11 @@ export default defineComponent({
             .get(DesktopProjectManager)
             .createProject({
               title: this.params.projectName,
-              templateIds: [this.currentProjectTemplateId],
               menu_settings: {
                 'menu-about': false,
                 'menu-gamedesign': true,
                 'menu-team': true,
               },
-              init_script: 'starter',
             }) : null;
           let rootWorkspaceId = null
           if (new_project_info){
@@ -242,10 +305,13 @@ export default defineComponent({
           await this.$getAppManager().get(DesktopProjectManager).initializeLocalProject(this.projectPath, {
             id: new_project_info?.id ?? null,
             title: this.params.projectName,
-            rootWorkspaceId
+            rootWorkspaceId: rootWorkspaceId ?? null,
           });
           if(this.currentProjectTemplateId){
             await this.$getAppManager().get(DesktopProjectManager).importTemplateProject(this.currentProjectTemplateId);
+            if(this.params.projectType === 'cloud'){
+              await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
+            }
           }
           await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(this.projectPath);          
         })

@@ -44,31 +44,47 @@
         </menu-button>
       </div>
       <div class="DialogSpeechNode-content">
-        <DataField
+        <div
           v-for="(variable, var_index) of mainSpeechList"
           :key="variable.name"
-          :ref="'main-' + variable.name"
           class="DialogSpeechNode-prop-line"
-          :model-value="nodeDataController.values[variable.name] ?? null"
-          :play-value="
-            playingNodeData?.values
-              ? playingNodeData.values[variable.name]
-              : null
-          "
-          :in-id="generateDataPinId(false, variable.name)"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          :title="variable.description ?? ''"
-          :placeholder="
-            variable.name === 'text'
-              ? $t('imsDialogEditor.speech.enterSpeech')
-              : ''
-          "
-          :caption="getMainVariableCaption(var_index)"
-          @update:model-value="
-            nodeDataController.setValue(variable.name, $event)
-          "
-        ></DataField>
+        >
+          <DataField
+            :ref="'main-' + variable.name"
+            class="DialogSpeechNode-prop-dataField"
+            :model-value="
+              nodeDataController.values[variable.name] === undefined
+                ? variable.default
+                : nodeDataController.values[variable.name]
+            "
+            :play-value="
+              playingNodeData?.values
+                ? playingNodeData.values[variable.name]
+                : null
+            "
+            :in-id="generateDataPinId(false, variable.name)"
+            :node-data-controller="nodeDataController"
+            :readonly="readonly"
+            :title="variable.description ?? ''"
+            :placeholder="
+              variable.name === 'text'
+                ? $t('imsDialogEditor.speech.enterSpeech')
+                : ''
+            "
+            :caption="getMainVariableCaption(var_index)"
+            @update:model-value="
+              nodeDataController.setValue(variable.name, $event)
+            "
+          ></DataField>
+          <button
+            v-if="shouldShowRestoreVariableButton(variable)"
+            class="is-button is-button-icon DialogSpeechNode-prop-restore"
+            :title="$t('imsDialogEditor.speech.restoreValues')"
+            @click="nodeDataController.deleteValue(variable.name)"
+          >
+            <i class="ri-arrow-go-back-line"></i>
+          </button>
+        </div>
         <div v-if="options.length > 0" class="DialogSpeechNode-options">
           <ContextMenuZone
             v-for="(option, option_index) of options"
@@ -129,7 +145,12 @@
                     nodeDataController.getOptionValue(
                       option_index,
                       variable.name,
-                    )
+                    ) === undefined
+                      ? variable.default
+                      : nodeDataController.getOptionValue(
+                          option_index,
+                          variable.name,
+                        )
                   "
                   :play-value="
                     playingNodeData?.options &&
@@ -158,6 +179,19 @@
                     )
                   "
                 ></DataField>
+                <button
+                  v-if="shouldShowRestoreOptionButton(variable, option_index)"
+                  class="is-button is-button-icon DialogSpeechNode-prop-restore"
+                  :title="$t('imsDialogEditor.speech.restoreValues')"
+                  @click="
+                    nodeDataController.deleteOptionValue(
+                      option_index,
+                      variable.name,
+                    )
+                  "
+                >
+                  <i class="ri-arrow-go-back-line"></i>
+                </button>
               </div>
             </div>
             <div
@@ -216,6 +250,8 @@ import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue
 import DataField from '../parts/DataField.vue';
 import {
   AssetPropType,
+  sameAssetPropValues,
+  type AssetPropValue,
   type AssetPropValueFile,
 } from '~ims-app-base/logic/types/Props';
 import { convertTranslatedTitle } from '~ims-app-base/logic/utils/assets';
@@ -223,7 +259,10 @@ import { generateDataPinId } from '../editor/DialogEditor';
 import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import type { DialogBlockController } from '../editor/DialogBlockController';
+import type {
+  DialogBlockController,
+  DialogVariable,
+} from '../editor/DialogBlockController';
 import SpeechParametersDialog from '../dialogs/SpeechParametersDialog.vue';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
@@ -335,6 +374,48 @@ export default defineComponent({
     this.updatePins();
   },
   methods: {
+    shouldShowRestoreVariableButton(variable: DialogVariable) {
+      let variable_value = this.nodeDataController.values[variable.name];
+      if (variable_value === undefined || variable_value === null) {
+        variable_value = variable.default;
+      }
+      if (
+        variable_value?.hasOwnProperty('get') ||
+        variable_value?.hasOwnProperty('param')
+      ) {
+        return false;
+      }
+      return (
+        !this.readonly &&
+        variable.default !== undefined &&
+        variable.default !== null &&
+        !sameAssetPropValues(variable.default, variable_value as AssetPropValue)
+      );
+    },
+    shouldShowRestoreOptionButton(
+      variable: DialogVariable,
+      option_index: number,
+    ) {
+      let variable_value = this.nodeDataController.getOptionValue(
+        option_index,
+        variable.name,
+      );
+      if (variable_value === undefined || variable_value === null) {
+        variable_value = variable.default;
+      }
+      if (
+        variable_value?.hasOwnProperty('get') ||
+        variable_value?.hasOwnProperty('param')
+      ) {
+        return false;
+      }
+      return (
+        !this.readonly &&
+        variable.default !== undefined &&
+        variable.default !== null &&
+        !sameAssetPropValues(variable.default, variable_value as AssetPropValue)
+      );
+    },
     async deleteCover() {
       const confirm = await this.$getAppManager()
         .get(DialogManager)
@@ -520,22 +601,48 @@ export default defineComponent({
       }
       return option.values.condition === undefined || option.values.condition;
     },
+    sameAssetPropValues,
   },
 });
 </script>
 
 <style lang="scss" scoped>
 .DialogSpeechNode-prop-line {
-  display: flex;
   margin-bottom: 10px;
+  margin-right: 2px;
+
+  &:not(:hover) {
+    .DialogSpeechNode-prop-restore {
+      opacity: 0 !important;
+    }
+  }
+}
+.DialogSpeechNode-prop-dataField {
+  display: flex;
   align-items: baseline;
+}
+.DialogSpeechNode-prop-restore {
+  height: fit-content;
+  transition: opacity 0.2s;
+}
+
+.DialogSpeechNode-options-one-param {
+  &:not(:hover) {
+    .DialogSpeechNode-prop-restore {
+      opacity: 0 !important;
+    }
+  }
 }
 
 .DialogSpeechNode-prop-line,
 .DialogSpeechNode-options-one-param {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   &:not(:hover):deep(
       .DataField-in:not(.state-connected),
-      .DataField-out:not(.state-connected)
+      .DataField-out:not(.state-connected),
+
     ) {
     opacity: 0;
   }
@@ -610,6 +717,9 @@ export default defineComponent({
       padding-left: 22px;
     }
   }
+}
+.DialogSpeechNode-options {
+  margin-top: 10px;
 }
 
 .DialogSpeechNode-prop-content {

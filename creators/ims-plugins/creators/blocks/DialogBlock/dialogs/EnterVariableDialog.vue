@@ -18,6 +18,17 @@
       </div>
       <div class="EnterVariableDialog-field">
         <div class="EnterVariableDialog-field-caption">
+          {{ $t('imsDialogEditor.var.enterServiceName') }}
+        </div>
+        <div class="EnterVariableDialog-field-control">
+          <ims-input
+            :model-value="variable.name"
+            @update:model-value="setName($event)"
+          ></ims-input>
+        </div>
+      </div>
+      <div class="EnterVariableDialog-field">
+        <div class="EnterVariableDialog-field-caption">
           {{ $t('imsDialogEditor.var.enterType') }}
         </div>
         <div class="EnterVariableDialog-field-control">
@@ -105,6 +116,7 @@ export default defineComponent({
         description: this.dialog.state.initial?.description ?? null,
         autoFill: this.dialog.state.initial?.autoFill ?? null,
       } as DialogVariable,
+      hasUserInteractedWithServiceName: false,
     };
   },
   computed: {
@@ -119,8 +131,18 @@ export default defineComponent({
   },
   methods: {
     setTitle(val: string) {
-      this.variable.name = normalizeAssetPropPart(val);
+      if (!this.variable.name || !this.hasUserInteractedWithServiceName) {
+        this.variable.name = normalizeAssetPropPart(val);
+      }
       this.variable.title = val;
+    },
+    setName(val: string) {
+      if (!val.trim()) {
+        this.hasUserInteractedWithServiceName = false;
+      } else {
+        this.hasUserInteractedWithServiceName = true;
+      }
+      this.variable.name = normalizeAssetPropPart(val);
     },
     async save() {
       if (!this.variable.name) {

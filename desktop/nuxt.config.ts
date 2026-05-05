@@ -146,6 +146,7 @@ export default defineNuxtConfig({
       SUPERVISOR_API_HOST: process.env.SUPERVISOR_API_HOST,
       GAMEMANAGER_API_HOST: process.env.GAMEMANAGER_API_HOST,
       SPACE_API_HOST: process.env.SPACE_API_HOST,
+      CREATORS_HOST: process.env.CREATORS_HOST,
       PROJECT_TEMPLATES_LINK: process.env.PROJECT_TEMPLATES_LINK,
     },
   },

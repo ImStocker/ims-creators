@@ -1,6 +1,12 @@
 <template>
+  <div v-if="projectTemplatesError" class="is-input SelectTemplate-error">
+    {{ projectTemplatesError }}
+    <button class="is-button is-button-icon" @click="reloadTemplates">
+      <i class="ri-refresh-line"></i>
+    </button>
+  </div>
   <ims-select
-    v-if="projectTemplatesLoaded"
+    v-else-if="projectTemplatesLoaded"
     v-model="currentProjectTemplateId"
     :reduce="(o: any) => o.id"
     :get-option-key="(o: any) => o.id"
@@ -56,6 +62,7 @@ export default defineComponent({
   data() {
     return {
       projectTemplatesLoaded: false,
+      projectTemplatesError: null as string | null,
       currentProjectTemplateId: null as string | null,
       projectTemplates: [] as {
         title: string;
@@ -79,20 +86,31 @@ export default defineComponent({
     if (this.value) {
       this.currentProjectTemplateId = this.value;
     }
-    this.projectTemplates = await this.$getAppManager()
-      .get(ProjectManager)
-      .loadProjectTemplates();
-    this.projectTemplates = this.projectTemplates.filter(
-      (p) => p.lang === this.currentLang,
-    );
-    if (this.projectTemplates.length > 0) {
-      this.currentProjectTemplateId = this.projectTemplates[0].id;
-    }
-    this.projectTemplatesLoaded = true;
+    await this.reloadTemplates();
   },
   methods: {
     getOpenLink(project_id: string) {
       return `https://ims.cr5.space/app/p/${project_id}/project`;
+    },
+    async reloadTemplates() {
+      this.projectTemplatesLoaded = false;
+      this.projectTemplatesError = null;
+
+      try {
+        this.projectTemplates = await this.$getAppManager()
+          .get(ProjectManager)
+          .loadProjectTemplates();
+        this.projectTemplates = this.projectTemplates.filter(
+          (p) => p.lang === this.currentLang,
+        );
+        if (this.projectTemplates.length > 0) {
+          this.currentProjectTemplateId = this.projectTemplates[0].id;
+        }
+      } catch (err: any) {
+        this.projectTemplatesError = err.message;
+      } finally {
+        this.projectTemplatesLoaded = true;
+      }
     },
   },
 });
@@ -102,9 +120,14 @@ export default defineComponent({
 .SelectTemplate {
   width: 100%;
 }
-.SelectTemplate-load {
+.SelectTemplate-load,
+.SelectTemplate-error {
   text-align: center;
   width: 250px;
+}
+.SelectTemplate-error,
+.SelectTemplate-error > button {
+  color: var(--color-main-error);
 }
 .SelectTemplate-option {
   display: flex;

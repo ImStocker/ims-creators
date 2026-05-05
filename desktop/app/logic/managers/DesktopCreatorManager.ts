@@ -2,7 +2,7 @@ import PromptDialog from "~ims-app-base/components/Common/PromptDialog.vue";
 import AuthManager from "~ims-app-base/logic/managers/AuthManager";
 import DialogManager from "~ims-app-base/logic/managers/DialogManager";
 import { AppSubManagerBase, type IAppManager } from "~ims-app-base/logic/managers/IAppManager";
-import { ProjectRolePulseRights, type AppLoadResult } from "~ims-app-base/logic/types/ProjectTypes";
+import { ProjectRolePulseRights, type AppLoadResult, type ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import type { LocalProjectInitInfo } from "#bridge/api/ImsHostProject";
 import DesktopProjectManager from "./DesktopProjectManager";
@@ -12,6 +12,11 @@ import ApiManager from "~ims-app-base/logic/managers/ApiManager";
 import CreatorAssetManager from "~ims-app-base/logic/managers/CreatorAssetManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
+import type { Workspace } from "~ims-app-base/logic/types/Workspaces";
+import { DesktopCreatorAssetManager } from "./DesktopCreatorAssetManager";
+import DesktopUiManager from "./DesktopUiManager";
+import UiManager from "~ims-app-base/logic/managers/UiManager";
+import DesktopSyncManager from "./DesktopSyncManager";
 
 const PROJECT_META_INDEX = '.imsc/index.json';
 
@@ -120,6 +125,8 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             .get(CreatorAssetManager)
             .updateWorkspacesCache(appInfo.project.rootWorkspaces);
         }
+        this.appManager.get(CreatorAssetManager).initForProject(appInfo.project);
+        this.appManager.get(DesktopSyncManager).initForProject(appInfo.project);
         this.appManager
           .get(ProjectSettingsManager)
           .setCurrentProjectSettings(appInfo.project?.settings ?? null);
@@ -221,6 +228,26 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         this.appActivate(appInfo, local_path);
     }
 
+    async connectToCloudProject(new_project_info: ProjectFullInfo){
+        let rootWorkspaceId = null
+        if (new_project_info){
+            rootWorkspaceId = new_project_info.rootWorkspaces.find((w: Workspace) => w.name === 'gdd')?.id;
+        }
+        assert(this._loadedForProjectPath)
+        await this.appManager.get(DesktopProjectManager).initializeLocalProject(this._loadedForProjectPath, {
+            id: new_project_info.id ?? null,
+            title: new_project_info.title,
+            rootWorkspaceId: rootWorkspaceId ?? null,
+            recreate: true,
+        });
+        const project_info = this.appManager.get(DesktopProjectManager).getProjectInfo()
+        assert(project_info)
+        Object.assign(project_info, new_project_info, {
+            localPath: project_info.localPath
+        })      
+        this.appManager.get<DesktopCreatorAssetManager>(CreatorAssetManager).setProjectIdToFiles(project_info.id);
+        await this.appManager.get(UiManager).reloadPage();
+    }
 }
 
     

@@ -13,24 +13,12 @@ import * as node_path from 'path';
 import fs from 'node:fs'
 import crypto from 'crypto';
 import axios from "axios";
-import type { SyncInfo, SyncItem } from "#logic/types/SyncTypes";
+import type { SyncInfo } from "#logic/types/SyncTypes";
+import { SyncCurrentStateStatus, type SyncCurrentState } from "#bridge/types/SyncTypes";
 
 const SYNC_CHUNK_SIZE = 50;
 export const SQLITE_NOW_STM = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 const ATTACHMENTS_DIR = 'attachments';
-
-export type WorkspaceEntity = {
-    id: string;
-    projectId: string;
-    title: string;
-    name: string | null;
-    parentId: string;
-    createdAt: string;
-    updatedAt: string;
-    deletedAt?: string;
-    index: number | null;
-    props: AssetProps | null;
-}
 
 export type ProjectDbFile = {
     server_file_id: string,
@@ -38,31 +26,77 @@ export type ProjectDbFile = {
     server_store: string
 }
 
+type ServerAssetToCheckChange = {
+    title: AssetFull['title'],
+    name: AssetFull['name'],
+    index: AssetFull['index'],
+    ownIcon: AssetFull['ownIcon'],
+    isAbstract: AssetFull['isAbstract'],
+    parentIds: AssetFull['parentIds'],
+    workspaceId: AssetFull['workspaceId'],
+    blocks: {
+        id: AssetFull['blocks'][0]['id'],
+        title: AssetFull['blocks'][0]['title'],
+        name: AssetFull['blocks'][0]['name'],
+        type: AssetFull['blocks'][0]['type'],
+        index: AssetFull['blocks'][0]['index'],
+        props: AssetFull['blocks'][0]['props'],
+    }[]
+}
+
+type ServerWorkspaceToCheckChange = {
+    title: Workspace['title'],
+    name: Workspace['name'],
+    index: Workspace['index'],
+    parentId: Workspace['parentId'],
+    props: Workspace['props'],
+}
+
 export class SyncService {
 
     private _syncProcessRunning = false;
     private _synchronizationTimer: NodeJS.Timeout | undefined;
+    private _currentState: SyncCurrentState = {
+        status: SyncCurrentStateStatus.FREE,
+        hasChanges: false,
+        error: null
+    };
+    private _syncWithCloudTime: number = 60;
 
     constructor(public db: ProjectFileDb){
 
     }
 
-    init(){
-        this._synchronizationTimer = setInterval(() => {
-            this.syncProject();
-        }, 60 * 1000);
+    async changeAutoSynchronization(new_val: number){
+        this._syncWithCloudTime = new_val;
+        await this.db.settings.setKey('syncWithCloud', new_val);
+        this._resetSyncTimer(true);
     }
 
-    destroy(){
+    private _resetSyncTimer(restart: boolean){
         if(this._synchronizationTimer){
-           clearInterval(this._synchronizationTimer); 
-           this._synchronizationTimer = undefined
+            clearInterval(this._synchronizationTimer);
+            this._synchronizationTimer = undefined;
+        }
+        if(restart && this._syncWithCloudTime > 0 && this._currentState.status !== SyncCurrentStateStatus.PAUSE) {
+            this._synchronizationTimer = setInterval(() => {
+                this.syncProject();
+            }, this._syncWithCloudTime * 1000);
         }
     }
 
-    async getSyncStatus(): Promise<SyncInfo> {
+    async init(){
+        this._currentState.status = (await this.db.settings.getKey('syncOnPause', false) ? SyncCurrentStateStatus.PAUSE : SyncCurrentStateStatus.FREE );
+        this._syncWithCloudTime = await this.db.settings.getKey('syncWithCloud', 60);
+        this._resetSyncTimer(true);
+    }
+
+    destroy(){        
+        this._resetSyncTimer(false);
+    }
+
+    async getSyncErrors(): Promise<SyncInfo> {
         let sync_info: SyncInfo = {
-            inProcess: this._syncProcessRunning,
             syncEnd: null,
             syncState: null,
             assets: [],
@@ -89,20 +123,45 @@ export class SyncService {
             sync_info.assets =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM assets
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
             
             sync_info.workspaces =await this.db.dataSource.createQueryRunner().query(`
                 SELECT id, title, need_sync, synced_at, conflict, conflict_message
                 FROM workspaces
-                WHERE synced_at < ? OR need_sync IS NOT NULL
-                ORDER BY id DESC
-                LIMIT 1; 
-            `, [ sync_info.syncEnd]);
+                WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL) OR conflict IS NOT NULL
+                ORDER BY need_sync DESC, id DESC
+            `, []);
         }
         return sync_info;
+    }
+
+    async getCurrentSyncState(){
+        return {...this._currentState};
+    }
+
+    async changeCurrentState(changes: {
+        status?: SyncCurrentStateStatus,
+        hasChanges?: boolean,
+        error?: string | null
+    }){
+        let has_changes = false;
+        if(changes.status !== undefined  && changes.status !== this._currentState.status) {
+            this._currentState.status = changes.status;
+            has_changes = true;
+        }
+        if(changes.hasChanges !== undefined && changes.hasChanges !== this._currentState.hasChanges) {
+            this._currentState.hasChanges = changes.hasChanges;
+            has_changes = true;
+        }
+        if(changes.error !== undefined && changes.error !== this._currentState.error) {
+            this._currentState.error = changes.error;
+            has_changes = true;
+        }
+        if(has_changes){
+            this.db.sendSyncState(this._currentState);
+        }
     }
 
     async resyncAssetsAndWorkspaces(
@@ -110,23 +169,59 @@ export class SyncService {
         workspace_ids: string[],
     ){
         await this.db.dataSource.createQueryRunner().query(`
-            UPDATE assets
-            SET need_sync = ${SQLITE_NOW_STM}
-            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
-        `, [...asset_ids]);
-        await this.db.dataSource.createQueryRunner().query(`
             UPDATE workspaces
-            SET need_sync = ${SQLITE_NOW_STM}
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
             WHERE id IN (`+ workspace_ids.map(i => `?`) +`) 
         `, [...workspace_ids]);
+        await this.db.dataSource.createQueryRunner().query(`
+            UPDATE assets
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
+            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
+        `, [...asset_ids]);
+        const db_workspaces: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
+            SELECT id,server_state,server_deleted
+            FROM workspaces
+            WHERE id IN (`+ workspace_ids.map(i => `?`) +`) 
+        `, [...workspace_ids]);
+        await this._syncWorkspaces(db_workspaces);
+        const db_assets: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
+            SELECT id,server_state,server_deleted
+            FROM assets
+            WHERE id IN (`+ asset_ids.map(i => `?`) +`) 
+        `, [...asset_ids]);
+        await this._syncAssets(db_assets);
+    }
+
+    async pauseSyncProject(){
+        await this.db.settings.setKey('syncOnPause', true)
+        this.changeCurrentState({
+            status: SyncCurrentStateStatus.PAUSE,
+        });
+        this._resetSyncTimer(true);
+    }
+    
+    async resumeSyncProject(){
+        await this.db.settings.setKey('syncOnPause', false)
+        this.changeCurrentState({
+            status: SyncCurrentStateStatus.FREE,
+        });
+        this._resetSyncTimer(true);
+        await this.syncProject();
     }
 
     async syncProject(){
         if (this._syncProcessRunning) return;
         if (!this.db.info.id) return;
+
+        const account = this.db.api.getTokenInfo();
+        if (!account) return;
+
         let sync_log_id: number | null = null;
         try{
             this._syncProcessRunning = true;
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.IN_PROCESS
+            });
             const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
                 INSERT INTO sync_logs (sync_start)
                 VALUES (${SQLITE_NOW_STM}) RETURNING id;
@@ -134,6 +229,11 @@ export class SyncService {
             sync_log_id = insert_res[0].id;
             await this.checkUnsyncedAssetsAndWorkspaces(sync_log_id);
             await this.syncAssetsAndWorkspaces();
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.FREE,
+                hasChanges: false,
+                error: null,
+            });
         }
         catch(err: any){
             if(sync_log_id) {
@@ -146,6 +246,10 @@ export class SyncService {
             else {
                 log.error('Sync failed', err);
             }
+            this.changeCurrentState({
+                status: SyncCurrentStateStatus.FREE,
+                error: err.message,
+            });
         }
         finally {
             if(sync_log_id) {
@@ -172,10 +276,10 @@ export class SyncService {
             LIMIT 1; 
         `);
 
-        const assetDeletedIdsMap = new Map();
-        const assetUpdatedIdsMap = new Map();
-        const workspaceDeletedIdsMap = new Map();
-        const workspaceUpdatedIdsMap = new Map(); 
+        const assetDeletedIdsMap = new Map<string, string>();
+        const assetUpdatedIdsMap = new Map<string, string>();
+        const workspaceDeletedIdsMap = new Map<string, string>();
+        const workspaceUpdatedIdsMap = new Map<string, string>(); 
     
         const asset_condition: AssetPropWhere = {
             issystem: false,
@@ -210,23 +314,27 @@ export class SyncService {
                     last_asset_id = changes.last.assetId;
                     last_workspace_id = changes.last.workspaceId;
                 }
-
-                for(const [updated_id, title] of Object.entries(changes.assetUpdatedIds)){
+                const assets = await this.db.asset.assetsGetShort({
+                    where: {
+                        id: [...changes.assetUpdatedIds, ...changes.assetDeletedIds]
+                    }
+                })
+                for(const updated_id of changes.assetUpdatedIds){
                     assetDeletedIdsMap.delete(updated_id);
-                    assetUpdatedIdsMap.set(updated_id, title);
+                    assetUpdatedIdsMap.set(updated_id, assets.list.find(a => a.id === updated_id)?.title ?? '');
                 }
-                for(const [deleted_id, title] of Object.entries(changes.assetDeletedIds)){
+                for(const deleted_id of changes.assetDeletedIds){
                     assetUpdatedIdsMap.delete(deleted_id);
-                    assetDeletedIdsMap.set(deleted_id, title);
+                    assetDeletedIdsMap.set(deleted_id, assets.list.find(a => a.id === deleted_id)?.title ?? '');
                 }
 
-                for(const [updated_id, title] of changes.workspaceUpdatedIds){
+                for(const updated_id of changes.workspaceUpdatedIds){
                     workspaceDeletedIdsMap.delete(updated_id);
-                    workspaceUpdatedIdsMap.set(updated_id, title);
+                    workspaceUpdatedIdsMap.set(updated_id, this.db.workspace.getWorkspaceById(updated_id)?.title ?? '');
                 }
-                for(const [deleted_id, title] of changes.workspaceDeletedIds){
+                for(const deleted_id of changes.workspaceDeletedIds){
                     workspaceUpdatedIdsMap.delete(deleted_id);
-                    workspaceDeletedIdsMap.set(deleted_id, title);
+                    workspaceDeletedIdsMap.set(deleted_id, this.db.workspace.getWorkspaceById(deleted_id)?.title ?? '');
                 }
         
                 if (
@@ -338,7 +446,7 @@ export class SyncService {
     }
 
     private async _syncAsset(db_asset: SyncTableRow){
-        await syncEntity<ProjectFileDbAsset, AssetSetDTO>(db_asset, {
+        await syncEntity<ProjectFileDbAsset, AssetFull, AssetSetDTO, AssetSetDTO>(db_asset, {
             db: this.db, 
             entityTable: 'assets',
             serverLoad: (id) => this._loadFromServerAsset(id),
@@ -357,9 +465,7 @@ export class SyncService {
                 if (!server_asset_full.objects.assetFulls[id]){
                     return null;
                 }
-                return await this.convertServerAssetToLocal(
-                    server_asset_full.objects.assetFulls[id]
-                );
+                return server_asset_full.objects.assetFulls[id]
             },
             serverDelete: async (id) => {
                 await this.db.api.call(Service.CREATORS, HttpMethods.POST, `assets/delete`, {
@@ -368,13 +474,10 @@ export class SyncService {
                     }
                 });
             },
+            serverGetChanges: (source, target) => this._getAssetsChangesServer(source, target),
+            serverToLocal: (state) => this.convertServerAssetToLocal(state),
             localLoad: async (id) => {
-                let asset = this.db.asset.assets.byId.get(id) ?? null;
-                if(asset) {
-                    const is_synced_file = await this._getSyncedFile(id);
-                    return is_synced_file ? asset : await this.convertLocalAssetToServer(asset);
-                }
-                return null;
+                return this.db.asset.assets.byId.get(id) ?? null;
             },
             localPut: async (id, change, create) => {
                 let res: AssetsFullResult;
@@ -398,23 +501,52 @@ export class SyncService {
                     id: [id],
                 })
             },
-            getChanges: (source, target) => this.getAssetsChanges(source, target),
+            localGetChanges: (source, target) => this._getAssetsChangesLocal(source, target),
+            localToServer: (state) => this.convertLocalAssetToServer(state)
         })
     }
 
+    private async _checkParentAssetNeedSyncAndSync(need_sync_assets_map: Map<string, SyncTableRow>, asset_id: string){
+        const db_asset = need_sync_assets_map.get(asset_id)
+        if(!db_asset) return;
+        
+        const local_asset = this.db.asset.assets.byId.get(db_asset.id);
+        if(local_asset?.parentIds) {
+            for(const parent_id of local_asset.parentIds) {
+                await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
+            }
+        }
+        else {
+            const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
+                where: JSON.stringify({
+                    id: [db_asset.id],
+                })
+            });
+            const server_asset = server_asset_full.objects.assetFulls[db_asset.id];
+            if(server_asset?.parentIds) {
+                for(const parent_id of server_asset.parentIds) {
+                    await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
+                }
+            }
+        }
+        await this._syncAsset(db_asset);
+        need_sync_assets_map.delete(db_asset.id);
+    }
+
     private async _syncAssets(db_assets: SyncTableRow[]){
+        const need_sync_assets_map = new Map(db_assets.map(a => [a.id, a]));
         for(const db_asset of db_assets){
-            await this._syncAsset(db_asset);
+            await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, db_asset.id);
         }
     }
 
     private async _syncWorkspace(db_workspace: SyncTableRow){
-        await syncEntity<ProjectFileDbWorkspace, ChangeWorkspaceDTO>(db_workspace, {
+        await syncEntity<ProjectFileDbWorkspace, Workspace, ChangeWorkspaceDTO, ChangeWorkspaceDTO>(db_workspace, {
             db: this.db, 
             entityTable: 'workspaces',
             serverLoad: (id) => this._loadFromServerWorkspace(id),
             serverPut: async (id, change, create) => {
-                const server_workspace_full: WorkspaceEntity =  create ? 
+                const server_workspace_full: Workspace =  create ? 
                     await this.db.api.call(Service.CREATORS, HttpMethods.POST, `workspaces`, {
                         id,
                         ...change
@@ -423,17 +555,15 @@ export class SyncService {
                 if (!server_workspace_full){
                     return null;
                 }
-                return await this.convertServerWorkspaceToLocal(server_workspace_full)
+                return server_workspace_full
             },
+            serverToLocal: (state) => this.convertServerWorkspaceToLocal(state),
             serverDelete: async (id) => {
                 await this.db.api.call(Service.CREATORS, HttpMethods.DELETE, `workspaces/${id}`);
             },
+            serverGetChanges: (source, target) => this.getWorkspacesChangesServer(source, target),
             localLoad: async (id) => {
-                let workspace = this.db.workspace.workspaces.byId.get(id) ?? null;
-                if(workspace) {
-                    return await this.convertLocalWorkspaceToServer(workspace);
-                }
-                return null;
+                return this.db.workspace.workspaces.byId.get(id) ?? null;
             },
             localPut: async (id, change, create) => {
                 if (create){
@@ -450,7 +580,8 @@ export class SyncService {
             localDelete: async (id) => {
                 await this.db.workspace.workspacesDelete(id)
             },
-            getChanges: (source, target) => this.getWorkspacesChanges(source, target),
+            localToServer: state => this.convertLocalWorkspaceToServer(state),
+            localGetChanges: (source, target) => this.getWorkspacesChangesLocal(source, target),
         });
     }
 
@@ -462,37 +593,47 @@ export class SyncService {
     }
 
     
-    private async _loadFromServerAsset(db_asset_id: string): Promise<ProjectFileDbAsset | null>{
+    private async _loadFromServerAsset(db_asset_id: string): Promise<AssetFull | null>{
         const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
             where: JSON.stringify({
                 id: [db_asset_id],
             })
         });
-        const server_asset = server_asset_full.objects.assetFulls[db_asset_id]
-        if(server_asset){
-            return await this.convertServerAssetToLocal(server_asset)
-        }
-        else {
-            return null;
-        }
+        return server_asset_full.objects.assetFulls[db_asset_id]
     }
 
-    private async _loadFromServerWorkspace(db_workspace_id: string): Promise<ProjectFileDbWorkspace | null>{
+    private async _loadFromServerWorkspace(db_workspace_id: string): Promise<Workspace | null>{
         const server_workspaces: ApiResultListWithTotal<Workspace> = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `workspaces`, {
             where: JSON.stringify({
                 ids: [db_workspace_id],
             })
         });
-        const server_workspace = server_workspaces.list[0]
-        if(server_workspace){
-            return await this.convertServerWorkspaceToLocal(server_workspace as any)
-        }
-        else {
-            return null;
-        }
+        return server_workspaces.list[0] ?? null
+    }
+    private _getAssetsChangesLocal(source_asset: ProjectFileDbAsset, target_asset: ProjectFileDbAsset | null): AssetSetDTO {
+        return this._getAssetsChangesServer(
+            {
+                ...source_asset,
+                blocks: source_asset.blocks.map(b => {
+                    return {
+                        ...b,
+                        props: assignPlainValueToAssetProps({}, b.props),
+                    }
+                })
+            },
+            target_asset ? {
+                ...target_asset,
+                blocks: target_asset.blocks.map(b => {
+                    return {
+                        ...b,
+                        props: assignPlainValueToAssetProps({}, b.props),
+                    }
+                })
+            } : null
+        )
     }
 
-    getAssetsChanges(source_asset: ProjectFileDbAsset, target_asset: ProjectFileDbAsset | null): AssetSetDTO {
+    private _getAssetsChangesServer(source_asset: ServerAssetToCheckChange, target_asset: ServerAssetToCheckChange | null): AssetSetDTO {
         const changes: AssetSetDTO = {};
         if(!target_asset || source_asset.title !== target_asset.title) {
             changes.title = source_asset.title;
@@ -503,11 +644,8 @@ export class SyncService {
         if(!target_asset || source_asset.index !== target_asset.index) {
             changes.index = source_asset.index;
         }
-        if(!target_asset || source_asset.creatorUserId !== target_asset.creatorUserId) {
-            changes.creatorUserId = source_asset.creatorUserId ?? undefined;
-        }
-        if(!target_asset || source_asset.icon !== target_asset.icon) {
-            changes.icon = source_asset.icon;
+        if(!target_asset || source_asset.ownIcon !== target_asset.ownIcon) {
+            changes.icon = source_asset.ownIcon;
         }
         if(!target_asset || source_asset.isAbstract !== target_asset.isAbstract) {
             changes.isAbstract = source_asset.isAbstract;
@@ -542,11 +680,8 @@ export class SyncService {
                 any_block_change = true;
             }
             const change_asset_props: AssetProps[] = target_block ? 
-                diffAssetPropObjects(
-                    assignPlainValueToAssetProps({}, source_block.props ?? {}),
-                    assignPlainValueToAssetProps({}, target_block.props ?? {})
-                ) :
-                [assignPlainValueToAssetProps({}, source_block.props ?? {})]
+                diffAssetPropObjects(source_block.props ?? {}, target_block.props ?? {}) :
+                [{}, source_block.props ?? {}]
             if(change_asset_props.length > 0){
                 block_change.props = change_asset_props
                 any_block_change = true;
@@ -577,7 +712,18 @@ export class SyncService {
         return changes;
     }
 
-    getWorkspacesChanges(source_workspace: ProjectFileDbWorkspace, target_workspace: ProjectFileDbWorkspace | null): ChangeWorkspaceDTO {
+    getWorkspacesChangesLocal(source_workspace: ProjectFileDbWorkspace, target_workspace: ProjectFileDbWorkspace | null): ChangeWorkspaceDTO {
+        return this.getWorkspacesChangesServer({
+            ...source_workspace,
+            props: assignPlainValueToAssetProps({}, source_workspace.props)
+        },
+        target_workspace ? {
+            ...target_workspace,
+            props: assignPlainValueToAssetProps({}, target_workspace.props)
+        } : null)
+    }
+
+    getWorkspacesChangesServer(source_workspace: ServerWorkspaceToCheckChange, target_workspace: ServerWorkspaceToCheckChange | null): ChangeWorkspaceDTO {
         const changes: ChangeWorkspaceDTO = {};
         if(!target_workspace || source_workspace.title !== target_workspace.title) {
             changes.title = source_workspace.title;
@@ -591,10 +737,10 @@ export class SyncService {
         if(!target_workspace || source_workspace.parentId !== target_workspace.parentId) {
             changes.parentId = source_workspace.parentId ?? undefined;
         }
-        const source_props = assignPlainValueToAssetProps({}, source_workspace.props ?? {})
+        const source_props = source_workspace.props ?? {}
         const change_props: AssetProps[] = target_workspace ? diffAssetPropObjects(
                     source_props,
-                    assignPlainValueToAssetProps({}, target_workspace.props ?? {}) 
+                    target_workspace.props
                 ) :
                     [source_props]
         if(change_props.length > 0){
@@ -602,10 +748,8 @@ export class SyncService {
         }
         return changes;
     }
-    
-    async copyAssetToServer(localAssetId: string): Promise<AssetsFullResult> {
-        const full = this.db.asset.assets.byId.get(localAssetId);
-        if (!full) throw new Error('Asset not found');
+
+    prepareAssetToServer(full: ProjectFileDbAsset) {
         let blocks:
             | {
                 [blockKey: string]: AssetBlockParamsDTO;
@@ -622,15 +766,24 @@ export class SyncService {
                 type: r.type,
             };
         }
+        return {
+            icon: full.ownIcon ?? undefined,
+            title: full.title,
+            isAbstract: full.isAbstract,
+            parentIds: full.parentIds,
+            workspaceId: full.workspaceId ?? undefined,
+            blocks,
+        }
+    }
+    
+    async copyAssetToServer(localAssetId: string): Promise<AssetsFullResult> {
+        const full = this.db.asset.assets.byId.get(localAssetId);
+        if (!full) throw new Error('Asset not found');
+        const asset = this.prepareAssetToServer(full);
         return await this.db.api.call(Service.CREATORS, HttpMethods.POST, `assets/create`, {
             id: localAssetId,
             set: {
-                icon: full.ownIcon ?? undefined,
-                title: full.title,
-                isAbstract: full.isAbstract,
-                parentIds: full.parentIds,
-                workspaceId: full.workspaceId ?? undefined,
-                blocks,
+                ...asset,
             },
         });
     }
@@ -777,24 +930,27 @@ export class SyncService {
         }
     }
     
-    async convertLocalAssetToServer(asset: ProjectFileDbAsset): Promise<ProjectFileDbAsset>{
-        let new_asset: ProjectFileDbAsset = {...asset};
+    async convertLocalAssetToServer(asset: ProjectFileDbAsset): Promise<AssetFull>{
+        let new_asset: AssetFull = {...asset, blocks: []};
         new_asset.blocks = [];
         for(const block of asset.blocks){
-            const new_block = {...block};
-            new_block.props = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_block.props));
-            new_block.computed = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_block.computed));
-            if(block.inherited) {
-                new_block.inherited = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(block.inherited));
-            }
+            const new_block: AssetBlockEntity = {
+                ...block,
+                props: await this.convertLocalPropsToServer(block.props),
+                computed: await this.convertLocalPropsToServer(block.computed),
+                inherited: block.inherited ? await this.convertLocalPropsToServer(block.inherited) : null,
+                rights: 5
+            };
             new_asset.blocks.push(new_block);
         }
         return new_asset;
     }
 
-    async convertLocalWorkspaceToServer(workspace: ProjectFileDbWorkspace): Promise<ProjectFileDbWorkspace>{
-        let new_workspace: ProjectFileDbWorkspace = {...workspace};
-        new_workspace.props = convertAssetPropsToPlainObject(await this.convertLocalPropsToServer(new_workspace.props));
+    async convertLocalWorkspaceToServer(workspace: ProjectFileDbWorkspace): Promise<Workspace>{
+        const new_workspace: Workspace = {
+            ...workspace,
+            props: await this.convertLocalPropsToServer(workspace.props)
+        };
         return new_workspace;
     }
 
@@ -820,6 +976,9 @@ export class SyncService {
     }
 
     async convertLocalFileToServer(file: AssetPropValueFile): Promise<AssetPropValueFile>{
+        if (!/^loc-/.test(file.Store)) {
+           return file;
+        }
         const formData = new FormData();
         const project_root = this.db.localPath;
         const attachment_path = node_path.join(project_root ?? '', ATTACHMENTS_DIR, file.Title);
@@ -889,7 +1048,6 @@ export class SyncService {
             creatorUserId: server_asset.creatorUserId,
             unread: server_asset.unread,
             hasImage: server_asset.hasImage,
-            localName: server_asset.localName
         }
         for(const block of server_asset.blocks){
             const local_block = await this.convertServerPropsToLocal(block);
@@ -903,7 +1061,7 @@ export class SyncService {
         return local_asset; 
     }
     
-    async convertServerWorkspaceToLocal (server_workspace: WorkspaceEntity): Promise<ProjectFileDbWorkspace> {
+    async convertServerWorkspaceToLocal (server_workspace: Workspace): Promise<ProjectFileDbWorkspace> {
         const local_block = await this.convertServerFileToLocal(server_workspace.props ?? {});
         const local_workspace: ProjectFileDbWorkspace = {
             ...server_workspace,
@@ -912,4 +1070,20 @@ export class SyncService {
         }
         return local_workspace; 
     }
+    
+    async markNotSyncedEntities(type: 'workspace' | 'asset', entries: {id: string, title?: string | null}[]){
+        if (entries.length === 0){
+            return;
+        }
+        await this.db.dataSource.createQueryRunner().query(`
+            INSERT INTO ${type === 'workspace' ? 'workspaces' : 'assets'} (id, title, need_sync)
+            VALUES ` + entries.map(i => `(?,?, ${SQLITE_NOW_STM})`).join(',') +
+            ` ON CONFLICT (id) DO UPDATE SET need_sync = ${SQLITE_NOW_STM}, title = COALESCE(EXCLUDED.title, title);
+        `, entries.map(ent => 
+            [ent.id, ent.title ?? null]).flat());
+        this.changeCurrentState({
+            hasChanges: true
+        })
+    }
+
 }

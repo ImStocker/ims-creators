@@ -15,7 +15,7 @@
 
         <div class="ProjectDropdownMenu-button-append">
           <template v-if="currentProject">
-            <i class=" ProjectDropdownMenu-button-localIcon ri-computer-fill"></i>
+            <i class=" ProjectDropdownMenu-button-localIcon" :class="projectInfo?.id ? 'ri-cloud-fill' : 'ri-computer-fill'"></i>
             <caption-string
                 v-if="!isDesktop"
                 class="ProjectDropdownMenu-button-license"
@@ -55,6 +55,7 @@ import AuthManager from '~ims-app-base/logic/managers/AuthManager';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import type DesktopAuthManager from '#logic/managers/DesktopAuthManager';
 
 
 export default defineComponent({
@@ -89,7 +90,7 @@ export default defineComponent({
   },
   methods: {
     async logout() {
-      await this.$getAppManager().get(AuthManager).logout();
+      await this.$getAppManager().get<DesktopAuthManager>(AuthManager).logout();
       await openSignInLink(this.$router as any);
     },
     changeLang(lang: LangStr) {
@@ -110,7 +111,7 @@ export default defineComponent({
     },
     projectTitle(){
       if(this.isDesktop) {
-        return `${this.$t('desktop.welcome.localProject')}:\n${this.currentProject?.localPath}`;
+        return `${this.$t('desktop.welcome.' + (this.projectInfo?.id ? 'cloudProject' : 'localProject'))}:\n${this.currentProject?.localPath}`;
       }
       else {
         return this.currentProject?.title;
@@ -176,19 +177,19 @@ export default defineComponent({
           },
         },
         {
-          title: this.$t('desktop.mainMenu.openOtherProject'),
+          title: this.$t('desktop.mainMenu.openAnotherProject'),
           children: [
             ...this.recentProjectList.map((el: any) => {
               return {
                 title: el.localPath,
                 action: this.projectInfo?.localPath === el.localPath ? undefined : () => this.openProject(el.localPath),
               }
-            }),
+            }).slice(0, 10),
             {
               type: 'separator'
             },
             {
-              title: this.$t('desktop.mainMenu.openOtherProject') + '...',
+              title: this.$t('desktop.mainMenu.openAnotherProject') + '...',
               action: async () => {
                 window.imshost.window.openNew({ localPath: null });
               },

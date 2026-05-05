@@ -7,15 +7,35 @@ export default {
     signUpHereLink: 'Sign up here',
     password: 'Password',
     signInHeader: 'Sign in',
+    needLoginForAction: 'Please, log in to perform this action',
+    newConfirmationCodeSent: 'New confirmation code has been sent to the mail',
   },
   desktop: {
     fsSync: {
+      menu: {
+        errors: 'Errors of synchronization',
+        pause: 'Pause',
+        pauseEnd: 'Synchronization was paused',
+        syncNow: 'Synchronize now',
+        syncNowEnd: 'Synchronization was finished',
+        syncNowEndWithErrors: 'Synchronization was finished with errors',
+        resume: 'Resume',
+        resumeEnd: 'Synchronization was resumed',
+        syncWithCloud: 'Synchronize with cloud',
+        syncWithCloudEnd: 'Synchronization with cloud is completed',
+        openInCloud: 'Open in cloud',
+        repeat: 'Repeat',
+        pauseSyncing: 'Pause syncing',
+        loginToSync: "Please, log in your PRO account to sync your project with cloud"
+      },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',
       syncButton: 'Resynchronize',
       notSyncedAssets: 'Not synced assets',
       notSyncedWorkspaces: 'Not synced workspaces',
       noErrors: 'No errors',
+      createNew: 'Create new',
+      selectExist: 'Select existing'
     },
     welcome: {
       begin: 'Welcome to',
@@ -35,6 +55,7 @@ export default {
       typeTooltip: 'Type',
       local: 'Local',
       localProject: 'Local project',
+      cloudProject: 'Cloud project',
       cloud: 'Cloud',
       name: 'Name',
       nameTooltip: 'Name',
@@ -49,7 +70,9 @@ export default {
       sameProjectTitle: 'Project at given path already exists',
       needAuth: 'Please enter to your PRO-account to create cloud project',
       needLicense: 'Please buy PRO-license to create cloud project',
-      buy: 'Buy',
+      buy: 'Buy',      
+      dataNotLoad: 'There was problem loading your data',
+      loginToAnotherAccount: 'Login to another account'
     },
     mainMenu: {
       settings: 'Settings',
@@ -58,7 +81,7 @@ export default {
       help: 'Help',
       feedback: 'Feedback',
       changeUser: 'Change user',
-      openOtherProject: 'Open other project',
+      openAnotherProject: 'Open another project',
       closeWindow: 'Close window',
       newWindow: 'New window',
       website: 'Website',
@@ -95,6 +118,13 @@ export default {
         maintenance: 'Maintenance',
         openLogsFolder: 'Open folder with logs',
         autoUpdate: 'Check for updates when the app starts',
+        syncWithCloud: 'Auto syncing with the cloud',
+        syncWithCloudTime: {
+          every30: 'Every 30 sec',
+          every60: 'Every minute',
+          every300: 'Every 5 minutes',
+          'every-1': 'No'
+        }
       },
       close: 'Close',
       plugins: {
@@ -146,5 +176,9 @@ export default {
       updateBoxReady: 'Ready',
       updateBoxError: 'Error'
     },
+    cloudOnlySection: {
+      cloudOnlySectionHeader: "This section is only available in cloud projects",
+      cloudOnlySectionBody: "Please open this section in web version of project."
+    }
   },
 };

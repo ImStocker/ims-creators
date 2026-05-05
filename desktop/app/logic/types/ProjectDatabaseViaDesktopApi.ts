@@ -149,7 +149,7 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
     return window.imshost.project.getAssetLocalPath(info.localPath, asset_id); 
   }
 
-  getWorkspaceLocalPath(workspace_id: string): Promise<string | null> {
+  getWorkspaceLocalPathFolder(workspace_id: string): Promise<string | null> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
     return window.imshost.project.getWorkspaceLocalPath(info.localPath, workspace_id); 
@@ -180,11 +180,21 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
     pid: string,
     callback: (changes: ProjectContentChangeEventArg) => void,
   ): IProjectDatabaseEventHandler {
-    // TODO: implement
+    window.subscribeContentChange(
+      async (payload: ProjectContentChangeEventArg) => {
+        callback(payload);
+      },
+    );
+
     return {
       cancel: () => {},
-      isConnected: () => false,
-      listenContent: () => {}
+      isConnected() {
+        return false;
+      },
+      listenContent: (asset_ids: string[], workspace_ids: string[]) => {},
+      listenComment: () => ({
+        cancel: () => {}
+      })
     }
   }
 }

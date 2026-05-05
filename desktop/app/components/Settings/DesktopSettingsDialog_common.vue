@@ -8,7 +8,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent } from 'vue';
 import type { FormSchema } from "~ims-app-base/components/Form/FormBuilderTypes"
 import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
 import FormBuilder from '~ims-app-base/components/Form/FormBuilder.vue';
@@ -17,6 +17,9 @@ import UiManager from "~ims-app-base/logic/managers/UiManager"
 import type { LangStr } from '~ims-app-base/logic/types/ProjectTypes';
 import FormCheckBox from '~ims-app-base/components/Form/FormCheckBox.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import DesktopSyncManager from '#logic/managers/DesktopSyncManager';
+import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default defineComponent({
   name: 'DesktopSettingsDialog_common',
@@ -27,9 +30,19 @@ export default defineComponent({
     search: {},
     isEmpty: {}
   },
+  data(){
+    return {
+        syncWithCloud: 60,
+    }
+  },
+  async mounted(){
+    const project_path = this.projectInfo?.localPath;
+    assert(project_path, 'Need project path')
+    this.syncWithCloud = await window.imshost.settings.getKey(project_path, 'syncWithCloud', 60)
+  },
   computed: {
     formSchema(): FormSchema {
-        return [
+        const schema = [
             {
                 caption: this.$t('desktop.settings.fields.language'),
                 prop: 'appLanguage',
@@ -75,8 +88,28 @@ export default defineComponent({
                 editorProps: {
                     value: this.needAutoUpdate,
                 },
-            }
+            },
         ]
+        if(this.projectInfo?.id){
+            schema.push({
+                caption: this.$t('desktop.settings.fields.syncWithCloud'),
+                prop: 'syncWithCloud',
+                editor: ImsSelect,
+                editorProps: {
+                    getOptionLabel: (opt: any) => opt.title,
+                    reduce: (opt: any) => opt.value,
+                    options: [30, 60, 300, -1].map(value => 
+                        {
+                            return {
+                                value: value as any,
+                                title: this.$t('desktop.settings.fields.syncWithCloudTime.every' + value)
+                            }
+                        }
+                    )
+                }
+            })
+        }
+        return schema;
     },
     formSchemaFiltered(){
         if(this.search)
@@ -115,11 +148,17 @@ export default defineComponent({
       set(val: boolean) {
         this.$getAppManager().get(UiPreferenceManager).setPreference('settings.autoUpdateCheck', val);
       }, 
-    }
+    },
+    projectInfo() {
+      return this.$getAppManager().get(ProjectManager).getProjectInfo();
+    },
   },
   watch:{
     formSchemaFiltered(){
         this.$emit('update:isEmpty', this.formSchemaFiltered.length === 0)
+    },
+    async syncWithCloud(new_val: number){
+        await this.$getAppManager().get(DesktopSyncManager).changeAutoSynchronization(new_val);
     }
   }
 });

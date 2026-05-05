@@ -6,6 +6,10 @@ import DialogManager from "~ims-app-base/logic/managers/DialogManager";
 import type { IAppManager } from "~ims-app-base/logic/managers/IAppManager";
 import { EntityCache } from "~ims-app-base/logic/types/EntityCache";
 import assert from 'assert';
+import type { ProjectLicense } from "~ims-app-base/logic/types/ProjectTypes";
+import DesktopSyncManager from "./DesktopSyncManager";
+
+
 
 
 export default class DesktopAuthManager extends AuthManager{
@@ -19,10 +23,6 @@ export default class DesktopAuthManager extends AuthManager{
     }
 
     async init() {
-        const user_info = this._apiManager.getTokenInfo();
-        if (user_info) {
-            await this._apiManager.ensureValidTokenInfo();
-        }
         this._avatarsCache = new EntityCache<AvatarEntity>({
             key: 'id',
             ttl: 1000 * 60 * 10,
@@ -92,6 +92,7 @@ export default class DesktopAuthManager extends AuthManager{
             await this._apiManager.setToken(undefined, undefined, remember);
         } finally {
             await this._apiManager.removeToken();
+            await this.appManager.get(DesktopSyncManager).pauseSyncProject();
         }
     }
 
@@ -145,6 +146,23 @@ export default class DesktopAuthManager extends AuthManager{
         `${this.appManager.$env.AUTH_API_HOST ?? '/'}auth/avatar/${size}/${user_id}` +
         (this._avatarReloadEpoch ? '?' + this._avatarReloadEpoch : '')
         );
+    }
+
+    async getUserLicense(): Promise<{
+        list: ProjectLicense[];
+        total: number;
+      }
+    >
+    {
+        if (!this.getUserInfo()){
+            return {
+                list: [],
+                total: 0
+            }
+        }
+        return await this.appManager
+        .get(ApiManager)
+        .call(Service.CREATORS, HttpMethods.GET, 'license/user');
     }
 
 }

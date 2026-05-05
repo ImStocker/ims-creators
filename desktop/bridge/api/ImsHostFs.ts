@@ -29,6 +29,10 @@ export class ImsHostFs extends ImsHostBase {
   async readTextFile(path: string): Promise<string> {
     return await fs.promises.readFile(path, 'utf-8');
   }
+
+  async readDir(path: string) {
+    return await fs.promises.readdir(path);
+  }
   
   async stat(path: string): Promise<fs.Stats> {
     return await fs.promises.stat(path);
@@ -48,6 +52,14 @@ export class ImsHostFs extends ImsHostBase {
     await fs.promises.mkdir(path, {
       recursive
     })
+  }
+  
+  async deleteFile(path: string): Promise<void>{
+    await fs.promises.unlink(path);
+  }
+
+  async deleteFolder(path: string): Promise<void>{
+    await fsExtra.remove(path)
   }
 
   showSelectDirectoryDialog(

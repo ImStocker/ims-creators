@@ -176,7 +176,7 @@ export default defineComponent({
 $header-height: 60px;
 
 .App {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
 
   .App-header,
@@ -295,6 +295,8 @@ $header-height: 60px;
   background-color: var(--local-bg-color);
   --local-bg-color: var(--editor-bg-color);
   --local-box-color: var(--editor-box-color);
+
+  --panel-bg-color: var(--local-box-color);
 }
 .switcherButton:disabled{
   cursor: default;

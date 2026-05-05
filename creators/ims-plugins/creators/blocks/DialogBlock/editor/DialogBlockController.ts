@@ -1,10 +1,16 @@
-import type { Edge, GraphNode } from '@vue-flow/core';
+import type {
+  Edge,
+  GraphEdge,
+  GraphNode,
+  ViewportTransform,
+} from '@vue-flow/core';
 import type { DialogBlockState } from './DialogEditor';
 import {
   convertNodeToPlainNode,
   exportDialogBlockData,
   extractDialogBlockData,
   generateDataPinId,
+  isEdgeBelongToNode,
   parseDataPinId,
 } from './DialogEditor';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
@@ -51,6 +57,12 @@ export type DialogBlockContentUserData = {
   id: string;
 };
 
+export function sortVariables(variables: DialogVariable[]) {
+  return variables
+    .sort((a, b) => a.name?.localeCompare(b.name))
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+}
+
 export class DialogBlockController
   extends BlockEditorController
   implements IDialogVariableController
@@ -59,6 +71,7 @@ export class DialogBlockController
   private _expectPropsChange = false;
   readonly savePropsDelayed: () => void;
   private _assignedDataTypePins = new Map<string, AssetPropValueType[]>();
+  private _newNodeToSelectIds = new Set<string>();
 
   constructor(
     appManager: IAppManager,
@@ -88,34 +101,89 @@ export class DialogBlockController
     return this.state.nodes.find((n) => n.type === 'start');
   }
 
-  copyNodesToClipboard(selected_node_ids: string[]) {
-    const nodes_to_copy: ({ id: string } & ScriptBlockPlainNode)[] = [];
-    for (const selected_id of selected_node_ids) {
-      const selected_node = this.state.nodes.find((n) => n.id === selected_id);
-      if (!selected_node) return;
-      nodes_to_copy.push({
-        id: selected_id,
-        ...convertNodeToPlainNode(selected_node),
-      });
+  cutNodes(selected_node_ids: string[], viewport: ViewportTransform) {
+    this.copyNodesToClipboard(selected_node_ids, viewport);
+    for (const node_id of selected_node_ids) {
+      this.deleteNodeById(node_id);
     }
-    clipboardCopyPlainText(JSON.stringify(nodes_to_copy));
   }
 
-  async pasteNodesFromClipboard() {
+  copyNodesToClipboard(
+    selected_node_ids: string[],
+    viewport: ViewportTransform,
+  ) {
+    const nodes_to_copy: { id: string } & ScriptBlockPlainNode = {} as {
+      id: string;
+    } & ScriptBlockPlainNode;
+
+    for (const selected_id of selected_node_ids) {
+      const selected_node = this.state.nodes.find((n) => n.id === selected_id);
+
+      if (!selected_node) return;
+
+      const screenX = selected_node.position.x * viewport.zoom + viewport.x;
+      const screenY = selected_node.position.y * viewport.zoom + viewport.y;
+
+      nodes_to_copy[selected_id] = {
+        id: selected_id,
+        ...convertNodeToPlainNode(selected_node),
+        _screenX: screenX,
+        _screenY: screenY,
+      };
+    }
+    for (const edge of this.state.edges) {
+      if (!nodes_to_copy[edge.source]) {
+        continue;
+      }
+      if (!edge.sourceHandle) {
+        continue;
+      }
+      if (edge.sourceHandle === 'out') {
+        nodes_to_copy[edge.source].next = edge.target;
+      } else {
+        const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
+        if (out_m) {
+          const options_ind = parseInt(out_m[1]) - 1;
+          const source_node = nodes_to_copy[edge.source];
+          if (
+            edge.source &&
+            source_node.options &&
+            options_ind < source_node.options.length
+          ) {
+            source_node.options[options_ind].next = edge.target;
+          }
+        }
+      }
+    }
+    clipboardCopyPlainText(
+      JSON.stringify({
+        nodes: Object.values(nodes_to_copy),
+        viewport,
+      }),
+    );
+  }
+
+  async pasteNodesFromClipboard(viewport: ViewportTransform) {
     const changer = this.changer;
     if (!changer) return;
 
     const pasted_data = await clipboardReadPlainText();
+
     try {
       const parsed = JSON.parse(pasted_data);
+      const nodes = parsed.nodes;
 
-      if (!Array.isArray(parsed)) return;
+      if (!Array.isArray(nodes)) return;
 
-      if (!parsed.length) return;
+      if (!nodes.length) return;
 
       const isValidNode = (
         node: any,
-      ): node is { id: string } & ScriptBlockPlainNode =>
+      ): node is {
+        id: string;
+        _screenX?: number;
+        _screenY?: number;
+      } & ScriptBlockPlainNode =>
         node &&
         typeof node === 'object' &&
         typeof node.id === 'string' &&
@@ -125,14 +193,14 @@ export class DialogBlockController
         typeof node.pos.x === 'number' &&
         typeof node.pos.y === 'number';
 
-      if (parsed.every(isValidNode)) {
+      if (nodes.every(isValidNode)) {
         try {
           const id_map = new Map();
-          parsed.forEach((node) => {
+          nodes.forEach((node) => {
             id_map.set(node.id, uuidv4());
           });
 
-          const new_nodes = parsed.map((node) => {
+          const new_nodes = nodes.map((node) => {
             const new_node = structuredClone(node);
             new_node.id = id_map.get(node.id);
 
@@ -151,14 +219,27 @@ export class DialogBlockController
               }
             }
             remap(new_node);
-            new_node.pos.x += 50;
-            new_node.pos.y += 50;
+            this._newNodeToSelectIds.add(new_node.id);
+            let new_x = new_node.pos.x;
+            let new_y = new_node.pos.y;
+            if (
+              new_node._screenX !== undefined &&
+              new_node._screenY !== undefined
+            ) {
+              new_x = (new_node._screenX - viewport.x) / viewport.zoom;
+              new_y = (new_node._screenY - viewport.y) / viewport.zoom;
+            }
+            new_node.pos.x = new_x + 50;
+            new_node.pos.y = new_y + 50;
             return new_node;
           });
 
           const changed_keys: AssetProps = {};
           for (let i = 0; i < new_nodes.length; i++) {
+            delete new_nodes[i]._screenX;
+            delete new_nodes[i]._screenY;
             const { id, ...node_data } = new_nodes[i];
+
             assignPlainValueToAssetProps(
               changed_keys,
               node_data,
@@ -184,6 +265,26 @@ export class DialogBlockController
     if (this._expectPropsChange) return;
 
     this.state = extractDialogBlockData(this.resolvedBlock.computed);
+    debugger;
+    if (this._newNodeToSelectIds.size !== 0) {
+      const edge_to_select = new Set<string>();
+      for (const node_id of this._newNodeToSelectIds) {
+        for (const edge of this.state.edges) {
+          if (isEdgeBelongToNode(edge.id, node_id)) {
+            edge_to_select.add(edge.id);
+          }
+        }
+      }
+      this.setSelectedNodeIds(this._newNodeToSelectIds);
+      this.setSelectedEdgeIds(edge_to_select);
+      this.setSelection(this._newNodeToSelectIds, edge_to_select);
+      this._newNodeToSelectIds = new Set();
+    }
+  }
+
+  setSelection(node_ids: Set<string>, edge_ids: Set<string>) {
+    this.setSelectedNodeIds(node_ids);
+    this.setSelectedEdgeIds(edge_ids);
   }
 
   getNodePinDataType(
@@ -575,10 +676,16 @@ export class DialogBlockController
           : null) ?? 'out';
     }
     if (!toHandle) {
-      toHandle =
-        (to?.handleBounds?.target && to?.handleBounds?.target[0]
-          ? to.handleBounds.target[0].id
-          : null) ?? 'in';
+      if (fromHandle.startsWith('data-out-')) {
+        toHandle =
+          to?.handleBounds?.target?.find((t) => t?.id?.startsWith('data-in'))
+            ?.id ?? 'in';
+      } else {
+        toHandle =
+          (to?.handleBounds?.target && to?.handleBounds?.target[0]
+            ? to.handleBounds.target[0].id
+            : null) ?? 'in';
+      }
     }
 
     let is_data_match = false;
@@ -683,24 +790,42 @@ export class DialogBlockController
   }
 
   async onNodeDeleted(nodeId: string) {
-    const leftEdge = this.state.edges.find(
+    const leftEdgeIndex = this.state.edges.findIndex(
       (e) => e.target === nodeId && e.targetHandle === 'in',
     );
-    const rightEdge = this.state.edges.find(
+    let leftEdge: Edge | undefined;
+    if (leftEdgeIndex >= 0) {
+      leftEdge = this.state.edges[leftEdgeIndex];
+      this.state.edges.splice(leftEdgeIndex, 1);
+    }
+
+    const rightEdgeIndex = this.state.edges.findIndex(
       (e) =>
         e.source === nodeId &&
         (e.sourceHandle === 'out' || /^out-\d+$/.test(e.sourceHandle ?? '')),
     );
-    if (!leftEdge || !rightEdge) {
-      return;
+    let rightEdge: Edge | undefined;
+    if (rightEdgeIndex >= 0) {
+      rightEdge = this.state.edges[rightEdgeIndex];
+      this.state.edges.splice(rightEdgeIndex, 1);
     }
-    await new Promise((res) => setTimeout(res, 1));
-    this.addEdge(
-      leftEdge.source,
-      rightEdge.target,
-      leftEdge.sourceHandle ?? undefined,
-      rightEdge.targetHandle ?? undefined,
-    );
+
+    for (let i = this.state.edges.length - 1; i >= 0; i--) {
+      const edge = this.state.edges[i];
+      if (edge.source === nodeId || edge.target === nodeId) {
+        this.state.edges.splice(i, 1);
+      }
+    }
+
+    if (leftEdge && rightEdge) {
+      await new Promise((res) => setTimeout(res, 1));
+      this.addEdge(
+        leftEdge.source,
+        rightEdge.target,
+        leftEdge.sourceHandle ?? undefined,
+        rightEdge.targetHandle ?? undefined,
+      );
+    }
     this.savePropsDelayed();
   }
 
@@ -737,10 +862,32 @@ export class DialogBlockController
     }
   }
 
+  getOwnVariables() {
+    const props_state = extractDialogBlockData(this.resolvedBlock.props);
+    const computed_state = this.state;
+    const res: DialogVariable[] = [];
+    for (const [v_key, v_data] of Object.entries(props_state.variables.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      if (computed_state.variables.own[v_key]) {
+        Object.assign(v_data, computed_state.variables.own[v_key]);
+      }
+      res.push(v_data);
+    }
+
+    return sortVariables(res);
+  }
+
   getVariables(): DialogVariable[] {
-    return Object.values(this.state.variables.own)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const res: DialogVariable[] = [];
+    for (const v_data of Object.values(this.state.variables.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      res.push(v_data);
+    }
+    return sortVariables(res);
   }
 
   getVariableByName(variable_name: string): DialogVariable | null {
@@ -750,11 +897,6 @@ export class DialogBlockController
   }
 
   addVariable(variable: DialogVariable) {
-    if (this.state.variables.own.hasOwnProperty(variable.name)) {
-      throw new Error(
-        this.appManager.$t('imsDialogEditor.var.variableAlreadyExists'),
-      );
-    }
     this.state.variables.own = {
       ...this.state.variables.own,
       [variable.name]: variable,
@@ -925,6 +1067,25 @@ export class DialogBlockController
     return selected_item_ids;
   }
 
+  setSelectedNodeIds(selected_node_ids: Set<string>) {
+    for (const node of this.state.nodes) {
+      const selected_was = (node as GraphNode).selected;
+      const selected_need = selected_node_ids.has(node.id);
+      if (selected_was !== selected_need) {
+        (node as GraphNode).selected = selected_need;
+      }
+    }
+  }
+  setSelectedEdgeIds(selected_edge_ids: Set<string>) {
+    for (const edge of this.state.edges) {
+      const selected_was = (edge as GraphEdge).selected;
+      const selected_need = selected_edge_ids.has(edge.id);
+      if (selected_was !== selected_need) {
+        (edge as GraphEdge).selected = selected_need;
+      }
+    }
+  }
+
   override setSelectedContentItemIds(itemIds: string[]): void {
     const selected_node_ids = new Set<string>();
     for (const item_id of itemIds) {
@@ -935,13 +1096,8 @@ export class DialogBlockController
         }
       }
     }
-    for (const node of this.state.nodes) {
-      const selected_was = (node as GraphNode).selected;
-      const selected_need = selected_node_ids.has(node.id);
-      if (selected_was !== selected_need) {
-        (node as GraphNode).selected = selected_need;
-      }
-    }
+    this.setSelectedNodeIds(selected_node_ids);
+    this.setSelectedEdgeIds(new Set());
   }
 
   override getContentItems(): BlockContentItem<DialogBlockContentUserData>[] {

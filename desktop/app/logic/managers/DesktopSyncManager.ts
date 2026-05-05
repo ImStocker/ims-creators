@@ -1,34 +1,49 @@
+import { SyncCurrentStateStatus, type SyncCurrentState } from "#bridge/types/SyncTypes";
 import type { SyncInfo } from "#logic/types/SyncTypes";
 import { AppSubManagerBase } from "~ims-app-base/logic/managers/IAppManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
+import UiPreferenceManager from "~ims-app-base/logic/managers/UiPreferenceManager";
+import type { ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
+import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default class DesktopSyncManager extends AppSubManagerBase {
-    private _synchronizationTimer: NodeJS.Timeout | undefined;
-    private _syncInfo: SyncInfo | undefined;
+    private _currentSyncState: SyncCurrentState = {
+        status: SyncCurrentStateStatus.FREE,
+        hasChanges: false,
+        error: null,
+    }
 
     init(){
-        this._synchronizationTimer = setInterval(async () => {
-            await this.loadSyncStatus();
-        }, 10 * 1000);
+        window.subscribeSyncState((val: SyncCurrentState) => {
+            this._currentSyncState = val;
+        });
     }
 
     destroy(){
-        if(this._synchronizationTimer){
-           clearInterval(this._synchronizationTimer); 
-           this._synchronizationTimer = undefined
-        }
     }
 
-    getSyncStatus(): SyncInfo | undefined {
-        return this._syncInfo ? {...this._syncInfo} : undefined;
+    get autoSyncingTime(){
+        return this.appManager
+            .get(UiPreferenceManager)
+            .getPreference('settings.syncWithCloud', 60);
     }
 
+    getCurrentSyncState(): SyncCurrentState  {
+        return this._currentSyncState;
+    }
 
-    async loadSyncStatus(){
-        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
-        if(local_path){
-            this._syncInfo = await window.imshost.sync.getSyncStatus(local_path);
+    async initForProject(project: ProjectFullInfo | null) {
+        if (!project){
+            return;
         }
+        assert(project?.localPath, 'project local path is not set');
+        this._currentSyncState = await window.imshost.sync.getCurrentSyncState(project.localPath);
+    }
+
+    async getSyncErrors(): Promise<SyncInfo> {
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath;
+        assert(local_path, 'local_path is not set');
+        return await window.imshost.sync.getSyncErrors(local_path);
     }
 
     async runSync(){
@@ -38,10 +53,31 @@ export default class DesktopSyncManager extends AppSubManagerBase {
         }
     }
 
+    async pauseSyncProject(){
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
+        if(local_path){
+            await window.imshost.sync.pauseSyncProject(local_path);
+        }
+    }
+
+    async resumeSyncProject(){
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
+        if(local_path){
+            await window.imshost.sync.resumeSyncProject(local_path);
+        }
+    }
+
     async resyncAssetsAndWorkspaces(asset_ids: string[], workspace_ids: string[]){
         const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
         if(local_path){
             await window.imshost.sync.resyncAssetsAndWorkspaces(local_path, asset_ids,workspace_ids);
+        }
+    }
+
+    async changeAutoSynchronization(new_val: number){
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
+        if(local_path){
+            await window.imshost.sync.changeAutoSynchronization(local_path, new_val);
         }
     }
 }

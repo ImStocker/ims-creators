@@ -10,7 +10,7 @@
         class="ManageVariablesDropdown-list-item"
       >
         <div class="ManageVariablesDropdown-list-item-name">
-          {{ variable.name }}
+          {{ variable.title }}
         </div>
         <div class="ManageVariablesDropdown-list-item-value">
           <DataFieldDisplay

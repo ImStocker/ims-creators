@@ -8,15 +8,34 @@ export default {
     password: 'Пароль',
     signInHeader: 'Вход',
     newConfirmationCodeSent: 'Новый код подтверждения отправлен на почту',
+    needLoginForAction: 'Пожалуйста, войдите, чтобы выполнить это действие',
   },
   desktop: {
     fsSync: {
+      menu: {
+        errors: 'Ошибки синхронизации',
+        pause: 'Приостановить',
+        pauseEnd: 'Синхронизация приостановлена',
+        syncNow: 'Синхронизировать сейчас',
+        syncNowEnd: 'Синхронизация завершена',
+        syncNowEndWithErrors: 'Синхронизация завершена с ошибками',
+        resume: 'Возобновить',
+        resumeEnd: 'Синхронизация возобновлена',
+        syncWithCloud: 'Синхронизировать с облаком',
+        syncWithCloudEnd: 'Синхронизация с облаком завершена',
+        openInCloud: 'Открыть в облаке',
+        repeat: 'Повторить',
+        pauseSyncing: 'Приостановить синхронизацию',
+        loginToSync: "Пожалуйста, войдите в свою PRO-учетную запись, чтобы синхронизировать проект"
+      },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',
       syncButton: 'Синхронизировать снова',
       notSyncedAssets: 'Несинхронизированные элементы',
       notSyncedWorkspaces: 'Несинхронизированные папки',
       noErrors: 'Нет ошибок',
+      createNew: 'Создать новый',
+      selectExist: 'Выбрать существующий'
     },
     welcome: {
       begin: 'Добро пожаловать в',
@@ -36,6 +55,7 @@ export default {
       typeTooltip: 'Тип',
       local: 'Локальный',
       localProject: 'Локальный проект',
+      cloudProject: 'Облачный проект',
       cloud: 'Облачный',
       name: 'Название',
       nameTooltip: 'Название',
@@ -51,6 +71,8 @@ export default {
       needAuth: 'Пожалуйста, войдите в свою PRO учетную запись, чтобы создать облачный проект',
       needLicense: 'Пожалуйста, приобретите PRO лицензию, чтобы создать облачный проект',
       buy: 'Купить',
+      dataNotLoad: 'Не удалось загрузить ваши данные',
+      loginToAnotherAccount: 'Войти в другой аккаунт',
     },
     mainMenu: {
       settings: 'Настройки',
@@ -58,7 +80,7 @@ export default {
       goToSite: 'Перейти на сайт',
       help: 'Справка',
       feedback: 'Обратная связь',
-      openOtherProject: 'Открыть другой проект',
+      openAnotherProject: 'Открыть другой проект',
       changeUser: 'Сменить пользователя',
       closeWindow: 'Закрыть окно',
       newWindow: 'Новое окно',
@@ -96,6 +118,13 @@ export default {
         maintenance: 'Сервис',
         openLogsFolder: 'Открыть папку с логами',
         autoUpdate: 'Проверять обновления при запуске приложения',
+        syncWithCloud: 'Автосинхронизация с облаком',
+        syncWithCloudTime: {
+          every30: 'Каждые 30 секунд',
+          every60: 'Каждую минуту',
+          every300: 'Каждые 5 минут',
+          'every-1': 'Нет'
+        }
       },
       close: 'Закрыть',
       plugins: {
@@ -147,5 +176,9 @@ export default {
         updateBoxReady: 'Готово',
         updateBoxError: 'Ошибка'
     },
+    cloudOnlySection: {
+      cloudOnlySectionHeader: "Раздел доступен только в облачных проектах",
+      cloudOnlySectionBody: "Пожалуйста, откройте этот раздел в веб-версии проекта"
+    }
   },
 };
