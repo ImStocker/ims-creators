@@ -33,6 +33,9 @@ export default class DesktopSyncManager extends AppSubManagerBase {
     }
 
     async initForProject(project: ProjectFullInfo | null) {
+        if (!project){
+            return;
+        }
         assert(project?.localPath, 'project local path is not set');
         this._currentSyncState = await window.imshost.sync.getCurrentSyncState(project.localPath);
     }

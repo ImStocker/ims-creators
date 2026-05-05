@@ -154,6 +154,12 @@ export default class DesktopAuthManager extends AuthManager{
       }
     >
     {
+        if (!this.getUserInfo()){
+            return {
+                list: [],
+                total: 0
+            }
+        }
         return await this.appManager
         .get(ApiManager)
         .call(Service.CREATORS, HttpMethods.GET, 'license/user');

@@ -27,7 +27,7 @@ export async function createWindow(args: WindowArgs) {
   // Create the browser window.
   const win = new BrowserWindow({
     width: 700,
-    height: 700,
+    height: 720,
     show: false,
     webPreferences: {
       preload: preload

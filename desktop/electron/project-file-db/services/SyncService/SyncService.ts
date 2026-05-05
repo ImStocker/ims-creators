@@ -212,6 +212,10 @@ export class SyncService {
     async syncProject(){
         if (this._syncProcessRunning) return;
         if (!this.db.info.id) return;
+
+        const account = this.db.api.getTokenInfo();
+        if (!account) return;
+
         let sync_log_id: number | null = null;
         try{
             this._syncProcessRunning = true;
