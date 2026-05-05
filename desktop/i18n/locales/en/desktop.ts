@@ -176,5 +176,9 @@ export default {
       updateBoxReady: 'Ready',
       updateBoxError: 'Error'
     },
+    cloudOnlySection: {
+      cloudOnlySectionHeader: "This section is only available in cloud projects",
+      cloudOnlySectionBody: "Please open this section in web version of project."
+    }
   },
 };

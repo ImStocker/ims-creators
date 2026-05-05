@@ -176,5 +176,9 @@ export default {
         updateBoxReady: 'Готово',
         updateBoxError: 'Ошибка'
     },
+    cloudOnlySection: {
+      cloudOnlySectionHeader: "Раздел доступен только в облачных проектах",
+      cloudOnlySectionBody: "Пожалуйста, откройте этот раздел в веб-версии проекта"
+    }
   },
 };
