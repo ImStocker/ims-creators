@@ -3,15 +3,13 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
-import { absolutePathToUuid, isDir, isDirSync, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
 import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
 import path from "node:path";
 import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../project-db-constants";
 import log from 'electron-log/main';
-import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
-import { mergeProjectContentChangeEventArgs } from "~ims-app-base/logic/types/mergeProjectContentChangeEventArgs";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
    
 type FileSystemExpectChange = {
@@ -34,6 +32,8 @@ export const ASSET_EXT = '.ima.json'
 export const ASSET_EXT_TEST_REGEXP = /\.ima[ \d\(\)\[\]_]*\.json$/i
 export const WORKSPACE_EXT = '.imw.json'
 export const WORKSPACE_EXT_TEST_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i
+
+export const ATTACHMENTS_FOLDER = 'attachments'
 
 function prepareEntityTitle(filename: string, title: string | null, ext_regexp: RegExp): string {
     const title_to_filename = title ? prepareFileBasenameByEntityTitle(title) : '';
@@ -505,9 +505,7 @@ export class FileSystemService{
     }
 
     private async _initWatcher(){
-        const ignoringPaths = new Set([
-            path.join(this.db.localPath, '.imsc', 'project.db-journal'),
-            path.join(this.db.localPath, '.imsc', 'project.db'),            
+        const ignoringPaths = new Set<string>([           
         ])
         this._fsWatcherSubscription = await watcher.subscribe(this.db.localPath, async (err, events) => {
             if (err){
@@ -520,6 +518,15 @@ export class FileSystemService{
                 let ignored = ignoringPaths.has(event.path) || 
                               this._fsExpectChanges.some(expect => expect.filepaths.some(f => event.path.startsWith(f)));
                 if (ignored){
+                    continue;
+                }
+                const local_path = node_path.relative(this.db.localPath, event.path);
+                if (local_path === ATTACHMENTS_FOLDER){
+                    continue;
+                }
+                const segments = event.path.split(/\/\\/g);
+                const has_hidden_segment = segments.some(s => s.startsWith('.'));
+                if (has_hidden_segment){
                     continue;
                 }
 

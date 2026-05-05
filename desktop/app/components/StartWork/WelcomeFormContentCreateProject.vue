@@ -29,9 +29,9 @@
         </ValueSwitcher>
       </div>
       <div v-if="needAuth || needLicense">
-        <div class="WelcomeFormContentCreateProject-message" v-if="userInfo">
-          {{ $t('desktop.welcome.' + (needLicense ? 'needLicense' : 'needAuth')) }}
-          <button v-if="needLicense" 
+        <div class="WelcomeFormContentCreateProject-message">
+          {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
+          <button v-if="needLicense && userInfo" 
             class="is-button accent" 
             @click="buyLicense()">
             {{$t('desktop.welcome.buy')}}
@@ -41,6 +41,14 @@
             class="WelcomeFormContentStart-login"
             :open-external="true"
         />
+        <div class="WelcomeFormContentCreateProject-create" v-if="userInfo">
+          <button 
+            v-if="userInfo && needLicense"
+            class="is-button accent"
+            @click="logout">
+              {{ $t('desktop.welcome.loginToAnotherAccount') }}
+          </button>
+        </div>
       </div>
       <template v-else>
         <div class="WelcomeFormContentCreateProject-Action">
@@ -234,14 +242,26 @@ export default defineComponent({
     }
   },
   methods: {
+    async logout(){
+      try{
+        await this.$getAppManager()
+            .get<DesktopAuthManager>(AuthManager)
+            .logout();
+      }
+      catch(err: any){
+        this.$getAppManager().get(UiManager).showError(err.message);
+      }
+    },
     async updateUserLicense(){
-       try{
+      try{
         this.userLicenses = await this.$getAppManager()
             .get<DesktopAuthManager>(AuthManager)
             .getUserLicense();
       }
       catch(err: any){
-        this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+        if(this.params.projectType !== 'cloud'){
+          this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
+        }
       }
     },
     async checkExistsProject(val: string){

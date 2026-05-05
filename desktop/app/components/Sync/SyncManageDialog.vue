@@ -24,6 +24,7 @@
                     </div>
                   </div>
                   <button class="is-button is-button-icon"
+                    v-if="asset.conflict || asset.conflict_message"
                     @click="repeatAssetSync(asset.id)"
                     :disabled="!!repeatingAssetIds.find(id => id === asset.id)"
                     :title="$t('desktop.fsSync.menu.repeat')">
@@ -51,6 +52,7 @@
                     </div>
                   </div>
                   <button
+                    v-if="workspace.conflict || workspace.conflict_message"
                     class="is-button is-button-icon"
                     @click="repeatWorkspaceSync(workspace.id)"
                     :class="{ loading: repeatingWorkspaceIds.find(id => id === workspace.id)}"

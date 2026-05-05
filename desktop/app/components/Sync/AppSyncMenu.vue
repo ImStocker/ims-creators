@@ -85,7 +85,12 @@ export default defineComponent({
           list.push({
             title: this.$t('desktop.fsSync.menu.syncNow'),
             action: async () => {
-                await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
+                if(!this.userInfo){
+                  await this.$getAppManager()
+                    .get(AuthManager)
+                    .ensureLoggedInDialog(this.$t('auth.needLoginForAction'));
+                }
+                await this.$getAppManager().get(DesktopSyncManager).runSync()
                 const sync_status = this.$getAppManager().get(DesktopSyncManager).getCurrentSyncState();
                 if(sync_status?.error){
                   this.$getAppManager().get(UiManager).showError(this.$t('desktop.fsSync.menu.syncNowEndWithErrors'));
@@ -96,16 +101,7 @@ export default defineComponent({
               }
           });
         }
-        if(this.inProcess && !this.onPause) {
-          list.push({
-            title: this.$t('desktop.fsSync.menu.pause'),
-            action: async () => {
-              await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
-              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
-            }
-          });
-        }
-        else if(this.projectInfo?.id && this.onPause){
+        if(this.projectInfo?.id && !this.inProcess && this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.resume'),
             action: async () => {
@@ -118,6 +114,15 @@ export default defineComponent({
           title: this.$t('desktop.fsSync.menu.errors'),
           action: async () => await this.openSyncManageDialog(),
         });
+        if(this.projectInfo?.id && !this.onPause){
+          list.push({
+            title: this.$t('desktop.fsSync.menu.pauseSyncing'),
+            action: async () => {
+              await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
+              this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
+            }
+          });
+        }
         list.push({
           title: this.$t('desktop.fsSync.menu.openInCloud'),
           action: async () => {
