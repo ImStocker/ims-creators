@@ -44,42 +44,51 @@
         </menu-button>
       </div>
       <div class="DialogSpeechNode-content">
-        <DataField
+        <div
           v-for="(variable, var_index) of mainSpeechList"
           :key="variable.name"
-          :ref="'main-' + variable.name"
           class="DialogSpeechNode-prop-line"
-          :model-value="
-            nodeDataController.values[variable.name] === undefined
-              ? variable.default
-              : nodeDataController.values[variable.name]
-          "
-          :play-value="
-            playingNodeData?.values
-              ? playingNodeData.values[variable.name]
-              : null
-          "
-          :in-id="generateDataPinId(false, variable.name)"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          :title="variable.description ?? ''"
-          :placeholder="
-            variable.name === 'text'
-              ? $t('imsDialogEditor.speech.enterSpeech')
-              : ''
-          "
-          :caption="getMainVariableCaption(var_index)"
-          @update:model-value="
-            nodeDataController.setValue(variable.name, $event)
-          "
-        ></DataField>
-        <button
-          v-if="!readonly && mainSpeechVariablesHasDefault"
-          class="is-button is-button-action DialogSpeechNode-restore-button"
-          @click="setMainSpeechDefault()"
         >
-          {{ $t('imsDialogEditor.speech.restoreValues') }}
-        </button>
+          <DataField
+            :ref="'main-' + variable.name"
+            class="DialogSpeechNode-prop-dataField"
+            :model-value="
+              nodeDataController.values[variable.name] === undefined
+                ? variable.default
+                : nodeDataController.values[variable.name]
+            "
+            :play-value="
+              playingNodeData?.values
+                ? playingNodeData.values[variable.name]
+                : null
+            "
+            :in-id="generateDataPinId(false, variable.name)"
+            :node-data-controller="nodeDataController"
+            :readonly="readonly"
+            :title="variable.description ?? ''"
+            :placeholder="
+              variable.name === 'text'
+                ? $t('imsDialogEditor.speech.enterSpeech')
+                : ''
+            "
+            :caption="getMainVariableCaption(var_index)"
+            @update:model-value="
+              nodeDataController.setValue(variable.name, $event)
+            "
+          ></DataField>
+          <button
+            v-if="
+              !readonly &&
+              variable.default !== undefined &&
+              variable.default !== null
+            "
+            class="is-button is-button-icon DialogSpeechNode-prop-restore"
+            :title="$t('imsDialogEditor.speech.restoreValues')"
+            @click="nodeDataController.deleteValue(variable.name)"
+          >
+            <i class="ri-arrow-go-back-line"></i>
+          </button>
+        </div>
         <div v-if="options.length > 0" class="DialogSpeechNode-options">
           <ContextMenuZone
             v-for="(option, option_index) of options"
@@ -174,14 +183,24 @@
                     )
                   "
                 ></DataField>
+                <button
+                  v-if="
+                    !readonly &&
+                    variable.default !== undefined &&
+                    variable.default !== null
+                  "
+                  class="is-button is-button-icon DialogSpeechNode-prop-restore"
+                  :title="$t('imsDialogEditor.speech.restoreValues')"
+                  @click="
+                    nodeDataController.deleteOptionValue(
+                      option_index,
+                      variable.name,
+                    )
+                  "
+                >
+                  <i class="ri-arrow-go-back-line"></i>
+                </button>
               </div>
-              <button
-                v-if="!readonly && optionSpeechVariablesHasDefault"
-                class="is-button is-button-action DialogSpeechNode-restore-button"
-                @click="setOptionDefault(option_index)"
-              >
-                {{ $t('imsDialogEditor.speech.restoreValues') }}
-              </button>
             </div>
             <div
               v-if="isPlaying && playOptionConditionPass(option_index)"
@@ -316,14 +335,8 @@ export default defineComponent({
     mainSpeechList() {
       return this.dialogController.getMainSpeech();
     },
-    mainSpeechVariablesHasDefault() {
-      return !!this.mainSpeechList.find((v) => v.default);
-    },
     optionSpeechList() {
       return this.dialogController.getOptionSpeech();
-    },
-    optionSpeechVariablesHasDefault() {
-      return !!this.optionSpeechList.find((v) => v.default);
     },
     isPlaying() {
       return this.dialogPlayer.currentPlayingNode?.id === this.id;
@@ -364,16 +377,6 @@ export default defineComponent({
     this.updatePins();
   },
   methods: {
-    setMainSpeechDefault() {
-      for (const variable of this.mainSpeechList) {
-        this.nodeDataController.deleteValue(variable.name);
-      }
-    },
-    setOptionDefault(option_index: number) {
-      for (const variable of this.optionSpeechList) {
-        this.nodeDataController.deleteOptionValue(option_index, variable.name);
-      }
-    },
     async deleteCover() {
       const confirm = await this.$getAppManager()
         .get(DialogManager)
@@ -565,16 +568,41 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .DialogSpeechNode-prop-line {
-  display: flex;
   margin-bottom: 10px;
+  margin-right: 2px;
+
+  &:not(:hover) {
+    .DialogSpeechNode-prop-restore {
+      opacity: 0 !important;
+    }
+  }
+}
+.DialogSpeechNode-prop-dataField {
+  display: flex;
   align-items: baseline;
+}
+.DialogSpeechNode-prop-restore {
+  height: fit-content;
+  transition: opacity 0.2s;
+}
+
+.DialogSpeechNode-options-one-param {
+  &:not(:hover) {
+    .DialogSpeechNode-prop-restore {
+      opacity: 0 !important;
+    }
+  }
 }
 
 .DialogSpeechNode-prop-line,
 .DialogSpeechNode-options-one-param {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   &:not(:hover):deep(
       .DataField-in:not(.state-connected),
-      .DataField-out:not(.state-connected)
+      .DataField-out:not(.state-connected),
+
     ) {
     opacity: 0;
   }
@@ -649,10 +677,6 @@ export default defineComponent({
       padding-left: 22px;
     }
   }
-}
-
-.DialogSpeechNode-restore-button {
-  margin: 0 10px;
 }
 .DialogSpeechNode-options {
   margin-top: 10px;
