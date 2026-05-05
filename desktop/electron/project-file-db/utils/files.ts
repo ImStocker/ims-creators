@@ -10,6 +10,7 @@ import { WORKSPACE_EXT } from '../services/FileSystemService';
 export const forbiddenFilenameCharsRegexp = /[<>:"/\\|?*\x00-\x1f]/;
 export const forbiddenFilenameValuesRegexp = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
 export const trailingDotsOrSpaces = /[\s.]$/;
+export const maxFilenameLen = 128;
 
 export function getIndexRangeStartAndStep(
   from: number | undefined,
@@ -43,7 +44,7 @@ export function getImsExtname(localPath: string){
 }
 
 export function prepareFileBasenameByEntityTitle(title: string){
-  return title.replace(forbiddenFilenameCharsRegexp, '_').trim()
+  return title.replace(forbiddenFilenameCharsRegexp, '_').substring(0, maxFilenameLen).trim()
 }
 
 export function getAssetLocalPath(asset: { localName?: string, workspaceId: string | null}, db: ProjectFileDb): string {
