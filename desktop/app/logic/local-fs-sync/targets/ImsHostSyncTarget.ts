@@ -49,7 +49,6 @@ export class ImsHostSyncTarget implements ISyncTarget {
     }
   
     async isEmpty() {
-      debugger;
       const files = await window.imshost.fs.readDir(this._basePath);
       for (const _filePath of files) {
         return false;

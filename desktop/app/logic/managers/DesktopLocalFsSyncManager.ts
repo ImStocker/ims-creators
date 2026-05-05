@@ -1,24 +1,10 @@
 import LocalFsSyncManager from '../../../../ims-app-base/app/logic/managers/LocalFsSyncManager';
-import SyncStoreCore from '~ims-app-base/logic/types/SyncStoreCore';
 import { ImsHostSyncTarget } from '../local-fs-sync/targets/ImsHostSyncTarget';
-import type { IAppManager } from '../../../../ims-app-base/app/logic/managers/IAppManager';
+import ProjectManager from '../../../../ims-app-base/app/logic/managers/ProjectManager';
 
 export default class DesktopLocalFsSyncManager extends LocalFsSyncManager {
-  protected _core: SyncStoreCore;
-
-  constructor(appManager: IAppManager) {
-    super(appManager);
-    this._core = new SyncStoreCore({
-      storageGetter: async () =>
-        window.imshost.storage.getItem('fsSync-' + 0),
-      storageSetter: async (val) =>
-        window.imshost.storage.setItem('fsSync-' + 0, val),
-    });
-  }
-
-  override async init(): Promise<void> {
-    super.init();
-    await this._core.init();
+  get projectPath() {
+    return this.appManager.get(ProjectManager).getProjectInfo()?.localPath
   }
     
   override createFsSyncTarget(rootDirPath: string) {
@@ -32,12 +18,12 @@ export default class DesktopLocalFsSyncManager extends LocalFsSyncManager {
   }
 
   override async getDirHandle(key: string): Promise<FileSystemDirectoryHandle | undefined> {
-    if (!this._core.inited) return;
-    return this._core.getKey(key);
+    if (!this.projectPath) return;
+    return await window.imshost.settings.getKey(this.projectPath, key);
   }
 
   override async saveDirHandle(key: string, rootDirHandle: any): Promise<void> {
-    if (!this._core.inited) return;
-    this._core.setKey(key, rootDirHandle);
+    if (!this.projectPath) return;
+    await window.imshost.settings.setKey(this.projectPath, key, rootDirHandle);
   }
 }
