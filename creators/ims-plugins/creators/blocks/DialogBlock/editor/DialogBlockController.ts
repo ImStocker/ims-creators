@@ -265,7 +265,7 @@ export class DialogBlockController
     if (this._expectPropsChange) return;
 
     this.state = extractDialogBlockData(this.resolvedBlock.computed);
-    debugger;
+
     if (this._newNodeToSelectIds.size !== 0) {
       const edge_to_select = new Set<string>();
       for (const node_id of this._newNodeToSelectIds) {
