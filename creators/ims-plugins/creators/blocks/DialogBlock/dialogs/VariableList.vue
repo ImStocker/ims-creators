@@ -1,36 +1,49 @@
 <template>
-  <div v-if="variableList.length > 0" class="VariableList-grid">
-    <div class="VariableList-grid-row">
-      <div class="VariableList-grid-column"></div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.name') }}
+  <div class="VariableList">
+    <form-search
+      v-if="variableList && variableList.length"
+      class="VariableList-search"
+      :value="searchQuery"
+      @change="searchQuery = $event"
+    ></form-search>
+    <div v-if="filteredVariables.length > 0" class="VariableList-grid">
+      <div class="VariableList-grid-row">
+        <div class="VariableList-grid-column"></div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.name') }}
+        </div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.type') }}
+        </div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.defaultValue') }}
+        </div>
       </div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.type') }}
-      </div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.defaultValue') }}
-      </div>
+      <sortable-list
+        handle-selector=".VariableListItem-drag"
+        id-key="name"
+        :list="filteredVariables"
+        @update:list="changeList($event)"
+      >
+        <template #default="{ item }">
+          <variable-list-item
+            class="VariableList-item"
+            :variable-controller="collectionController"
+            :variable="item"
+            :show-auto-fill="showAutoFill"
+          >
+          </variable-list-item>
+        </template>
+      </sortable-list>
     </div>
-    <sortable-list
-      handle-selector=".VariableListItem-drag"
-      id-key="name"
-      :list="variableList"
-      @update:list="changeList($event)"
-    >
-      <template #default="{ item }">
-        <variable-list-item
-          class="VariableList-item"
-          :variable-controller="variableController"
-          :variable="item"
-          :show-auto-fill="showAutoFill"
-        >
-        </variable-list-item>
-      </template>
-    </sortable-list>
-  </div>
-  <div v-else class="VariableList-empty">
-    {{ $t('imsDialogEditor.var.noVariablesYet') }}
+    <div v-else class="VariableList-empty">
+      {{
+        $t(
+          'imsDialogEditor.var.' +
+            (searchQuery ? 'noVariablesFound' : 'noVariablesYet'),
+        )
+      }}
+    </div>
   </div>
 </template>
 
@@ -44,15 +57,17 @@ import VariableListItem from './VariableListItem.vue';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
+import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 export default defineComponent({
   name: 'VariableList',
   components: {
     VariableListItem,
     SortableList,
+    FormSearch,
   },
   props: {
-    variableController: {
+    collectionController: {
       type: Object as PropType<IDialogVariableController>,
       required: true,
     },
@@ -61,9 +76,19 @@ export default defineComponent({
       default: false,
     },
   },
+  data() {
+    return {
+      searchQuery: '',
+    };
+  },
   computed: {
     variableList() {
-      return this.variableController.getVariables();
+      return this.collectionController.getEntities();
+    },
+    filteredVariables() {
+      return this.variableList.filter((v) =>
+        v.title.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      );
     },
   },
   async mounted() {
@@ -74,7 +99,7 @@ export default defineComponent({
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
-          this.variableController.reorderVariables(reordered_variables);
+          this.collectionController.reorderEntities(reordered_variables);
         });
     },
     async loadVariablesAssetKinds() {
@@ -98,7 +123,9 @@ export default defineComponent({
 </script>
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
-
+.VariableList-search {
+  margin-bottom: 10px;
+}
 .VariableList-grid {
   --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;
   --variable-list-column-gap: 2px;

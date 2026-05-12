@@ -153,6 +153,14 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       type: NodeType.EXEC,
       playDataCompute: playDataComputeTrigger,
     },
+    {
+      name: 'function',
+      icon: 'ri-code-s-slash-line',
+      node: DialogTriggerNode,
+      color: '#ea9595',
+      type: NodeType.EXEC,
+      playDataCompute: playDataComputeTrigger,
+    },
     /*{
       name: 'timer',
       icon: 'ri-time-line',

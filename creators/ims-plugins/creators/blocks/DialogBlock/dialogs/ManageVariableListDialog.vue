@@ -19,7 +19,7 @@
       <div class="ManageVariableListDialog-list">
         <variable-list
           v-if="variableController && !controllerLoading"
-          :variable-controller="variableController"
+          :collection-controller="variableController"
         ></variable-list>
         <div
           v-else-if="controllerLoading"
@@ -84,16 +84,16 @@ type DialogResult = void;
 
 function getVariableController(dialogController: DialogBlockController) {
   return {
-    getVariables: () => dialogController.getOwnVariables(),
-    addVariable: (variable: DialogVariable) =>
+    getEntities: () => dialogController.getOwnVariables(),
+    addEntity: (variable: DialogVariable) =>
       dialogController.addVariable(variable),
-    changeVariable: (variable_name: string, variable: DialogVariable) =>
+    changeEntity: (variable_name: string, variable: DialogVariable) =>
       dialogController.changeVariable(variable_name, variable),
-    deleteVariable: (variable_name: string) =>
+    deleteEntity: (variable_name: string) =>
       dialogController.deleteVariable(variable_name),
-    canDeleteVariable: (variable_name: string) =>
+    canDeleteEntity: (variable_name: string) =>
       dialogController.canDeleteVariable(variable_name),
-    reorderVariables: (variables: DialogVariable[]) =>
+    reorderEntities: (variables: DialogVariable[]) =>
       dialogController.reorderVariables(variables),
   };
 }
@@ -135,7 +135,7 @@ export default defineComponent({
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
     },
     variableList() {
-      return this.variableController?.getVariables() ?? [];
+      return this.variableController?.getEntities() ?? [];
     },
     dialogController() {
       return this.dialog.state.dialogController;
@@ -308,7 +308,7 @@ export default defineComponent({
             },
           );
           if (!new_variable) return;
-          this.variableController?.addVariable(new_variable);
+          this.variableController?.addEntity(new_variable);
         });
       this.creationLoading = false;
     },
@@ -318,21 +318,6 @@ export default defineComponent({
 
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
-
-.ManageVariableListDialog-row {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.ManageVariableListDialog-empty {
-  margin-bottom: 20px;
-}
-
-.ManageVariableListDialog-empty {
-  text-align: center;
-}
 
 .ManageVariableListDialog {
   width: 700px;

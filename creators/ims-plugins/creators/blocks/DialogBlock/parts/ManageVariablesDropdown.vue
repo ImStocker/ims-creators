@@ -1,11 +1,16 @@
 <template>
   <div class="ManageVariablesDropdown is-dropdown">
-    <div
+    <form-search
       v-if="variables && variables.length"
+      :value="searchQuery"
+      @change="searchQuery = $event"
+    ></form-search>
+    <div
+      v-if="filteredVariables && filteredVariables.length"
       class="ManageVariablesDropdown-list tiny-scrollbars"
     >
       <div
-        v-for="variable of variables"
+        v-for="variable of filteredVariables"
         :key="variable.name"
         class="ManageVariablesDropdown-list-item"
       >
@@ -23,7 +28,12 @@
       </div>
     </div>
     <div v-else class="ManageVariablesDropdown-list-empty">
-      {{ $t('imsDialogEditor.var.noVariablesYet') }}
+      {{
+        $t(
+          'imsDialogEditor.var.' +
+            (searchQuery ? 'noVariablesFound' : 'noVariablesYet'),
+        )
+      }}
     </div>
     <button
       v-if="!readonly"
@@ -40,11 +50,13 @@ import DataFieldDisplay from './DataFieldDisplay.vue';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 export default defineComponent({
   name: 'ManageVariablesDropdown',
   components: {
     DataFieldDisplay,
+    FormSearch,
   },
   inject: ['projectContext'],
   props: {
@@ -57,9 +69,19 @@ export default defineComponent({
       default: false,
     },
   },
+  data() {
+    return {
+      searchQuery: '',
+    };
+  },
   computed: {
     variables() {
       return this.dialogController.getVariables();
+    },
+    filteredVariables() {
+      return this.variables.filter((v) =>
+        v.title.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      );
     },
   },
   methods: {

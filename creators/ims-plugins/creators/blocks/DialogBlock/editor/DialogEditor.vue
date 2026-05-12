@@ -106,19 +106,32 @@
         ></CreateNodeDropdown>
       </dropdown-element>
     </div>
-
-    <menu-button class="DialogEditor-variables">
-      <template #button="{ toggle }">
-        <button class="is-button is-button-action" @click="toggle">
-          <i class="ri-arrow-up-s-line"></i>
-          {{ $t('imsDialogEditor.var.variables') }}
-        </button>
-      </template>
-      <manage-variables-dropdown
-        :dialog-controller="blockControllerMut"
-        :readonly="readonly"
-      ></manage-variables-dropdown>
-    </menu-button>
+    <div class="DialogEditor-buttons">
+      <menu-button class="DialogEditor-variables">
+        <template #button="{ toggle }">
+          <button class="is-button is-button-action" @click="toggle">
+            <i class="ri-arrow-up-s-line"></i>
+            {{ $t('imsDialogEditor.var.variables') }}
+          </button>
+        </template>
+        <manage-variables-dropdown
+          :dialog-controller="blockControllerMut"
+          :readonly="readonly"
+        ></manage-variables-dropdown>
+      </menu-button>
+      <menu-button class="DialogEditor-actions">
+        <template #button="{ toggle }">
+          <button class="is-button is-button-action" @click="toggle">
+            <i class="ri-arrow-up-s-line"></i>
+            {{ $t('imsDialogEditor.actions.actionsTitle') }}
+          </button>
+        </template>
+        <manage-actions-dropdown
+          :dialog-controller="blockControllerMut"
+          :readonly="readonly"
+        ></manage-actions-dropdown>
+      </menu-button>
+    </div>
   </div>
 </template>
 
@@ -178,6 +191,7 @@ import DropdownElement from '~ims-app-base/components/Common/DropdownElement.vue
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import ManageVariablesDropdown from '../parts/ManageVariablesDropdown.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
+import ManageActionsDropdown from '../parts/ManageActionsDropdown.vue';
 
 type CreateNodeContext = {
   clickedAt: { x: number; y: number } | null;
@@ -210,6 +224,7 @@ export default defineComponent({
     DropdownElement,
     MenuButton,
     ManageVariablesDropdown,
+    ManageActionsDropdown,
   },
   inject: ['projectContext'],
   props: {
@@ -939,11 +954,14 @@ export default defineComponent({
   justify-content: center;
   pointer-events: none;
 }
-.DialogEditor-variables {
+.DialogEditor-buttons {
+  display: flex;
+  gap: 5px;
   position: absolute;
   bottom: 5px;
   left: 5px;
-
+}
+.DialogEditor-buttons {
   .is-button {
     padding-left: 18px;
     &:not(:hover):not(:focus) {
