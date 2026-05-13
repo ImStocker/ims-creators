@@ -9,7 +9,10 @@
           <ims-input v-model="action.name"></ims-input>
         </div>
       </div>
-      <div class="EnterActionDialog-field">
+      <div
+        v-if="!dialog.state.params?.disableTypeChange"
+        class="EnterActionDialog-field"
+      >
         <div class="EnterActionDialog-field-caption">
           {{ $t('imsDialogEditor.actions.selectType') }}
         </div>
@@ -106,6 +109,9 @@ import { getAvailableActionTypes } from '../logic/nodeActions';
 type DialogProps = {
   initial?: DialogAction;
   validate?: (variable: DialogAction) => void | Promise<void>;
+  params?: {
+    disableTypeChange?: boolean;
+  };
 };
 
 type DialogResult = DialogAction | null;

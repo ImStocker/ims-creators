@@ -54,18 +54,19 @@
           <span class="ActionsListItem-params-list-item-title">
             {{ param.title }}
           </span>
-          <template v-if="param.type?.Type">
-            —
-            <span class="ActionsListItem-params-list-item-type">
-              <div
-                class="ActionsListItem-params-list-item-type-ellipse"
-                :class="'type-' + param.type.Type"
-              ></div>
-              {{
-                $t('imsDialogEditor.var.types.' + param.type.Type.toString())
-              }}
-            </span>
-          </template>
+          —
+          <span class="ActionsListItem-params-list-item-type">
+            <div
+              class="ActionsListItem-params-list-item-type-ellipse"
+              :class="'type-' + (param.type?.Type ?? 'any')"
+            ></div>
+            {{
+              $t(
+                'imsDialogEditor.var.types.' +
+                  (param.type?.Type.toString() ?? 'any'),
+              )
+            }}
+          </span>
         </div>
       </div>
     </div>
@@ -82,18 +83,19 @@
           <span class="ActionsListItem-params-list-item-title">
             {{ param.title }}
           </span>
-          <template v-if="param.type?.Type">
-            —
-            <span class="ActionsListItem-params-list-item-type">
-              <div
-                class="ActionsListItem-params-list-item-type-ellipse"
-                :class="'type-' + param.type.Type"
-              ></div>
-              {{
-                $t('imsDialogEditor.var.types.' + param.type.Type.toString())
-              }}
-            </span>
-          </template>
+          —
+          <span class="ActionsListItem-params-list-item-type">
+            <div
+              class="ActionsListItem-params-list-item-type-ellipse"
+              :class="'type-' + (param.type?.Type ?? 'any')"
+            ></div>
+            {{
+              $t(
+                'imsDialogEditor.var.types.' +
+                  (param.type?.Type.toString() ?? 'any'),
+              )
+            }}
+          </span>
         </div>
       </div>
     </div>
@@ -120,8 +122,8 @@ import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
 import { getAvailableActionTypes } from '../logic/nodeActions';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
-import DialogManager from '../../../../../../ims-app-base/app/logic/managers/DialogManager';
-import ConfirmDialog from '../../../../../../ims-app-base/app/components/Common/ConfirmDialog.vue';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
 import EnterActionDialog from './EnterActionDialog.vue';
 import {
   checkParamsExists,
@@ -311,6 +313,9 @@ export default defineComponent({
   }
   &.type-asset {
     background-color: var(--imsde-type-asset-fill);
+  }
+  &.type-any {
+    background-color: var(--imsde-type-any-fill);
   }
 }
 .ActionsListItem {

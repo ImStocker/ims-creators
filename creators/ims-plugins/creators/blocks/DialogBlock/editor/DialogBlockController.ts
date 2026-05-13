@@ -583,7 +583,7 @@ export class DialogBlockController extends BlockEditorController {
         if (!node_data.params) node_data.params = { in: [], out: [] };
         if (!node_data.params[scope]) node_data.params[scope] = [];
         if (node_data.params[scope].some((p) => p.name === variable.name)) {
-          throw new Error('Paramter already exists');
+          throw new Error('Parameter already exists');
         }
         node_data.params[scope].push(variable);
         this.savePropsDelayed();

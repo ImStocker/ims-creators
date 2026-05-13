@@ -4,6 +4,7 @@ import DialogStartNode from './DialogStartNode.vue';
 import DialogTriggerNode from './DialogTriggerNode.vue';
 import DialogSetVarNode from './DialogSetVarNode.vue';
 import DialogGetVarNode from './DialogGetVarNode.vue';
+import DialogFunctionNode from './DialogFunctionNode.vue';
 import { NodeType, type NodeDescriptor } from './NodeDescriptor';
 import DialogEndNode from './DialogEndNode.vue';
 import DialogOpNode from './DialogOpNode.vue';
@@ -156,8 +157,8 @@ export function getNodeDescriptors(): NodeDescriptor[] {
     {
       name: 'function',
       icon: 'ri-code-s-slash-line',
-      node: DialogTriggerNode,
-      color: '#ea9595',
+      node: DialogFunctionNode,
+      color: '#ea95ea',
       type: NodeType.EXEC,
       playDataCompute: playDataComputeTrigger,
     },
