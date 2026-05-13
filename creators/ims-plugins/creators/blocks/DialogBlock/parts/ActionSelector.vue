@@ -30,9 +30,9 @@ import type {
   DialogBlockController,
 } from '../editor/DialogBlockController';
 import { ScriptBlockPlainActionTypes } from '../logic/nodeStoring';
-import DialogManager from '../../../../../../ims-app-base/app/logic/managers/DialogManager';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
-import type { IProjectContext } from '../../../../../../ims-app-base/app/logic/types/IProjectContext';
+import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 
 type ActionOpt = {
   action: DialogAction | null;
@@ -73,7 +73,11 @@ export default defineComponent({
         (opt) => opt.action && opt.action.name === model_value,
       );
       if (action) return action;
-      return null;
+      return {
+        action: null,
+        title: model_value,
+        key: model_value,
+      };
     },
     actionOptions(): ActionOpt[] {
       return [
