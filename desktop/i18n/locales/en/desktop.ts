@@ -21,6 +21,7 @@ export default {
         syncNowEndWithErrors: 'Synchronization was finished with errors',
         resume: 'Resume',
         resumeEnd: 'Synchronization was resumed',
+        resyncAll: 'Resynchronize all',
         syncWithCloud: 'Synchronize with cloud',
         syncWithCloudEnd: 'Synchronization with cloud is completed',
         openInCloud: 'Open in cloud',

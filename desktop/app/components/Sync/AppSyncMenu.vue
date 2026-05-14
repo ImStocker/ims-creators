@@ -129,10 +129,6 @@ export default defineComponent({
             }
           });
         }
-        list.push({
-          title: this.$t('desktop.fsSync.menu.errors'),
-          action: async () => await this.openSyncManageDialog(),
-        });
         if(this.projectInfo?.id && !this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.pauseSyncing'),
@@ -142,6 +138,23 @@ export default defineComponent({
             }
           });
         }
+        list.push({
+          type: 'separator',
+        });
+        list.push({
+          title: this.$t('desktop.fsSync.menu.errors'),
+          action: async () => await this.openSyncManageDialog(),
+        });
+        list.push({
+          title: this.$t('desktop.fsSync.menu.resyncAll'),
+          action: async () => {
+            await this.$getAppManager().get(DesktopSyncManager).resyncAll()
+            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
+          }
+        });
+        list.push({
+          type: 'separator',
+        });
         list.push({
           title: this.$t('desktop.fsSync.menu.openInCloud'),
           action: async () => {
