@@ -103,7 +103,7 @@ import VariableList from './VariableList.vue';
 import type { IDialogVariableController } from '../editor/DialogVariableController';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterVariableDialog from './EnterVariableDialog.vue';
-import UiManager from '../../../../../../ims-app-base/app/logic/managers/UiManager';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
 import { getAvailableActionTypes } from '../logic/nodeActions';
 
 type DialogProps = {

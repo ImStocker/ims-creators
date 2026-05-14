@@ -185,7 +185,6 @@ export default defineComponent({
       },
       set(val: string) {
         this.nodeDataController.setSubject(val);
-        this.updatePins();
       },
     },
     parametersGrid(): {
@@ -269,6 +268,11 @@ export default defineComponent({
       return this.dialogController
         .getActions()
         .find((el) => el.name === this.actionVal);
+    },
+  },
+  watch: {
+    parametersGrid() {
+      this.updatePins();
     },
   },
   mounted() {

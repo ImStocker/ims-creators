@@ -43,7 +43,7 @@
         @node-click="onNodeClick"
       >
         <template
-          v-for="node_desc of nodeDesсriptors"
+          v-for="node_desc of nodeDescriptors"
           :key="node_desc.name"
           #[`node-${node_desc.name}`]="params"
         >
@@ -99,10 +99,12 @@
     >
       <dropdown-element :shown="!!createNodeContext">
         <CreateNodeDropdown
+          :dialog-block-controller="blockController"
           :allowed-types="createNodeContext.allowedTypes"
           :need-data-in="createNodeContext.needDataIn"
           :need-data-out="createNodeContext.needDataOut"
           @choose="createNode($event)"
+          @choose-template="createNodeByTemplate($event)"
         ></CreateNodeDropdown>
       </dropdown-element>
     </div>
@@ -162,7 +164,11 @@ import DialogChanceNode from '../nodes/DialogChanceNode.vue';
 import DialogBranchNode from '../nodes/DialogBranchNode.vue';
 import CreateNodeDropdown from './CreateNodeDropdown.vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptiors';
-import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
+import {
+  NodeType,
+  type NodeDescriptor,
+  type NodeDescriptorTemplate,
+} from '../nodes/NodeDescriptor';
 import { v4 as uuidv4 } from 'uuid';
 import {
   getPreferenceKeyForBlock,
@@ -276,7 +282,7 @@ export default defineComponent({
     blockControllerMut() {
       return this.blockController;
     },
-    nodeDesсriptors() {
+    nodeDescriptors() {
       return getNodeDescriptors();
     },
     hasStart() {
@@ -391,6 +397,19 @@ export default defineComponent({
         };
         window.addEventListener('keydown', (this as any)._keyDownHandler);
       }
+    },
+    async createNodeByTemplate(params: {
+      descriptor: NodeDescriptor;
+      template: NodeDescriptorTemplate;
+    }) {
+      const created = await this.createNode(params.descriptor);
+      if (!created) return;
+
+      const node_data_controller =
+        this.blockControllerMut.getNodeDataController(created.id);
+      if (!node_data_controller) return;
+
+      params.template.apply(node_data_controller);
     },
     async createNode(descriptor: NodeDescriptor) {
       if (this.readonly) {
@@ -639,7 +658,7 @@ export default defineComponent({
         (n) => n.id === ev_node_id,
       );
       if (!node) return;
-      const descriptor = this.nodeDesсriptors.find(
+      const descriptor = this.nodeDescriptors.find(
         (nd) => nd.name === node.type,
       );
       if (!descriptor) return;
@@ -717,8 +736,15 @@ export default defineComponent({
 
       const event_dt = event.dataTransfer;
       if (!event_dt) return;
-      const drag_is_asset = event_dt.types.includes('asset');
-      if (!drag_is_asset) return;
+      const available_drag_types = [
+        'asset',
+        'dialog-variable',
+        'dialog-action',
+      ];
+      const drag_is_available = available_drag_types.some((type) =>
+        event_dt.types.includes(type),
+      );
+      if (!drag_is_available) return;
       event_dt.dropEffect = 'link';
       event.preventDefault();
     },
@@ -739,7 +765,10 @@ export default defineComponent({
       const event_dt = event.dataTransfer;
       if (!event_dt) return;
       const event_dt_asset = event_dt.getData('asset');
-      if (!event_dt_asset) return;
+      const event_dt_variable = event_dt.getData('dialog-variable');
+      const event_dt_action = event_dt.getData('dialog-action');
+
+      if (!event_dt_asset && !event_dt_variable && !event_dt_action) return;
 
       const editor_bbox = this.$el.getBoundingClientRect();
       const create_context: CreateNodeContext = {
@@ -753,37 +782,86 @@ export default defineComponent({
         connectStartParams: null,
         allowedTypes: [],
       };
-      const const_asset_descr = this.nodeDesсriptors.find(
-        (d) => d.name === 'constAsset',
-      );
-      if (!const_asset_descr) return;
 
-      await this.$getAppManager()
-        .get(UiManager)
-        .doTask(async () => {
-          const event_dt_asset_parsed = JSON.parse(event_dt_asset) as {
-            id: string;
-          };
-          if (!event_dt_asset_parsed.id) return;
-          const drop_asset_short = await this.$getAppManager()
-            .get(CreatorAssetManager)
-            .getAssetShortViaCache(event_dt_asset_parsed.id);
-          if (!drop_asset_short) {
-            throw new Error(this.$t('asset.assetNotFound'));
-          }
-          this.createNodeContext = create_context;
-          const created = await this.createNode(const_asset_descr);
-          if (!created) return;
+      if (event_dt_asset) {
+        const const_asset_descr = this.nodeDescriptors.find(
+          (d) => d.name === 'constAsset',
+        );
+        if (const_asset_descr) {
+          await this.$getAppManager()
+            .get(UiManager)
+            .doTask(async () => {
+              const event_dt_asset_parsed = JSON.parse(event_dt_asset) as {
+                id: string;
+              };
+              if (!event_dt_asset_parsed.id) return;
+              const drop_asset_short = await this.$getAppManager()
+                .get(CreatorAssetManager)
+                .getAssetShortViaCache(event_dt_asset_parsed.id);
+              if (!drop_asset_short) {
+                throw new Error(this.$t('asset.assetNotFound'));
+              }
+              this.createNodeContext = create_context;
+              const created = await this.createNode(const_asset_descr);
+              if (!created) return;
 
-          const node_instance = this.$refs['node-' + created.id] as any;
-          if (node_instance) {
-            node_instance.value = {
-              AssetId: drop_asset_short.id,
-              Title: drop_asset_short.title,
-              Name: drop_asset_short.name,
-            } as AssetPropValueAsset;
+              const node_instance = this.$refs['node-' + created.id] as any;
+              if (node_instance) {
+                node_instance.value = {
+                  AssetId: drop_asset_short.id,
+                  Title: drop_asset_short.title,
+                  Name: drop_asset_short.name,
+                } as AssetPropValueAsset;
+              }
+            });
+        }
+      }
+      if (event_dt_variable) {
+        const get_var_descr = this.nodeDescriptors.find(
+          (d) => d.name === 'getVar',
+        );
+        if (get_var_descr) {
+          await this.$getAppManager()
+            .get(UiManager)
+            .doTask(async () => {
+              this.createNodeContext = create_context;
+              const created = await this.createNode(get_var_descr);
+              if (!created) return;
+
+              const node_instance = this.$refs['node-' + created.id] as any;
+              if (node_instance) {
+                node_instance.nodeDataController.setValue(
+                  'variable',
+                  event_dt_variable,
+                );
+              }
+            });
+        }
+      }
+      if (event_dt_action) {
+        const action = this.blockControllerMut
+          .getActions()
+          .find((el) => el.name === event_dt_action);
+        if (action) {
+          const get_action_descr = this.nodeDescriptors.find(
+            (d) => d.name === action.type,
+          );
+          if (get_action_descr) {
+            await this.$getAppManager()
+              .get(UiManager)
+              .doTask(async () => {
+                this.createNodeContext = create_context;
+                const created = await this.createNode(get_action_descr);
+                if (!created) return;
+
+                const node_instance = this.$refs['node-' + created.id] as any;
+                if (node_instance) {
+                  node_instance.nodeDataController.setSubject(event_dt_action);
+                }
+              });
           }
-        });
+        }
+      }
     },
     onEdgeClick({ event, edge }: EdgeMouseEvent) {
       if (event.ctrlKey || event.metaKey) {

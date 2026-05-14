@@ -13,6 +13,8 @@
         v-for="action of filteredActions"
         :key="action.name"
         class="ManageActionsDropdown-list-item"
+        :draggable="!readonly"
+        @dragstart="onDragStart($event, action)"
       >
         <div class="ManageActionsDropdown-list-item-name">
           {{ action.name }}
@@ -92,6 +94,9 @@ export default defineComponent({
     },
   },
   methods: {
+    onDragStart(e: DragEvent, action: DialogAction) {
+      e.dataTransfer?.setData('dialog-action', action.name);
+    },
     getActionType(action: DialogAction) {
       return this.availableActionTypes.find((el) => el.value === action.type);
     },
@@ -125,6 +130,15 @@ export default defineComponent({
   flex-wrap: nowrap;
   align-items: center;
   gap: 20px;
+  padding: 0px 5px;
+  border-radius: 4px;
+  cursor: grab;
+
+  &[draggable] {
+    &:hover {
+      background-color: var(--local-hl-bg-color);
+    }
+  }
 }
 .ManageActionsDropdown-list-item-name,
 .ManageActionsDropdown-list-item-type {

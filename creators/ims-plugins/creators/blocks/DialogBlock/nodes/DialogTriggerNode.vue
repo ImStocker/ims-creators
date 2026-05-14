@@ -1,6 +1,7 @@
 <template>
   <dialog-action-node
     :id="id"
+    ref="node"
     class="DialogTriggerNode"
     :node-descriptor="nodeDescriptor"
     :node-data-controller="nodeDataController"

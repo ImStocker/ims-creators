@@ -1,8 +1,10 @@
 <template>
   <node-descriptors-dropdown
     class="CreateNodeDropdown"
-    :node-descriptors="nodeDesсriptors"
+    :node-descriptors="nodeDescriptors"
+    :dialog-block-controller="dialogBlockController"
     @choose="chooseOption($event)"
+    @choose-template="chooseTemplate($event)"
   >
   </node-descriptors-dropdown>
 </template>
@@ -11,12 +13,17 @@
 import type { PropType } from 'vue';
 import { defineComponent } from 'vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptiors';
-import type { NodeDescriptor, NodeType } from '../nodes/NodeDescriptor';
+import type {
+  NodeDescriptor,
+  NodeDescriptorTemplate,
+  NodeType,
+} from '../nodes/NodeDescriptor';
 import {
   AssetPropType,
   type AssetPropValueType,
 } from '~ims-app-base/logic/types/Props';
 import NodeDescriptorsDropdown from './NodeDescriptorsDropdown.vue';
+import type { DialogBlockController } from './DialogBlockController';
 
 export default defineComponent({
   name: 'CreateNodeDropdown',
@@ -24,6 +31,10 @@ export default defineComponent({
     NodeDescriptorsDropdown,
   },
   props: {
+    dialogBlockController: {
+      type: Object as PropType<DialogBlockController>,
+      required: true,
+    },
     allowedTypes: {
       type: Array<NodeType>,
       required: true,
@@ -41,9 +52,9 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ['choose'],
+  emits: ['choose', 'choose-template'],
   computed: {
-    nodeDesсriptors() {
+    nodeDescriptors() {
       const need_data_in_set = this.needDataIn
         ? new Set(this.needDataIn.map((t) => t.Type))
         : null;
@@ -86,6 +97,15 @@ export default defineComponent({
   methods: {
     chooseOption(opt: NodeDescriptor) {
       this.$emit('choose', opt);
+    },
+    chooseTemplate({
+      descriptor,
+      template,
+    }: {
+      descriptor: NodeDescriptor;
+      template: NodeDescriptorTemplate;
+    }) {
+      this.$emit('choose-template', { descriptor, template });
     },
   },
 });

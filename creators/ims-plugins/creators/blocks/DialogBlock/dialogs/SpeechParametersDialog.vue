@@ -16,7 +16,7 @@
             </div>
             <variable-list
               :show-auto-fill="true"
-              :collectionController="mainSpeechController"
+              :collection-controller="mainSpeechController"
             ></variable-list>
             <button
               type="button"
@@ -31,7 +31,7 @@
               {{ $t('imsDialogEditor.speech.responseOptionsProperties') }}
             </div>
             <variable-list
-              :collectionController="optionSpeechController"
+              :collection-controller="optionSpeechController"
             ></variable-list>
             <button
               type="button"
@@ -65,7 +65,7 @@ import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
-import type { IProjectContext } from '../../../../../../ims-app-base/app/logic/types/IProjectContext';
+import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 
 type DialogProps = {
   dialogController: DialogBlockController;
