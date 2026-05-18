@@ -11,11 +11,14 @@ export async function nodeVariableAdd(
     alreadyExist: string;
   },
   showAutoFill: boolean = false,
+  showKindControl: boolean = false,
 ): Promise<DialogVariable | null> {
+  // Refactor: transfer parameters to an object
   const new_param = await appManager
     .get(DialogManager)
     .show(EnterVariableDialog, {
       showAutoFill,
+      showKindControl,
       validate: (variable) => {
         const exists = list.some((v) => v.name === variable.name);
         if (exists) {
@@ -35,20 +38,16 @@ export async function nodeVariableChange(
     alreadyExist: string;
   },
   showAutoFill: boolean = false,
+  showKindControl: boolean = false,
 ): Promise<DialogVariable | null> {
+  // Refactor: transfer parameters to an object
   const new_param = await appManager
     .get(DialogManager)
     .show(EnterVariableDialog, {
       showAutoFill,
+      showKindControl,
       initial: param,
-      validate: (variable) => {
-        const exists = list.some(
-          (v) => v.name === variable.name && v !== param,
-        );
-        if (exists) {
-          throw new Error(messages.alreadyExist);
-        }
-      },
+      validate: (_variable) => {},
     });
   if (!new_param) return null;
   return new_param;
@@ -97,13 +96,16 @@ export async function nodeVariableDuplicate(
     alreadyExist: string;
   },
   showAutoFill: boolean = false,
+  showKindControl: boolean = false,
 ): Promise<DialogVariable | null> {
+  // Refactor: transfer parameters to an object
   const guessed_title = guessDuplicatedItemTitle(param.title, list);
 
   const new_param = await appManager
     .get(DialogManager)
     .show(EnterVariableDialog, {
       showAutoFill,
+      showKindControl,
       initial: {
         ...param,
         name: normalizeAssetPropPart(guessed_title),

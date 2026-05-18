@@ -77,6 +77,17 @@
               setParamValue(param_gr.variable, param_gr.isOutput, $event)
             "
           ></DataField>
+          <div
+            v-if="
+              wrongParameterNames.has(
+                (param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name,
+              )
+            "
+            :title="$t('imsDialogEditor.trigger.wrongParameter')"
+            class="DialogActionNode-badParam"
+          >
+            <i class="ri-error-warning-fill"></i>
+          </div>
         </ContextMenuZone>
       </div>
       <div v-if="playWaitUser" class="DialogActionNode-play">
@@ -163,6 +174,11 @@ export default defineComponent({
       required: true,
     },
   },
+  data() {
+    return {
+      wrongParameterNames: new Set<string>(),
+    };
+  },
   computed: {
     Position() {
       return Position;
@@ -235,33 +251,69 @@ export default defineComponent({
       ];
     },
     inputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [
-        ...(this.nodeDataController.params['in'] ?? []),
-      ];
+      const res: DialogVariable[] = [];
+
+      for (const legacy_param of this.nodeDataController.params['in'] ?? []) {
+        res.push(legacy_param);
+        this.wrongParameterNames.add('in-' + legacy_param.name);
+      }
 
       if (this.actionVal) {
         const existing_action = this.dialogController
           .getActions()
           .find((a) => a.name === this.actionVal);
         if (existing_action) {
-          res.push(...(existing_action.params?.['in'] ?? []));
+          for (const param of existing_action.params?.['in'] ?? []) {
+            res.push(param);
+            if (this.wrongParameterNames.has('in-' + param.name)) {
+              this.wrongParameterNames.delete(param.name);
+            }
+          }
+        }
+      }
+
+      if (this.nodeDataController.values) {
+        for (const value of Object.keys(this.nodeDataController.values)) {
+          if (
+            !res.find((v) => v.name === value) &&
+            this.nodeDataController.values[value] &&
+            this.nodeDataController.values[value]['get']
+          ) {
+            res.push({
+              name: value,
+              title: value,
+              default: null,
+              description: null,
+              type: null,
+            });
+            this.wrongParameterNames.add('in-' + value);
+          }
         }
       }
       return res;
     },
     outputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [
-        ...(this.nodeDataController.params['out'] ?? []),
-      ];
+      const res: DialogVariable[] = [];
+
+      for (const legacy_param of this.nodeDataController.params['out'] ?? []) {
+        res.push(legacy_param);
+        this.wrongParameterNames.add('out-' + legacy_param.name);
+      }
 
       if (this.actionVal) {
         const existing_action = this.dialogController
           .getActions()
           .find((a) => a.name === this.actionVal);
         if (existing_action) {
-          res.push(...(existing_action.params?.['out'] ?? []));
+          for (const param of existing_action.params?.['out'] ?? []) {
+            res.push(param);
+            if (this.wrongParameterNames.has('out-' + param.name)) {
+              this.wrongParameterNames.delete(param.name);
+            }
+          }
         }
       }
+
       return res;
     },
     action() {
@@ -273,6 +325,9 @@ export default defineComponent({
   watch: {
     parametersGrid() {
       this.updatePins();
+    },
+    actionVal() {
+      this.wrongParameterNames = new Set();
     },
   },
   mounted() {
@@ -332,6 +387,7 @@ export default defineComponent({
       }
 
       this.nodeDataController.deleteParam(key, param.name);
+      this.nodeDataController.deleteValue(param.name);
 
       this.updatePins();
     },
@@ -347,6 +403,19 @@ export default defineComponent({
         },
       );
       if (!new_variable) return;
+      const key = is_out ? 'out' : 'in';
+
+      if (this.action) {
+        const modified_action = this.action;
+        const existing_var_index = modified_action.params?.[key]?.findIndex(
+          (el) => el.name === param.name,
+        );
+        if (existing_var_index !== undefined && existing_var_index >= 0) {
+          modified_action.params![key][existing_var_index] = new_variable;
+          this.dialogController.changeAction(this.action.name, modified_action);
+        }
+      }
+
       this.nodeDataController.changeParam(
         is_out ? 'out' : 'in',
         param.name,
@@ -465,13 +534,20 @@ export default defineComponent({
 
 .DialogActionNode-parameters-one {
   margin-bottom: 5px;
+  display: flex;
+  align-items: baseline;
   &.type-input {
     grid-column: 1;
   }
   &.type-output {
+    flex-direction: row-reverse;
     grid-column: 2;
     justify-self: flex-end;
   }
+}
+.DialogActionNode-badParam {
+  display: inline-block;
+  color: var(--color-warning);
 }
 
 .DialogActionNode:deep(.DataFieldInput-string) {

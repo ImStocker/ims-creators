@@ -6,20 +6,25 @@
   >
     <template #header>{{ dialog.state.header }}</template>
     <template #content>
-      <value-switcher
-        v-if="currentAssetId && tabs.length > 1"
-        v-model="currentAssetId"
-        class="ManageCollectionDialog-tabs"
-        :options="tabs"
-        label-prop="title"
-        value-prop="id"
-      ></value-switcher>
       <div class="ManageCollectionDialog-list">
         <component
           :is="dialog.state.viewComponent"
           v-if="collectionController && !controllerLoading"
           :collection-controller="collectionController"
-        ></component>
+          v-bind="dialog.state.viewComponentProps"
+        >
+          <template #prepend-filters>
+            <ims-select
+              v-if="currentAssetId && tabs.length > 1"
+              v-model="currentAssetId"
+              class="ManageCollectionDialog-assets"
+              :options="tabs"
+              label-prop="title"
+              value-prop="id"
+              :reduce="(opt) => opt.id"
+            ></ims-select>
+          </template>
+        </component>
         <div
           v-else-if="controllerLoading"
           class="ManageCollectionDialog-loading"
@@ -66,8 +71,10 @@ import { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditorVM';
 import type { IDialogCollectionController } from '../editor/DialogVariableController';
 import ValueSwitcher from '~ims-app-base/components/Common/ValueSwitcher.vue';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import UiManager from '../../../../../../ims-app-base/app/logic/managers/UiManager';
-import ProjectManager from '../../../../../../ims-app-base/app/logic/managers/ProjectManager';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
+import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 type DialogProps = {
   header: string;
@@ -78,6 +85,7 @@ type DialogProps = {
     dialogController: DialogBlockController,
   ) => IDialogCollectionController;
   viewComponent: Component;
+  viewComponentProps?: Record<string, any>;
 };
 
 type DialogResult = void;
@@ -87,6 +95,8 @@ export default defineComponent({
   components: {
     DialogContent,
     ValueSwitcher,
+    ImsSelect,
+    FormSearch,
   },
   provide() {
     return {
@@ -296,9 +306,13 @@ export default defineComponent({
 .ManageCollectionDialog {
   width: 750px;
 }
-.ManageCollectionDialog-tabs {
-  --ValueSwitcher-border-radius: 8px;
-  margin-bottom: 10px;
+.ManageCollectionDialog-filters {
+  display: flex;
+  align-items: center;
+}
+.ManageCollectionDialog-assets {
+  min-width: 180px;
+  flex-shrink: 0;
 }
 .ManageCollectionDialog-loading {
   margin-bottom: 20px;

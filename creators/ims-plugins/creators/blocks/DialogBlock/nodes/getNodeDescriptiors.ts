@@ -31,6 +31,7 @@ import type { NodeDataController } from '../editor/NodeDataController';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import DialogCallScriptNode from './DialogCallScriptNode.vue';
 
 const opOptionsEq = {
   opEqual: {
@@ -187,7 +188,10 @@ export function getNodeDescriptors(): NodeDescriptor[] {
             };
           },
           manageTemplates: async (projectContext: IProjectContext) => {
-            await dialogController.manageActions(projectContext);
+            await dialogController.manageActions(
+              projectContext,
+              ScriptBlockPlainActionTypes.TRIGGER,
+            );
           },
         };
       },
@@ -227,10 +231,20 @@ export function getNodeDescriptors(): NodeDescriptor[] {
             };
           },
           manageTemplates: async (projectContext: IProjectContext) => {
-            await dialogController.manageActions(projectContext);
+            await dialogController.manageActions(
+              projectContext,
+              ScriptBlockPlainActionTypes.FUNCTION,
+            );
           },
         };
       },
+    },
+    {
+      name: 'callScript',
+      icon: 'ri-file-paper-2-line',
+      node: DialogCallScriptNode,
+      color: '#afb2ff',
+      type: NodeType.EXEC,
     },
     /*{
       name: 'timer',

@@ -1,11 +1,19 @@
 <template>
   <div class="VariableList">
-    <form-search
-      v-if="variableList && variableList.length"
-      class="VariableList-search"
-      :value="searchQuery"
-      @change="searchQuery = $event"
-    ></form-search>
+    <div class="VariableList-filters">
+      <slot name="prepend-filters"></slot>
+      <variable-kind-selector
+        v-if="showKindControl"
+        v-model="filters.kind"
+        class="VariableList-filters-kind"
+      ></variable-kind-selector>
+      <form-search
+        v-if="filteredVariables && filteredVariables.length"
+        class="VariableList-filters-query"
+        :value="filters.query"
+        @change="filters.query = $event"
+      ></form-search>
+    </div>
     <div v-if="filteredVariables.length > 0" class="VariableList-grid">
       <div class="VariableList-grid-row">
         <div class="VariableList-grid-column"></div>
@@ -13,7 +21,7 @@
           {{ $t('imsDialogEditor.var.name') }}
         </div>
         <div class="VariableList-grid-column">
-          {{ $t('imsDialogEditor.var.type') }}
+          {{ $t('imsDialogEditor.var.dataType') }}
         </div>
         <div class="VariableList-grid-column">
           {{ $t('imsDialogEditor.var.defaultValue') }}
@@ -31,6 +39,7 @@
             :variable-controller="collectionController"
             :variable="item"
             :show-auto-fill="showAutoFill"
+            :show-kind-control="showKindControl"
           >
           </variable-list-item>
         </template>
@@ -40,7 +49,7 @@
       {{
         $t(
           'imsDialogEditor.var.' +
-            (searchQuery ? 'noVariablesFound' : 'noVariablesYet'),
+            (filters.query ? 'noVariablesFound' : 'noVariablesYet'),
         )
       }}
     </div>
@@ -56,8 +65,12 @@ import type { IDialogVariableController } from '../editor/DialogVariableControll
 import VariableListItem from './VariableListItem.vue';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
-import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
+import {
+  ScriptBlockPlainVariableKinds,
+  type ScriptBlockPlainVariable,
+} from '../logic/nodeStoring';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
+import VariableKindSelector from '../parts/VariableKindSelector.vue';
 
 export default defineComponent({
   name: 'VariableList',
@@ -65,6 +78,7 @@ export default defineComponent({
     VariableListItem,
     SortableList,
     FormSearch,
+    VariableKindSelector,
   },
   props: {
     collectionController: {
@@ -75,10 +89,17 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showKindControl: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
-      searchQuery: '',
+      filters: {
+        query: '',
+        kind: ScriptBlockPlainVariableKinds.LOCAL,
+      },
     };
   },
   computed: {
@@ -86,8 +107,12 @@ export default defineComponent({
       return this.collectionController.getEntities();
     },
     filteredVariables() {
-      return this.variableList.filter((v) =>
-        v.title.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      return this.variableList.filter(
+        (v) =>
+          v.title.toLowerCase().includes(this.filters.query.toLowerCase()) &&
+          (v.kind === this.filters.kind ||
+            (this.filters.kind === ScriptBlockPlainVariableKinds.LOCAL &&
+              v.kind === undefined)),
       );
     },
   },
@@ -123,8 +148,18 @@ export default defineComponent({
 </script>
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
-.VariableList-search {
+.VariableList-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 10px;
+
+  .VariableList-filters-kind {
+    --ValueSwitcher-border-radius: 8px;
+  }
+  .VariableList-filters-query {
+    margin-left: auto;
+  }
 }
 .VariableList-grid {
   --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;

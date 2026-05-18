@@ -17,25 +17,10 @@
           {{ $t('imsDialogEditor.actions.selectType') }}
         </div>
         <div class="EnterActionDialog-field-input">
-          <value-switcher
+          <action-type-selector
             v-model="action.type"
             class="EnterActionDialog-selectType"
-            :options="availableActionTypes"
-            label-prop="title"
-            value-prop="value"
-          >
-            <template #option="{ option }">
-              <div class="EnterActionDialog-selectType-option">
-                <i
-                  :class="option.icon"
-                  class="EnterActionDialog-selectType-option-icon"
-                ></i>
-                <div class="EnterActionDialog-selectType-option-title">
-                  {{ option.title }}
-                </div>
-              </div>
-            </template>
-          </value-switcher>
+          ></action-type-selector>
         </div>
       </div>
       <div class="EnterActionDialog-field">
@@ -98,13 +83,12 @@ import {
   type ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
-import ValueSwitcher from '~ims-app-base/components/Common/ValueSwitcher.vue';
 import VariableList from './VariableList.vue';
 import type { IDialogVariableController } from '../editor/DialogVariableController';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterVariableDialog from './EnterVariableDialog.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
-import { getAvailableActionTypes } from '../logic/nodeActions';
+import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
 
 type DialogProps = {
   initial?: DialogAction;
@@ -121,7 +105,7 @@ export default defineComponent({
   components: {
     DialogContent,
     ImsInput,
-    ValueSwitcher,
+    ActionTypeSelector,
     VariableList,
   },
   props: {
@@ -156,9 +140,6 @@ export default defineComponent({
         'out',
         this.$t('imsDialogEditor.actions.outputParamsAlreadyExists'),
       );
-    },
-    availableActionTypes() {
-      return getAvailableActionTypes((key: string) => this.$t(key));
     },
   },
   methods: {
@@ -269,12 +250,9 @@ export default defineComponent({
     flex: 1;
   }
 }
+
 .EnterActionDialog-params {
   max-height: 300px;
   overflow: auto;
-}
-.EnterActionDialog-selectType-option {
-  display: flex;
-  gap: 5px;
 }
 </style>

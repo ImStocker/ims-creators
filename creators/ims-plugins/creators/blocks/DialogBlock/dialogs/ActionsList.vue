@@ -1,11 +1,19 @@
 <template>
   <div class="ActionsList">
-    <form-search
-      v-if="actionsList && actionsList.length"
-      class="ActionsList-search"
-      :value="searchQuery"
-      @change="searchQuery = $event"
-    ></form-search>
+    <div class="ActionsList-filters">
+      <slot name="prepend-filters"></slot>
+      <action-type-selector
+        v-model="filters.type"
+        class="ActionsList-filters-type"
+        nullable
+      ></action-type-selector>
+      <form-search
+        v-if="actionsList && actionsList.length"
+        class="ActionsList-filters-query"
+        :value="filters.query"
+        @change="filters.query = $event"
+      ></form-search>
+    </div>
     <div v-if="filteredActions.length > 0" class="ActionsList-grid">
       <div class="ActionsList-grid-row">
         <div class="ActionsList-grid-column"></div>
@@ -43,7 +51,7 @@
       {{
         $t(
           'imsDialogEditor.actions.' +
-            (searchQuery ? 'noActionsFound' : 'noActionsYet'),
+            (filters.query ? 'noActionsFound' : 'noActionsYet'),
         )
       }}
     </div>
@@ -53,10 +61,20 @@
 import { defineComponent, type PropType } from 'vue';
 import type { IDialogCollectionController } from '../editor/DialogVariableController';
 import ActionsListItem from './ActionsListItem.vue';
-import type { ScriptBlockPlainAction } from '../logic/nodeStoring';
+import type {
+  ScriptBlockPlainAction,
+  ScriptBlockPlainActionTypes,
+} from '../logic/nodeStoring';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
+import { getAvailableActionTypes } from '../logic/nodeActions';
+import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
+
+type ActionsListFilters = {
+  query: string;
+  type: ScriptBlockPlainActionTypes;
+};
 
 export default defineComponent({
   name: 'ActionsList',
@@ -64,16 +82,24 @@ export default defineComponent({
     ActionsListItem,
     SortableList,
     FormSearch,
+    ActionTypeSelector,
   },
   props: {
     collectionController: {
       type: Object as PropType<IDialogCollectionController>,
       required: true,
     },
+    initialFilters: {
+      type: Object as PropType<ActionsListFilters>,
+      default: null,
+    },
   },
   data() {
     return {
-      searchQuery: '',
+      filters: {
+        query: this.initialFilters?.query ?? '',
+        type: this.initialFilters?.type ?? null,
+      },
     };
   },
   computed: {
@@ -81,9 +107,14 @@ export default defineComponent({
       return this.collectionController.getEntities();
     },
     filteredActions() {
-      return this.actionsList.filter((a) =>
-        a.name.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      return this.actionsList.filter(
+        (a) =>
+          a.name.toLowerCase().includes(this.filters.query.toLowerCase()) &&
+          (this.filters.type ? a.type === this.filters.type : true),
       );
+    },
+    availableActionTypes() {
+      return getAvailableActionTypes((key: string) => this.$t(key));
     },
   },
   methods: {
@@ -98,8 +129,20 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-.ActionsList-search {
+.ActionsList-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 10px;
+
+  .ActionsList-filters-type {
+    --ValueSwitcher-border-radius: 8px;
+  }
+
+  .ActionsList-filters-query {
+    max-width: 180px;
+    margin-left: auto;
+  }
 }
 .ActionsList-grid {
   --actions-list-columns: 20px 150px 150px minmax(150px, 1fr) minmax(150px, 1fr)

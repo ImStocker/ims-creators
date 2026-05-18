@@ -105,6 +105,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showKindControl: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -125,6 +129,7 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
       this.variableController.addEntity(new_variable);
@@ -138,6 +143,7 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
       this.variableController.changeEntity(variable.name, new_variable);
@@ -151,6 +157,7 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
       this.variableController.addEntity(new_variable);

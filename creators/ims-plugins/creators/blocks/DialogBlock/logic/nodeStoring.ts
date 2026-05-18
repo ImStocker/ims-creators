@@ -19,6 +19,13 @@ export enum ScriptBlockPlainActionTypes {
   TRIGGER = 'trigger',
 }
 
+export enum ScriptBlockPlainVariableKinds {
+  LOCAL = 'local',
+  IN = 'in',
+  OUT = 'out',
+  INOUT = 'in-out',
+}
+
 export type ScriptBlockPlainAction = {
   name: string;
   type: ScriptBlockPlainActionTypes;
@@ -33,6 +40,7 @@ export type ScriptBlockPlainVariable = {
   name: string;
   title: string;
   type: AssetPropValueType | null;
+  kind?: ScriptBlockPlainVariableKinds;
   description: string | null;
   default: AssetPropValue;
   autoFill?: boolean;

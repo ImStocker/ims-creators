@@ -32,6 +32,7 @@ import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import type {
   ScriptBlockPlainAction,
+  ScriptBlockPlainActionTypes,
   ScriptBlockPlainNode,
   ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
@@ -1053,19 +1054,31 @@ export class DialogBlockController extends BlockEditorController {
         reorderEntities: (variables: DialogVariable[]) =>
           dialogController.reorderVariables(variables),
         createEntity: async () =>
-          await nodeVariableAdd(this.appManager, this.getOwnVariables(), {
-            alreadyExist: this.appManager.$t(
-              'imsDialogEditor.var.variableAlreadyExists',
-            ),
-          }),
+          await nodeVariableAdd(
+            this.appManager,
+            this.getOwnVariables(),
+            {
+              alreadyExist: this.appManager.$t(
+                'imsDialogEditor.var.variableAlreadyExists',
+              ),
+            },
+            false,
+            true,
+          ),
       }),
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/VariableList.vue')),
       ),
+      viewComponentProps: {
+        showKindControl: true,
+      },
     });
   }
 
-  async manageActions(projectContext: IProjectContext) {
+  async manageActions(
+    projectContext: IProjectContext,
+    actionType?: ScriptBlockPlainActionTypes,
+  ) {
     await this.appManager.get(DialogManager).show(ManageCollectionDialog, {
       dialogController: this,
       projectContext,
@@ -1110,6 +1123,11 @@ export class DialogBlockController extends BlockEditorController {
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/ActionsList.vue')),
       ),
+      viewComponentProps: {
+        initialFilters: {
+          type: actionType,
+        },
+      },
     });
   }
 
