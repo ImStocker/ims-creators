@@ -168,25 +168,12 @@ export class SyncService {
         await this.db.dataSource.createQueryRunner().query(`
             UPDATE workspaces
             SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
-            WHERE project_id = ?
-        `, [this.db.info.id]);
+        `, []);
         await this.db.dataSource.createQueryRunner().query(`
             UPDATE assets
             SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
-            WHERE project_id = ?
-        `, [this.db.info.id]);
-        const db_workspaces: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
-            SELECT id,server_state,server_deleted
-            FROM workspaces
-            WHERE project_id = ?
-        `, [this.db.info.id]);
-        await this._syncWorkspaces(db_workspaces);
-        const db_assets: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
-            SELECT id,server_state,server_deleted
-            FROM assets
-            WHERE project_id = ?
-        `, [this.db.info.id]);
-        await this._syncAssets(db_assets);
+        `, []);
+        await this.syncProject();
     }
 
     async resyncAssetsAndWorkspaces(

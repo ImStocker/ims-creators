@@ -144,9 +144,9 @@ export class ProjectFileDbTransaction{
                 let local_path = old_path_folder;
                 if(newEntry.parentId !== oldEntry.parentId || newEntry.title !== oldEntry.title) {
                     local_path = await applyImsFileLocationChange(newEntry, old_path_folder, this.db);
-                    newEntry.localName = node_path.basename(local_path);
+                    newEntry.localName = node_path.basename(local_path).replace(/(\.imw\.json)+$/gm, '');
                 }
-                await this.db.workspace.saveWorkspaceFileToFile(newEntry, local_path + WORKSPACE_EXT);
+                await this.db.workspace.saveWorkspaceFileToFile(newEntry, local_path.replace(/(\.imw\.json)+$/gm, ".imw.json"));
             }
             else if (newEntry) {
                 const workspace_file_basename = newEntry.title ? newEntry.title : entry_id;
