@@ -24,73 +24,15 @@
         </div>
         <ExecHandle id="out" type="source" :position="Position.Right" />
       </div>
-      <div
-        v-if="inputParameters.length > 0 || outputParameters.length > 0"
-        class="DialogCallScriptNode-parameters"
-      >
-        <ContextMenuZone
-          v-for="param_gr of parametersGrid"
-          :key="(param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name"
-          class="DialogCallScriptNode-parameters-one"
-          :class="param_gr.isOutput ? 'type-output' : 'type-input'"
-          :menu-list="
-            getParameterContextMenu(param_gr.variable, param_gr.isOutput)
-          "
-        >
-          <DataField
-            :in-id="
-              !param_gr.isOutput
-                ? generateDataPinId(false, param_gr.variable.name)
-                : ''
-            "
-            :out-id="
-              param_gr.isOutput
-                ? generateDataPinId(true, param_gr.variable.name)
-                : ''
-            "
-            :model-value="
-              !param_gr.isOutput
-                ? nodeDataController.values[param_gr.variable.name] ===
-                  undefined
-                  ? param_gr.variable.default
-                  : nodeDataController.values[param_gr.variable.name]
-                : null
-            "
-            :play-value="
-              !param_gr.isOutput
-                ? playingNodeData?.values
-                  ? playingNodeData?.values[param_gr.variable.name]
-                  : null
-                : dialogPlayer.playGetCurrentNodeParam(param_gr.variable.name)
-            "
-            :caption="param_gr.variable.title"
-            :node-data-controller="nodeDataController"
-            :title="param_gr.variable.description ?? ''"
-            :readonly="readonly"
-            :play-value-set="false"
-            @update:play-value="
-              dialogPlayer.playSetCurrentNodeParam(
-                param_gr.variable.name,
-                $event,
-              )
-            "
-            @update:model-value="
-              setParamValue(param_gr.variable, param_gr.isOutput, $event)
-            "
-          ></DataField>
-          <div
-            v-if="
-              wrongParameterNames.has(
-                (param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name,
-              )
-            "
-            :title="$t('imsDialogEditor.callScript.wrongParameter')"
-            class="DialogCallScriptNode-badParam"
-          >
-            <i class="ri-error-warning-fill"></i>
-          </div>
-        </ContextMenuZone>
-      </div>
+      <node-parameters-grid
+        :dialog-player="dialogPlayer"
+        :node-data-controller="nodeDataController"
+        :readonly="readonly"
+        :output-params="outputParameters"
+        :input-params="inputParameters"
+        :playing-node-data="playingNodeData"
+        :wrong-parameter-names="wrongParameterNames"
+      ></node-parameters-grid>
     </div>
   </div>
 </template>
@@ -122,23 +64,16 @@ import {
   castAssetPropValueToAsset,
   type AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
-import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
-import DataField from '../parts/DataField.vue';
-import {
-  nodeVariableChange,
-  nodeVariableDuplicate,
-} from '../logic/nodeVariables';
-import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
-import UiManager from '../../../../../../ims-app-base/app/logic/managers/UiManager';
+
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 
 export default defineComponent({
   name: 'DialogCallScriptNode',
   components: {
     ExecHandle,
     SelectAssetComboBox,
-    ContextMenuZone,
-    DataField,
+    NodeParametersGrid,
   },
   props: {
     id: {
@@ -187,38 +122,6 @@ export default defineComponent({
     };
   },
   computed: {
-    parametersGrid(): {
-      variable: DialogVariable;
-      isOutput: boolean;
-      index: number;
-    }[] {
-      const res: {
-        variable: DialogVariable;
-        isOutput: boolean;
-        index: number;
-      }[] = [];
-      for (
-        let i = 0;
-        i < Math.max(this.inputParameters.length, this.outputParameters.length);
-        i++
-      ) {
-        if (i < this.inputParameters.length) {
-          res.push({
-            variable: this.inputParameters[i],
-            isOutput: false,
-            index: i,
-          });
-        }
-        if (i < this.outputParameters.length) {
-          res.push({
-            variable: this.outputParameters[i],
-            isOutput: true,
-            index: i,
-          });
-        }
-      }
-      return res;
-    },
     externalScriptForSelection() {
       if (!this.externalScript) return null;
       return {
@@ -321,115 +224,9 @@ export default defineComponent({
       },
       immediate: true,
     },
-    parametersGrid() {
-      this.updatePins();
-    },
-  },
-  mounted() {
-    this.updatePins();
   },
   methods: {
     generateDataPinId,
-    updatePins() {
-      for (let i = 0; i < this.inputParameters.length; i++) {
-        this.nodeDataController.setPinDataType(
-          generateDataPinId(false, this.inputParameters[i].name),
-          this.inputParameters[i].type,
-        );
-      }
-      for (let i = 0; i < this.outputParameters.length; i++) {
-        this.nodeDataController.setPinDataType(
-          generateDataPinId(true, this.outputParameters[i].name),
-          this.outputParameters[i].type,
-        );
-      }
-    },
-    async changeParameter(param: DialogVariable, is_out: boolean) {
-      const new_variable = await nodeVariableChange(
-        this.$getAppManager(),
-        this[is_out ? 'outputParameters' : 'inputParameters'],
-        param,
-        {
-          alreadyExist: this.$t(
-            'imsDialogEditor.trigger.parameterAlreadyExists',
-          ),
-        },
-      );
-      if (!new_variable) return;
-      if (this.calledScriptController) {
-        this.calledScriptController.changeVariable(param.name, new_variable);
-      }
-      this.nodeDataController.changeParam(
-        is_out ? 'out' : 'in',
-        param.name,
-        new_variable,
-      );
-      this.updatePins();
-    },
-    async duplicateParameter(param: DialogVariable, is_out: boolean) {
-      const new_variable = await nodeVariableDuplicate(
-        this.$getAppManager(),
-        this[is_out ? 'outputParameters' : 'inputParameters'],
-        param,
-        {
-          alreadyExist: this.$t(
-            'imsDialogEditor.trigger.parameterAlreadyExists',
-          ),
-        },
-      );
-      if (!new_variable) return;
-      this.nodeDataController.addParam(is_out ? 'out' : 'in', new_variable);
-      this.updatePins();
-    },
-    getParameterContextMenu(_param: DialogVariable, _is_out: boolean) {
-      if (this.readonly) return [];
-      return [];
-      // TODO:
-      // return [
-      //   {
-      //     icon: 'edit',
-      //     title: this.$t('imsDialogEditor.trigger.changeParameter'),
-      //     action: () => this.changeParameter(param, is_out),
-      //   },
-      //   {
-      //     icon: 'copy',
-      //     title: this.$t('imsDialogEditor.trigger.duplicateParameter'),
-      //     action: () => this.duplicateParameter(param, is_out),
-      //   },
-      //   {
-      //     icon: 'delete',
-      //     title: this.$t('imsDialogEditor.trigger.deleteParameter'),
-      //     action: () => this.deleteParameter(param, is_out),
-      //     danger: true,
-      //   },
-      // ];
-    },
-    async deleteParameter(param: DialogVariable, is_out: boolean) {
-      const confirm = await this.$getAppManager()
-        .get(DialogManager)
-        .show(ConfirmDialog, {
-          header: this.$t('imsDialogEditor.trigger.deleteParameter'),
-          message: this.$t('imsDialogEditor.trigger.deleteParameterConfirm'),
-          danger: true,
-        });
-      if (!confirm) return;
-      const key = is_out ? 'out' : 'in';
-
-      // if (this.action) {
-      //   const modified_action = this.action;
-      //   const existing_var_index = modified_action.params?.[key]?.findIndex(
-      //     (el) => el.name === param.name,
-      //   );
-      //   if (existing_var_index !== undefined && existing_var_index >= 0) {
-      //     modified_action.params![key].splice(existing_var_index, 1);
-      //     this.dialogController.changeAction(this.action.name, modified_action);
-      //   }
-      // }
-
-      this.nodeDataController.deleteParam(key, param.name);
-
-      this.updatePins();
-    },
     setParamValue(
       param: DialogVariable,
       is_out: boolean,
@@ -513,30 +310,5 @@ export default defineComponent({
   position: relative;
   --local-text-color: var(--imsde-node-content-text-color);
   --input-text-color: var(--imsde-node-content-text-color);
-}
-.DialogCallScriptNode-parameters {
-  padding-bottom: 5px;
-  display: grid;
-  gap: 10px;
-  align-items: center;
-  border-top: 1px solid var(--imsde-node-content-inner-border-color);
-  padding-top: 10px;
-}
-.DialogCallScriptNode-parameters-one {
-  margin-bottom: 5px;
-  display: flex;
-  align-items: baseline;
-  &.type-input {
-    grid-column: 1;
-  }
-  &.type-output {
-    flex-direction: row-reverse;
-    grid-column: 2;
-    justify-self: flex-end;
-  }
-}
-.DialogCallScriptNode-badParam {
-  display: inline-block;
-  color: var(--color-warning);
 }
 </style>

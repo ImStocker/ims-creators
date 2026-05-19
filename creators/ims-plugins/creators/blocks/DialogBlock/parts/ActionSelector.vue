@@ -14,10 +14,10 @@
         class="is-button is-button-dropdown-item"
         @click="createAction(search)"
       >
-        {{ $t('imsDialogEditor.actions.createAction') }}
+        {{ $t(`imsDialogEditor.nodes.${actionType}.create`) }}
       </button>
       <button class="is-button is-button-dropdown-item" @click="manageActions">
-        {{ $t('imsDialogEditor.actions.manageActions') }}...
+        {{ $t(`imsDialogEditor.nodes.${actionType}.manageCaption`) }}...
       </button>
     </template>
   </ims-select>
@@ -52,7 +52,7 @@ export default defineComponent({
       required: true,
     },
     modelValue: {
-      type: String,
+      type: [String, null],
       default: null,
     },
     readonly: {
@@ -98,6 +98,7 @@ export default defineComponent({
     async manageActions() {
       await this.dialogController.manageActions(
         this.projectContext as IProjectContext,
+        this.actionType,
       );
     },
     async createAction(name: string) {

@@ -20,6 +20,7 @@ export enum ScriptBlockPlainActionTypes {
 }
 
 export enum ScriptBlockPlainVariableKinds {
+  GLOBAL = 'global',
   LOCAL = 'local',
   IN = 'in',
   OUT = 'out',

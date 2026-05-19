@@ -201,7 +201,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       icon: 'ri-code-s-slash-line',
       node: DialogFunctionNode,
       color: '#ea95ea',
-      type: NodeType.EXEC,
+      type: NodeType.DATA_START,
       playDataCompute: playDataComputeTrigger,
       getTemplateController: (dialogController: DialogBlockController) => {
         return {

@@ -32,6 +32,7 @@
         <div class="ActionsList-grid-column"></div>
       </div>
       <sortable-list
+        class="ActionsList-content tiny-scrollbars"
         handle-selector=".ActionsListItem-drag"
         id-key="name"
         :list="filteredActions"
@@ -129,6 +130,11 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
+.ActionsList {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 .ActionsList-filters {
   display: flex;
   align-items: center;
@@ -149,7 +155,13 @@ export default defineComponent({
     20px;
   --actions-list-column-gap: 2px;
 
-  margin-bottom: 20px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ActionsList-content {
+  overflow: auto;
+  flex: 1;
 }
 .ActionsList-empty {
   margin-bottom: 10px;

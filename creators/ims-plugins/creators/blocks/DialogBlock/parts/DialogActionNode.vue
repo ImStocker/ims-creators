@@ -12,7 +12,12 @@
     </div>
     <div class="DialogActionNode-body DialogEditorNode-body">
       <div class="DialogActionNode-body-main">
-        <ExecHandle id="in" type="target" :position="Position.Left" />
+        <ExecHandle
+          v-if="nodeDescriptor.type === NodeType.EXEC"
+          id="in"
+          type="target"
+          :position="Position.Left"
+        />
         <div class="DialogActionNode-content">
           <action-selector
             v-model="actionVal"
@@ -21,75 +26,24 @@
             :action-type="actionType"
           ></action-selector>
         </div>
-        <ExecHandle id="out" type="source" :position="Position.Right" />
+        <ExecHandle
+          v-if="nodeDescriptor.type === NodeType.EXEC"
+          id="out"
+          type="source"
+          :position="Position.Right"
+        />
       </div>
-      <div
-        v-if="inputParameters.length > 0 || outputParameters.length > 0"
-        class="DialogActionNode-parameters"
-      >
-        <ContextMenuZone
-          v-for="param_gr of parametersGrid"
-          :key="(param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name"
-          class="DialogActionNode-parameters-one"
-          :class="param_gr.isOutput ? 'type-output' : 'type-input'"
-          :menu-list="
-            getParameterContextMenu(param_gr.variable, param_gr.isOutput)
-          "
-        >
-          <DataField
-            :in-id="
-              !param_gr.isOutput
-                ? generateDataPinId(false, param_gr.variable.name)
-                : ''
-            "
-            :out-id="
-              param_gr.isOutput
-                ? generateDataPinId(true, param_gr.variable.name)
-                : ''
-            "
-            :model-value="
-              !param_gr.isOutput
-                ? nodeDataController.values[param_gr.variable.name] ===
-                  undefined
-                  ? param_gr.variable.default
-                  : nodeDataController.values[param_gr.variable.name]
-                : null
-            "
-            :play-value="
-              !param_gr.isOutput
-                ? playingNodeData?.values
-                  ? playingNodeData?.values[param_gr.variable.name]
-                  : null
-                : dialogPlayer.playGetCurrentNodeParam(param_gr.variable.name)
-            "
-            :caption="param_gr.variable.title"
-            :node-data-controller="nodeDataController"
-            :title="param_gr.variable.description ?? ''"
-            :readonly="readonly"
-            :play-value-set="param_gr.isOutput && playWaitUser"
-            @update:play-value="
-              dialogPlayer.playSetCurrentNodeParam(
-                param_gr.variable.name,
-                $event,
-              )
-            "
-            @update:model-value="
-              setParamValue(param_gr.variable, param_gr.isOutput, $event)
-            "
-          ></DataField>
-          <div
-            v-if="
-              wrongParameterNames.has(
-                (param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name,
-              )
-            "
-            :title="$t('imsDialogEditor.trigger.wrongParameter')"
-            class="DialogActionNode-badParam"
-          >
-            <i class="ri-error-warning-fill"></i>
-          </div>
-        </ContextMenuZone>
-      </div>
+      <node-parameters-grid
+        :dialog-player="dialogPlayer"
+        :node-data-controller="nodeDataController"
+        :readonly="readonly"
+        :output-params="outputParameters"
+        :input-params="inputParameters"
+        :play-wait-user="playWaitUser"
+        :playing-node-data="playingNodeData"
+        :wrong-parameter-names="wrongParameterNames"
+        :get-parameter-context-menu="getParameterContextMenu"
+      ></node-parameters-grid>
       <div v-if="playWaitUser" class="DialogActionNode-play">
         <button class="is-button" @click="dialogPlayer.playChoose(null)">
           {{ $t('imsDialogEditor.play.continue') }}
@@ -104,14 +58,16 @@ import { defineComponent, type PropType } from 'vue';
 import { Position } from '@vue-flow/core';
 import ExecHandle from '../parts/ExecHandle.vue';
 import type { NodeDataController } from '../editor/NodeDataController';
-import { AssetPropType } from '~ims-app-base/logic/types/Props';
+import {
+  AssetPropType,
+  castAssetPropValueToString,
+} from '~ims-app-base/logic/types/Props';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
 import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import DataField from '../parts/DataField.vue';
 import {
   nodeVariableAdd,
   nodeVariableChange,
@@ -119,23 +75,22 @@ import {
 } from '../logic/nodeVariables';
 import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
 import { generateDataPinId } from '../editor/DialogEditor';
-import {
-  ScriptBlockPlainActionTypes,
-  type ScriptBlockPlainPropValue,
-} from '../logic/nodeStoring';
+import { ScriptBlockPlainActionTypes } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import ActionSelector from '../parts/ActionSelector.vue';
-import type { NodeDescriptor } from '../nodes/NodeDescriptor';
+import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
+import NodeParametersGrid from './NodeParametersGrid.vue';
 
 export default defineComponent({
   name: 'DialogActionNode',
   components: {
     ExecHandle,
     ContextMenuZone,
-    DataField,
+    NodeParametersGrid,
     ActionSelector,
   },
+  inject: ['projectContext'],
   props: {
     id: {
       type: String,
@@ -183,6 +138,9 @@ export default defineComponent({
     Position() {
       return Position;
     },
+    NodeType() {
+      return NodeType;
+    },
     AssetPropType() {
       return AssetPropType;
     },
@@ -192,51 +150,36 @@ export default defineComponent({
     playWaitUser() {
       return (
         this.dialogPlayer.currentPlayingNode?.id === this.id &&
-        this.outputParameters.length > 0
+        this.outputParameters.length > 0 &&
+        this.nodeDescriptor.type === NodeType.EXEC
       );
     },
     actionVal: {
-      get() {
-        return this.nodeDataController.subject ?? null;
+      get(): string {
+        return (
+          castAssetPropValueToString(this.nodeDataController.subject) ?? null
+        );
       },
       set(val: string) {
         this.nodeDataController.setSubject(val);
       },
     },
-    parametersGrid(): {
-      variable: DialogVariable;
-      isOutput: boolean;
-      index: number;
-    }[] {
-      const res: {
-        variable: DialogVariable;
-        isOutput: boolean;
-        index: number;
-      }[] = [];
-      for (
-        let i = 0;
-        i < Math.max(this.inputParameters.length, this.outputParameters.length);
-        i++
-      ) {
-        if (i < this.inputParameters.length) {
-          res.push({
-            variable: this.inputParameters[i],
-            isOutput: false,
-            index: i,
-          });
-        }
-        if (i < this.outputParameters.length) {
-          res.push({
-            variable: this.outputParameters[i],
-            isOutput: true,
-            index: i,
-          });
-        }
-      }
-      return res;
-    },
     contextMenu() {
       if (this.readonly) return [];
+      if (!this.action)
+        return [
+          {
+            title: this.$t(
+              `imsDialogEditor.nodes.${this.nodeDescriptor.name}.manageCaption`,
+            ),
+            action: () => {
+              this.dialogController.manageActions(
+                this.projectContext as any,
+                this.actionType,
+              );
+            },
+          },
+        ];
       return [
         {
           title: this.$t('imsDialogEditor.trigger.addInputParameter'),
@@ -323,23 +266,13 @@ export default defineComponent({
     },
   },
   watch: {
-    parametersGrid() {
-      this.updatePins();
-    },
     actionVal() {
       this.wrongParameterNames = new Set();
     },
   },
-  mounted() {
-    this.updatePins();
-  },
+
   methods: {
     generateDataPinId,
-    activate() {
-      if (!this.$refs['content']) return;
-      (this.$refs['content'] as any).focus();
-    },
-
     async addParameter(is_out: boolean) {
       const new_variable = await nodeVariableAdd(
         this.$getAppManager(),
@@ -362,7 +295,6 @@ export default defineComponent({
       } else {
         this.nodeDataController.addParam(key, new_variable);
       }
-      this.updatePins();
     },
     async deleteParameter(param: DialogVariable, is_out: boolean) {
       const confirm = await this.$getAppManager()
@@ -388,8 +320,6 @@ export default defineComponent({
 
       this.nodeDataController.deleteParam(key, param.name);
       this.nodeDataController.deleteValue(param.name);
-
-      this.updatePins();
     },
     async changeParameter(param: DialogVariable, is_out: boolean) {
       const new_variable = await nodeVariableChange(
@@ -421,7 +351,6 @@ export default defineComponent({
         param.name,
         new_variable,
       );
-      this.updatePins();
     },
     async duplicateParameter(param: DialogVariable, is_out: boolean) {
       const new_variable = await nodeVariableDuplicate(
@@ -436,7 +365,6 @@ export default defineComponent({
       );
       if (!new_variable) return;
       this.nodeDataController.addParam(is_out ? 'out' : 'in', new_variable);
-      this.updatePins();
     },
     getParameterContextMenu(param: DialogVariable, is_out: boolean) {
       if (this.readonly) return [];
@@ -458,28 +386,6 @@ export default defineComponent({
           danger: true,
         },
       ];
-    },
-    setParamValue(
-      param: DialogVariable,
-      is_out: boolean,
-      val: ScriptBlockPlainPropValue,
-    ) {
-      if (is_out) return;
-      this.nodeDataController.setValue(param.name, val);
-    },
-    updatePins() {
-      for (let i = 0; i < this.inputParameters.length; i++) {
-        this.nodeDataController.setPinDataType(
-          generateDataPinId(false, this.inputParameters[i].name),
-          this.inputParameters[i].type,
-        );
-      }
-      for (let i = 0; i < this.outputParameters.length; i++) {
-        this.nodeDataController.setPinDataType(
-          generateDataPinId(true, this.outputParameters[i].name),
-          this.outputParameters[i].type,
-        );
-      }
     },
   },
 });
@@ -521,33 +427,6 @@ export default defineComponent({
   color: var(--local-text-color);
   max-width: 600px;
   min-width: 150px;
-}
-
-.DialogActionNode-parameters {
-  padding-bottom: 5px;
-  display: grid;
-  gap: 10px;
-  align-items: center;
-  border-top: 1px solid var(--imsde-node-content-inner-border-color);
-  padding-top: 10px;
-}
-
-.DialogActionNode-parameters-one {
-  margin-bottom: 5px;
-  display: flex;
-  align-items: baseline;
-  &.type-input {
-    grid-column: 1;
-  }
-  &.type-output {
-    flex-direction: row-reverse;
-    grid-column: 2;
-    justify-self: flex-end;
-  }
-}
-.DialogActionNode-badParam {
-  display: inline-block;
-  color: var(--color-warning);
 }
 
 .DialogActionNode:deep(.DataFieldInput-string) {

@@ -305,6 +305,18 @@ export default defineComponent({
 <style lang="scss" scoped>
 .ManageCollectionDialog {
   width: 750px;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.Dialog-content) {
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 20px;
+  }
+}
+.ManageCollectionDialog-list {
+  height: 100%;
 }
 .ManageCollectionDialog-filters {
   display: flex;

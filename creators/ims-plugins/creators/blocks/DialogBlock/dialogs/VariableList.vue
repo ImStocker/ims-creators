@@ -28,6 +28,7 @@
         </div>
       </div>
       <sortable-list
+        class="VariableList-content tiny-scrollbars"
         handle-selector=".VariableListItem-drag"
         id-key="name"
         :list="filteredVariables"
@@ -98,7 +99,7 @@ export default defineComponent({
     return {
       filters: {
         query: '',
-        kind: ScriptBlockPlainVariableKinds.LOCAL,
+        kind: ScriptBlockPlainVariableKinds.GLOBAL,
       },
     };
   },
@@ -111,7 +112,7 @@ export default defineComponent({
         (v) =>
           v.title.toLowerCase().includes(this.filters.query.toLowerCase()) &&
           (v.kind === this.filters.kind ||
-            (this.filters.kind === ScriptBlockPlainVariableKinds.LOCAL &&
+            (this.filters.kind === ScriptBlockPlainVariableKinds.GLOBAL &&
               v.kind === undefined)),
       );
     },
@@ -148,6 +149,11 @@ export default defineComponent({
 </script>
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
+.VariableList {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 .VariableList-filters {
   display: flex;
   align-items: center;
@@ -159,15 +165,21 @@ export default defineComponent({
   }
   .VariableList-filters-query {
     margin-left: auto;
+    max-width: 150px;
   }
 }
 .VariableList-grid {
   --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;
   --variable-list-column-gap: 2px;
 
-  margin-bottom: 20px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-
+.VariableList-content {
+  overflow: auto;
+  flex: 1;
+}
 .VariableList-grid-row {
   display: grid;
   grid-template-columns: var(--variable-list-columns);

@@ -20,21 +20,21 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String as PropType<ScriptBlockPlainVariableKinds>,
-      default: ScriptBlockPlainVariableKinds.LOCAL,
+      default: ScriptBlockPlainVariableKinds.GLOBAL,
     },
   },
   emits: ['update:model-value'],
   computed: {
     ownModelValue: {
       get() {
-        return this.modelValue ?? ScriptBlockPlainVariableKinds.LOCAL;
+        return this.modelValue ?? ScriptBlockPlainVariableKinds.GLOBAL;
       },
       set(val: ScriptBlockPlainVariableKinds) {
         this.$emit('update:model-value', val);
       },
     },
     options() {
-      const available_kinds = ['local', 'in', 'out', 'in-out'];
+      const available_kinds = ['global', 'local', 'in', 'out', 'in-out'];
       return available_kinds.map((k) => {
         return {
           title: this.$t('imsDialogEditor.var.kinds.' + k),

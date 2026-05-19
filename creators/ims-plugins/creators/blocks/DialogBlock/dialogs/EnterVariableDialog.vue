@@ -133,7 +133,9 @@ export default defineComponent({
         type: this.dialog.state.initial?.type ?? null,
         description: this.dialog.state.initial?.description ?? null,
         autoFill: this.dialog.state.initial?.autoFill ?? null,
-        kind: this.dialog.state.initial?.kind,
+        kind:
+          this.dialog.state.initial?.kind ??
+          ScriptBlockPlainVariableKinds.GLOBAL,
       } as DialogVariable,
       hasUserInteractedWithServiceName: false,
     };
@@ -189,7 +191,7 @@ export default defineComponent({
 @use '~ims-app-base/style/Form';
 
 .EnterVariableDialog {
-  width: 400px;
+  width: 450px;
 }
 .EnterVariableDialog-field-caption {
   text-align: center;
