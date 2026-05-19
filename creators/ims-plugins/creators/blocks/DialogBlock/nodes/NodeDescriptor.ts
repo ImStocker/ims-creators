@@ -3,9 +3,14 @@ import type {
   AssetPropValue,
   AssetPropValueType,
 } from '~ims-app-base/logic/types/Props';
-import type { NodeData } from '../editor/NodeDataController';
+import type {
+  NodeData,
+  NodeDataController,
+} from '../editor/NodeDataController';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { ScriptPlayContext } from '../play/ScriptPlayContext';
+import type { DialogBlockController } from '../editor/DialogBlockController';
+import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 
 export enum NodeType {
   EXEC_START = 'exec-start',
@@ -14,6 +19,17 @@ export enum NodeType {
   DATA = 'data',
   DATA_START = 'data-start',
 }
+
+export type NodeDescriptorTemplate = {
+  title: string;
+  apply: (nodeDataController: NodeDataController) => void;
+};
+
+export type NodeDescriptorTemplateController = {
+  getTemplates: () => NodeDescriptorTemplate[];
+  manageTemplates: (projectContext: IProjectContext) => Promise<void>;
+  createTemplate: (name?: string) => Promise<NodeDescriptorTemplate | null>;
+};
 
 export type NodeDescriptor = {
   name: string;
@@ -35,4 +51,7 @@ export type NodeDescriptor = {
     playNode: ScriptPlayNode,
     choice: number | null,
   ) => string | null;
+  getTemplateController?: (
+    dialogController: DialogBlockController,
+  ) => NodeDescriptorTemplateController;
 };

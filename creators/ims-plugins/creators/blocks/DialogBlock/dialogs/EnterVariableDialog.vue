@@ -27,9 +27,23 @@
           ></ims-input>
         </div>
       </div>
+      <div
+        v-if="dialog.state.showKindControl"
+        class="EnterVariableDialog-field"
+      >
+        <div class="EnterVariableDialog-field-caption">
+          {{ $t('imsDialogEditor.var.enterKind') }}
+        </div>
+        <div class="EnterVariableDialog-field-control">
+          <variable-kind-selector
+            v-model="variable.kind"
+            class="EnterVariableDialog-selectKind"
+          ></variable-kind-selector>
+        </div>
+      </div>
       <div class="EnterVariableDialog-field">
         <div class="EnterVariableDialog-field-caption">
-          {{ $t('imsDialogEditor.var.enterType') }}
+          {{ $t('imsDialogEditor.var.enterDataType') }}
         </div>
         <div class="EnterVariableDialog-field-control">
           <variable-type-selector
@@ -84,11 +98,14 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
 import VariableTypeSelector from '../parts/VariableTypeSelector.vue';
 import FormCheckBox from '~ims-app-base/components/Form/FormCheckBox.vue';
+import VariableKindSelector from '../parts/VariableKindSelector.vue';
+import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
 
 type DialogProps = {
   initial?: DialogVariable;
   validate: (variable: DialogVariable) => void | Promise<void>;
   showAutoFill?: boolean;
+  showKindControl?: boolean;
 };
 
 type DialogResult = DialogVariable | null;
@@ -99,6 +116,7 @@ export default defineComponent({
     DialogContent,
     ImsInput,
     VariableTypeSelector,
+    VariableKindSelector,
     FormCheckBox,
   },
   props: {
@@ -115,11 +133,15 @@ export default defineComponent({
         type: this.dialog.state.initial?.type ?? null,
         description: this.dialog.state.initial?.description ?? null,
         autoFill: this.dialog.state.initial?.autoFill ?? null,
+        kind: this.dialog.state.initial?.kind,
       } as DialogVariable,
       hasUserInteractedWithServiceName: false,
     };
   },
   computed: {
+    ScriptBlockPlainVariableKinds() {
+      return ScriptBlockPlainVariableKinds;
+    },
     variableDescription: {
       get() {
         return this.variable.description ?? '';
@@ -175,5 +197,10 @@ export default defineComponent({
 }
 .EnterVariableDialog-field {
   margin-bottom: 10px;
+}
+.EnterVariableDialog-selectKind {
+  :deep(.ref-item) {
+    flex: 1;
+  }
 }
 </style>

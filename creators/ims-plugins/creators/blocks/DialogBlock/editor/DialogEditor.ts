@@ -13,7 +13,7 @@ import type {
   ScriptBlockPlainPropValueBind,
   ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
-import type { DialogVariable } from './DialogBlockController';
+import type { DialogAction, DialogVariable } from './DialogBlockController';
 import type { NodeData, NodeDataOption } from './NodeDataController';
 
 export function generateDataPinId(
@@ -49,6 +49,11 @@ export type DialogBlockState = {
   variables: {
     own: {
       [name: string]: DialogVariable;
+    };
+  };
+  actions: {
+    own: {
+      [name: string]: DialogAction;
     };
   };
   __settings: {
@@ -261,6 +266,9 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
     variables: {
       own: plain?.variables?.own ?? {},
     },
+    actions: {
+      own: plain?.actions?.own ?? {},
+    },
     __settings: {
       speech: {
         main: speech_main,
@@ -303,6 +311,7 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
     start: null,
     nodes: {},
     variables: state.variables,
+    actions: state.actions,
     __settings: state.__settings,
   };
   for (const node of state.nodes) {

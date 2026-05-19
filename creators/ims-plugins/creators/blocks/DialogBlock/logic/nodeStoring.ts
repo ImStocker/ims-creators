@@ -14,10 +14,33 @@ export type ScriptBlockPlainProps = {
   [prop: string]: ScriptBlockPlainPropValue;
 };
 
+export enum ScriptBlockPlainActionTypes {
+  FUNCTION = 'function',
+  TRIGGER = 'trigger',
+}
+
+export enum ScriptBlockPlainVariableKinds {
+  LOCAL = 'local',
+  IN = 'in',
+  OUT = 'out',
+  INOUT = 'in-out',
+}
+
+export type ScriptBlockPlainAction = {
+  name: string;
+  type: ScriptBlockPlainActionTypes;
+  params?: {
+    in: ScriptBlockPlainVariable[];
+    out: ScriptBlockPlainVariable[];
+  };
+  index?: number;
+};
+
 export type ScriptBlockPlainVariable = {
   name: string;
   title: string;
   type: AssetPropValueType | null;
+  kind?: ScriptBlockPlainVariableKinds;
   description: string | null;
   default: AssetPropValue;
   autoFill?: boolean;
@@ -52,6 +75,11 @@ export type ScriptBlockPlain = {
   variables: {
     own: {
       [name: string]: ScriptBlockPlainVariable;
+    };
+  };
+  actions: {
+    own: {
+      [name: string]: ScriptBlockPlainAction;
     };
   };
   __settings: {

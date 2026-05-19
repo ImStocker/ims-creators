@@ -1,36 +1,58 @@
 <template>
-  <div v-if="variableList.length > 0" class="VariableList-grid">
-    <div class="VariableList-grid-row">
-      <div class="VariableList-grid-column"></div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.name') }}
-      </div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.type') }}
-      </div>
-      <div class="VariableList-grid-column">
-        {{ $t('imsDialogEditor.var.defaultValue') }}
-      </div>
+  <div class="VariableList">
+    <div class="VariableList-filters">
+      <slot name="prepend-filters"></slot>
+      <variable-kind-selector
+        v-if="showKindControl"
+        v-model="filters.kind"
+        class="VariableList-filters-kind"
+      ></variable-kind-selector>
+      <form-search
+        v-if="filteredVariables && filteredVariables.length"
+        class="VariableList-filters-query"
+        :value="filters.query"
+        @change="filters.query = $event"
+      ></form-search>
     </div>
-    <sortable-list
-      handle-selector=".VariableListItem-drag"
-      id-key="name"
-      :list="variableList"
-      @update:list="changeList($event)"
-    >
-      <template #default="{ item }">
-        <variable-list-item
-          class="VariableList-item"
-          :variable-controller="variableController"
-          :variable="item"
-          :show-auto-fill="showAutoFill"
-        >
-        </variable-list-item>
-      </template>
-    </sortable-list>
-  </div>
-  <div v-else class="VariableList-empty">
-    {{ $t('imsDialogEditor.var.noVariablesYet') }}
+    <div v-if="filteredVariables.length > 0" class="VariableList-grid">
+      <div class="VariableList-grid-row">
+        <div class="VariableList-grid-column"></div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.name') }}
+        </div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.dataType') }}
+        </div>
+        <div class="VariableList-grid-column">
+          {{ $t('imsDialogEditor.var.defaultValue') }}
+        </div>
+      </div>
+      <sortable-list
+        handle-selector=".VariableListItem-drag"
+        id-key="name"
+        :list="filteredVariables"
+        @update:list="changeList($event)"
+      >
+        <template #default="{ item }">
+          <variable-list-item
+            class="VariableList-item"
+            :variable-controller="collectionController"
+            :variable="item"
+            :show-auto-fill="showAutoFill"
+            :show-kind-control="showKindControl"
+          >
+          </variable-list-item>
+        </template>
+      </sortable-list>
+    </div>
+    <div v-else class="VariableList-empty">
+      {{
+        $t(
+          'imsDialogEditor.var.' +
+            (filters.query ? 'noVariablesFound' : 'noVariablesYet'),
+        )
+      }}
+    </div>
   </div>
 </template>
 
@@ -43,16 +65,23 @@ import type { IDialogVariableController } from '../editor/DialogVariableControll
 import VariableListItem from './VariableListItem.vue';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
-import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
+import {
+  ScriptBlockPlainVariableKinds,
+  type ScriptBlockPlainVariable,
+} from '../logic/nodeStoring';
+import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
+import VariableKindSelector from '../parts/VariableKindSelector.vue';
 
 export default defineComponent({
   name: 'VariableList',
   components: {
     VariableListItem,
     SortableList,
+    FormSearch,
+    VariableKindSelector,
   },
   props: {
-    variableController: {
+    collectionController: {
       type: Object as PropType<IDialogVariableController>,
       required: true,
     },
@@ -60,10 +89,31 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showKindControl: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  data() {
+    return {
+      filters: {
+        query: '',
+        kind: ScriptBlockPlainVariableKinds.LOCAL,
+      },
+    };
   },
   computed: {
     variableList() {
-      return this.variableController.getVariables();
+      return this.collectionController.getEntities();
+    },
+    filteredVariables() {
+      return this.variableList.filter(
+        (v) =>
+          v.title.toLowerCase().includes(this.filters.query.toLowerCase()) &&
+          (v.kind === this.filters.kind ||
+            (this.filters.kind === ScriptBlockPlainVariableKinds.LOCAL &&
+              v.kind === undefined)),
+      );
     },
   },
   async mounted() {
@@ -74,7 +124,7 @@ export default defineComponent({
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
-          this.variableController.reorderVariables(reordered_variables);
+          this.collectionController.reorderEntities(reordered_variables);
         });
     },
     async loadVariablesAssetKinds() {
@@ -98,7 +148,19 @@ export default defineComponent({
 </script>
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
+.VariableList-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
 
+  .VariableList-filters-kind {
+    --ValueSwitcher-border-radius: 8px;
+  }
+  .VariableList-filters-query {
+    margin-left: auto;
+  }
+}
 .VariableList-grid {
   --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;
   --variable-list-column-gap: 2px;

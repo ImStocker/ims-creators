@@ -489,7 +489,9 @@ export class DialogPlayer {
             playing_state.history[playing_state.historyPointer]; // NOTE: can be chnaged if user use back/forward
 
           const graph = new ScriptPlayGraph(
-            extractDialogBlockPlain(this.dialogController.resolvedBlock.props),
+            extractDialogBlockPlain(
+              this.dialogController.resolvedBlock.computed,
+            ),
           );
           context = graph.step(activated_context, choice);
         }

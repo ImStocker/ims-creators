@@ -105,6 +105,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showKindControl: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -113,7 +117,7 @@ export default defineComponent({
   },
   computed: {
     variableList() {
-      return [...this.variableController.getVariables()];
+      return [...this.variableController.getEntities()];
     },
   },
   methods: {
@@ -125,9 +129,10 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
-      this.variableController.addVariable(new_variable);
+      this.variableController.addEntity(new_variable);
     },
     async editVariable(variable: DialogVariable) {
       const new_variable = await nodeVariableChange(
@@ -138,9 +143,10 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
-      this.variableController.changeVariable(variable.name, new_variable);
+      this.variableController.changeEntity(variable.name, new_variable);
     },
     async duplicateVariable(variable: DialogVariable) {
       const new_variable = await nodeVariableDuplicate(
@@ -151,9 +157,10 @@ export default defineComponent({
           alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
         },
         this.showAutoFill,
+        this.showKindControl,
       );
       if (!new_variable) return;
-      this.variableController.addVariable(new_variable);
+      this.variableController.addEntity(new_variable);
     },
     getVariableMenu(variable: DialogVariable) {
       return [
@@ -171,7 +178,7 @@ export default defineComponent({
             this.duplicateVariable(variable);
           },
         },
-        ...(this.variableController.canDeleteVariable(variable.name)
+        ...(this.variableController.canDeleteEntity(variable.name)
           ? [
               {
                 title: this.$t('imsDialogEditor.var.deleteVariable'),
@@ -188,7 +195,7 @@ export default defineComponent({
                       danger: true,
                     });
                   if (!confirm) return;
-                  this.variableController.deleteVariable(variable.name);
+                  this.variableController.deleteEntity(variable.name);
                 },
               },
             ]
@@ -196,7 +203,7 @@ export default defineComponent({
       ];
     },
     changeVariable(variable: DialogVariable, change: Partial<DialogVariable>) {
-      this.variableController.changeVariable(variable.name, {
+      this.variableController.changeEntity(variable.name, {
         ...variable,
         ...change,
       });
@@ -219,7 +226,7 @@ export default defineComponent({
           .showError(this.$t('imsDialogEditor.var.variableAlreadyExists'));
         return;
       }
-      this.variableController.changeVariable(variable.name, {
+      this.variableController.changeEntity(variable.name, {
         ...variable,
         title: new_title,
         name: new_name,

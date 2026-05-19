@@ -1,8 +1,7 @@
 <template>
   <dialog-action-node
     :id="id"
-    ref="node"
-    class="DialogTriggerNode"
+    class="DialogFunctionNode"
     :node-descriptor="nodeDescriptor"
     :node-data-controller="nodeDataController"
     :selected="selected"
@@ -10,7 +9,7 @@
     :readonly="readonly"
     :playing-node-data="playingNodeData"
     :dialog-player="dialogPlayer"
-    :action-type="ScriptBlockPlainActionTypes.TRIGGER"
+    :action-type="ScriptBlockPlainActionTypes.FUNCTION"
   ></dialog-action-node>
 </template>
 
@@ -25,7 +24,7 @@ import type { DialogPlayer } from '../play/DialogPlayer';
 import DialogActionNode from '../parts/DialogActionNode.vue';
 
 export default defineComponent({
-  name: 'DialogTriggerNode',
+  name: 'DialogFunctionNode',
   components: {
     DialogActionNode,
   },

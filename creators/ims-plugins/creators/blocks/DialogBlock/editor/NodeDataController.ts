@@ -1,4 +1,7 @@
-import type { AssetPropValueType } from '~ims-app-base/logic/types/Props';
+import type {
+  AssetPropValue,
+  AssetPropValueType,
+} from '~ims-app-base/logic/types/Props';
 import type {
   ScriptBlockPlainProps,
   ScriptBlockPlainPropValue,
@@ -30,8 +33,8 @@ export type NodeDataController = {
     in: ScriptBlockPlainVariable[];
     out: ScriptBlockPlainVariable[];
   };
-  get subject(): string;
-  setSubject(val: string): void;
+  get subject(): AssetPropValue;
+  setSubject(val: AssetPropValue): void;
   setValues(vals: ScriptBlockPlainProps): void;
   setValue(prop: string, val: ScriptBlockPlainPropValue): void;
   deleteValue(prop: string): void;

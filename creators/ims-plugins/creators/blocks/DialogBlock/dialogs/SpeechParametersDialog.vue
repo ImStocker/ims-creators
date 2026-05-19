@@ -16,7 +16,7 @@
             </div>
             <variable-list
               :show-auto-fill="true"
-              :variable-controller="mainSpeechController"
+              :collection-controller="mainSpeechController"
             ></variable-list>
             <button
               type="button"
@@ -31,7 +31,7 @@
               {{ $t('imsDialogEditor.speech.responseOptionsProperties') }}
             </div>
             <variable-list
-              :variable-controller="optionSpeechController"
+              :collection-controller="optionSpeechController"
             ></variable-list>
             <button
               type="button"
@@ -65,7 +65,7 @@ import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
-import type { IProjectContext } from '../../../../../../ims-app-base/app/logic/types/IProjectContext';
+import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 
 type DialogProps = {
   dialogController: DialogBlockController;
@@ -94,29 +94,29 @@ export default defineComponent({
   computed: {
     mainSpeechController(): IDialogVariableController {
       return {
-        getVariables: () => this.dialogController.getMainSpeech(),
-        addVariable: (variable: DialogVariable) =>
+        getEntities: () => this.dialogController.getMainSpeech(),
+        addEntity: (variable: DialogVariable) =>
           this.dialogController.addMainSpeech(variable),
-        changeVariable: (variable_name: string, variable: DialogVariable) =>
+        changeEntity: (variable_name: string, variable: DialogVariable) =>
           this.dialogController.changeMainSpeech(variable_name, variable),
-        deleteVariable: (variable_name: string) =>
+        deleteEntity: (variable_name: string) =>
           this.dialogController.deleteMainSpeech(variable_name),
-        canDeleteVariable: (variable_name: string) => variable_name !== 'text',
-        reorderVariables: (variables: DialogVariable[]) =>
+        canDeleteEntity: (variable_name: string) => variable_name !== 'text',
+        reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderMainSpeech(variables),
       };
     },
     optionSpeechController(): IDialogVariableController {
       return {
-        getVariables: () => this.dialogController.getOptionSpeech(),
-        addVariable: (variable: DialogVariable) =>
+        getEntities: () => this.dialogController.getOptionSpeech(),
+        addEntity: (variable: DialogVariable) =>
           this.dialogController.addOptionSpeech(variable),
-        changeVariable: (variable_name: string, variable: DialogVariable) =>
+        changeEntity: (variable_name: string, variable: DialogVariable) =>
           this.dialogController.changeOptionSpeech(variable_name, variable),
-        deleteVariable: (variable_name: string) =>
+        deleteEntity: (variable_name: string) =>
           this.dialogController.deleteOptionSpeech(variable_name),
-        canDeleteVariable: (variable_name: string) => variable_name !== 'text',
-        reorderVariables: (variables: DialogVariable[]) =>
+        canDeleteEntity: (variable_name: string) => variable_name !== 'text',
+        reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderOptionSpeech(variables),
       };
     },
@@ -124,10 +124,10 @@ export default defineComponent({
       return this.dialog.state.dialogController;
     },
     mainSpeechList() {
-      return [...this.mainSpeechController.getVariables()];
+      return [...this.mainSpeechController.getEntities()];
     },
     optionSpeechList() {
-      return [...this.optionSpeechController.getVariables()];
+      return [...this.optionSpeechController.getEntities()];
     },
   },
   methods: {
@@ -141,7 +141,7 @@ export default defineComponent({
         true,
       );
       if (!new_variable) return;
-      this.mainSpeechController.addVariable(new_variable);
+      this.mainSpeechController.addEntity(new_variable);
     },
     async addSettingSpeechOption() {
       const new_variable = await nodeVariableAdd(
@@ -160,7 +160,7 @@ export default defineComponent({
           0,
         ],
       );
-      this.optionSpeechController.addVariable({
+      this.optionSpeechController.addEntity({
         ...new_variable,
         index: max_index + 1,
       });

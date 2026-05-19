@@ -1,13 +1,20 @@
 <template>
   <div class="ManageVariablesDropdown is-dropdown">
-    <div
+    <form-search
       v-if="variables && variables.length"
+      :value="searchQuery"
+      @change="searchQuery = $event"
+    ></form-search>
+    <div
+      v-if="filteredVariables && filteredVariables.length"
       class="ManageVariablesDropdown-list tiny-scrollbars"
     >
       <div
-        v-for="variable of variables"
+        v-for="variable of filteredVariables"
         :key="variable.name"
         class="ManageVariablesDropdown-list-item"
+        :draggable="!readonly"
+        @dragstart="onDragStart($event, variable)"
       >
         <div class="ManageVariablesDropdown-list-item-name">
           {{ variable.title }}
@@ -23,7 +30,12 @@
       </div>
     </div>
     <div v-else class="ManageVariablesDropdown-list-empty">
-      {{ $t('imsDialogEditor.var.noVariablesYet') }}
+      {{
+        $t(
+          'imsDialogEditor.var.' +
+            (searchQuery ? 'noVariablesFound' : 'noVariablesYet'),
+        )
+      }}
     </div>
     <button
       v-if="!readonly"
@@ -37,14 +49,19 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
 import DataFieldDisplay from './DataFieldDisplay.vue';
-import type { DialogBlockController } from '../editor/DialogBlockController';
+import type {
+  DialogBlockController,
+  DialogVariable,
+} from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 export default defineComponent({
   name: 'ManageVariablesDropdown',
   components: {
     DataFieldDisplay,
+    FormSearch,
   },
   inject: ['projectContext'],
   props: {
@@ -57,12 +74,25 @@ export default defineComponent({
       default: false,
     },
   },
+  data() {
+    return {
+      searchQuery: '',
+    };
+  },
   computed: {
     variables() {
       return this.dialogController.getVariables();
     },
+    filteredVariables() {
+      return this.variables.filter((v) =>
+        v.title.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      );
+    },
   },
   methods: {
+    onDragStart(e: DragEvent, variable: DialogVariable) {
+      e.dataTransfer?.setData('dialog-variable', variable.name);
+    },
     manageVariables() {
       assert(this.projectContext, 'Project context is not provided');
       this.dialogController.manageVariables(
@@ -93,6 +123,15 @@ export default defineComponent({
   flex-wrap: nowrap;
   align-items: center;
   gap: 20px;
+  padding: 0px 5px;
+  border-radius: 4px;
+  cursor: grab;
+
+  &[draggable] {
+    &:hover {
+      background-color: var(--local-hl-bg-color);
+    }
+  }
 }
 .ManageVariablesDropdown-list-item-name,
 .ManageVariablesDropdown-list-item-value {
