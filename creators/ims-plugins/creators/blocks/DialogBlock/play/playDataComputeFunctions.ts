@@ -26,6 +26,12 @@ export function playDataComputeTrigger(
   return getScriptPlayContextNodeParam(context, playNode.id, param);
 }
 
+// export function playDataComputeGetProps(
+//   context: ScriptPlayContext,
+//   playNode: ScriptPlayNode,
+//   param: string,
+// ): AssetPropValue {}
+
 export function playDataComputeGetVar(
   context: ScriptPlayContext,
   playNode: ScriptPlayNode,

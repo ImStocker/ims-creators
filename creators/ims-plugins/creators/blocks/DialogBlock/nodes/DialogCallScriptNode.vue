@@ -46,10 +46,7 @@ import {
 } from '../editor/DialogBlockController';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
-import type {
-  ScriptBlockPlainActionTypes,
-  ScriptBlockPlainPropValue,
-} from '../logic/nodeStoring';
+import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import { Position } from '@vue-flow/core';
 import ExecHandle from '../parts/ExecHandle.vue';
 import SelectAssetComboBox from '~ims-app-base/components/Asset/SelectAssetComboBox.vue';
@@ -106,10 +103,6 @@ export default defineComponent({
     },
     dialogPlayer: {
       type: Object as PropType<DialogPlayer>,
-      required: true,
-    },
-    actionType: {
-      type: String as PropType<ScriptBlockPlainActionTypes>,
       required: true,
     },
   },

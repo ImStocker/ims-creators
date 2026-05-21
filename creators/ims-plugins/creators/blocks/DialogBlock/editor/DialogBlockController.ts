@@ -76,6 +76,19 @@ export function sortCollectionItems<T extends DialogBlockCollectionItem>(
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 }
 
+export function pickMoreSpecificType(
+  a: AssetPropValueType,
+  b: AssetPropValueType,
+) {
+  if (a.Type !== b.Type) return a;
+  if (a.Kind && !b.Kind) return a;
+  if (b.Kind && !a.Kind) return b;
+  if (a.Of && !b.Of) return a;
+  if (b.Of && !a.Of) return b;
+  if (a.Of && b.Of) return pickMoreSpecificType(a.Of, b.Of);
+  return a;
+}
+
 export class DialogBlockController extends BlockEditorController {
   state!: DialogBlockState;
   private _expectPropsChange = false;
@@ -301,24 +314,43 @@ export class DialogBlockController extends BlockEditorController {
     node_id: string,
     pin_id: string,
   ): AssetPropValueType[] | null {
-    const assigned = this._assignedDataTypePins.get(node_id + '|' + pin_id);
-    if (assigned) return assigned.length > 0 ? assigned : null;
+    const own = this._assignedDataTypePins.get(node_id + '|' + pin_id);
+    const own_valid = own?.length ? own : null;
 
+    const connected: AssetPropValueType[] = [];
     for (const e of this.state.edges) {
       if (e.target === node_id && e.targetHandle === pin_id) {
-        const assigned = this._assignedDataTypePins.get(
+        const type = this._assignedDataTypePins.get(
           e.source + '|' + e.sourceHandle,
         );
-        if (assigned) return assigned.length > 0 ? assigned : null;
+        if (type?.length) connected.push(...type);
       }
       if (e.source === node_id && e.sourceHandle === pin_id) {
-        const assigned = this._assignedDataTypePins.get(
+        const type = this._assignedDataTypePins.get(
           e.target + '|' + e.targetHandle,
         );
-        if (assigned) return assigned.length > 0 ? assigned : null;
+        if (type?.length) connected.push(...type);
       }
     }
-    return null;
+    const connected_valid = connected.length ? connected : null;
+
+    if (!own_valid && !connected_valid) return null;
+    if (!own_valid) return connected_valid;
+    if (!connected_valid) return own_valid;
+
+    const merged = [...own_valid];
+    for (const c_type of connected_valid) {
+      const existing = merged.find((t) => t.Type === c_type.Type);
+      if (!existing) {
+        merged.push(c_type);
+      } else {
+        merged[merged.indexOf(existing)] = pickMoreSpecificType(
+          c_type,
+          existing,
+        );
+      }
+    }
+    return merged;
   }
 
   getNodeDataController(node_id: string): NodeDataController {

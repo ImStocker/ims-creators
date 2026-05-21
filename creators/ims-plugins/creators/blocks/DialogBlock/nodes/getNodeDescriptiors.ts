@@ -243,9 +243,18 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       name: 'callScript',
       icon: 'ri-file-paper-2-line',
       node: DialogCallScriptNode,
-      color: '#afb2ff',
+      color: '#afc8ff',
       type: NodeType.EXEC,
     },
+    // {
+    //   name: 'getProps',
+    //   icon: 'ri-braces-line',
+    //   node: DialogGetPropsNode,
+    //   color: '#affaff',
+    //   type: NodeType.DATA_START,
+    //   playDataCompute: playDataComputeGetProps,
+    // },
+
     /*{
       name: 'timer',
       icon: 'ri-time-line',
