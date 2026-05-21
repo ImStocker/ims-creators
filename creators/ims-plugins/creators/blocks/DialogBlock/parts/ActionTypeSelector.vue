@@ -33,7 +33,7 @@ export default defineComponent({
   },
   props: {
     modelValue: {
-      type: String as PropType<ScriptBlockPlainActionTypes | null>,
+      type: [String, null] as PropType<ScriptBlockPlainActionTypes | null>,
       required: true,
     },
     nullable: {

@@ -1,12 +1,14 @@
 <template>
   <div class="ActionsList">
     <div class="ActionsList-filters">
-      <slot name="prepend-filters"></slot>
-      <action-type-selector
-        v-model="filters.type"
-        class="ActionsList-filters-type"
-        nullable
-      ></action-type-selector>
+      <div class="ActionsList-filters-group">
+        <slot name="prepend-filters"></slot>
+        <action-type-selector
+          v-model="filters.type"
+          class="ActionsList-filters-type"
+          nullable
+        ></action-type-selector>
+      </div>
       <form-search
         v-if="actionsList && actionsList.length"
         class="ActionsList-filters-query"
@@ -137,9 +139,17 @@ export default defineComponent({
 }
 .ActionsList-filters {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+
+  .ActionsList-filters-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
   .ActionsList-filters-type {
     --ValueSwitcher-border-radius: 8px;
@@ -147,7 +157,6 @@ export default defineComponent({
 
   .ActionsList-filters-query {
     max-width: 180px;
-    margin-left: auto;
   }
 }
 .ActionsList-grid {

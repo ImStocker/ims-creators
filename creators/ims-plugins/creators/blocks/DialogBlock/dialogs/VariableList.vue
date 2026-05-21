@@ -1,12 +1,14 @@
 <template>
   <div class="VariableList">
     <div class="VariableList-filters">
-      <slot name="prepend-filters"></slot>
-      <variable-kind-selector
-        v-if="showKindControl"
-        v-model="filters.kind"
-        class="VariableList-filters-kind"
-      ></variable-kind-selector>
+      <div class="VariableList-filters-group">
+        <slot name="prepend-filters"></slot>
+        <variable-kind-selector
+          v-if="showKindControl"
+          v-model="filters.kind"
+          class="VariableList-filters-kind"
+        ></variable-kind-selector>
+      </div>
       <form-search
         v-if="filteredVariables && filteredVariables.length && showSearch"
         class="VariableList-filters-query"
@@ -165,6 +167,12 @@ export default defineComponent({
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+
+  .VariableList-filters-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
   .VariableList-filters-kind {
     width: auto;
