@@ -180,6 +180,25 @@ export default {
     cloudOnlySection: {
       cloudOnlySectionHeader: "This section is only available in cloud projects",
       cloudOnlySectionBody: "Please open this section in web version of project."
+    },
+    contextMenu: {
+      cut: 'Cut',
+      copy: 'Copy',
+      paste: 'Paste',
+      selectAll: 'Select all',
+      save: 'Save Image',
+      saveImageAs: 'Save Image As…',
+      copyImage: 'Copy Image',
+      copyImageAddress: 'Copy Image Address',
+      saveVideo: 'Save Video',
+      saveVideoAs: 'Save Video As…',
+      copyVideoAddress: 'Copy Video Address',
+      saveAudio: 'Save Audio',
+      saveAudioAs: 'Save Audio As…',
+      copyAudioAddress: 'Copy Audio Address',
+      copyLink: 'Copy Link',
+      saveLinkAs: 'Save Link As…',
+      inspect: 'Inspect Element',
     }
   },
 };

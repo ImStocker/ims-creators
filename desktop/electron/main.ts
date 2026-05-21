@@ -5,13 +5,13 @@ import { initImsHostApi } from './imshost-api';
 import { installExtension } from 'electron-devtools-installer';
 import { pathToFileURL } from "node:url"
 import autoUpdateManager from './auto-update-manager';
-import contextMenu from 'electron-context-menu';
 
 const VUEDEVTOOLS_ID = 'nhdogjmejiglipccpnnnanhbledajbpd';
 
 import log from 'electron-log/main';
 import { closeAllProjectDb } from './project-file-db/project-registry';
 import { initMainTokenStorage } from './main-token-storage';
+import { MainAppControllerInstance } from './main-app-controller';
 
 function getDefaultWindowArgs(): WindowArgs {
   return {
@@ -49,10 +49,6 @@ async function initApp(){
         } 
       }
     ]);
-    
-    contextMenu({
-      showSearchWithGoogle: false
-    });
 
     app.on('window-all-closed', async () => {
       await closeAllProjectDb()
@@ -63,6 +59,8 @@ async function initApp(){
 
     await app.whenReady().then(async () => {
       log.log("App ready")
+
+      await MainAppControllerInstance.init();
 
       initImsHostApi();
       await initMainTokenStorage();
