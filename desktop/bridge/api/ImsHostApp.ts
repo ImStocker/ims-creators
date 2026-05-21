@@ -2,33 +2,17 @@ import { ImsHostBase } from './ImsHostBase';
 import { app } from 'electron'
 import { storageGetKey, storageSetKey } from "../../electron/storage";
 import log from 'electron-log/main';
+import { MainAppControllerInstance, type MainSupportedLang } from '../../electron/main-app-controller';
 
 export class ImsHostApp extends ImsHostBase{
   private _currentLanguage: string | undefined;
     
   async getLanguage(): Promise<string> {
-    if (this._currentLanguage === undefined){
-        this._currentLanguage = await storageGetKey('lang') ?? undefined;
-        if (!this._currentLanguage){
-            this._currentLanguage = 'en';
-            const system_locale = app.getLocale();
-            if (/^ru/i.test(system_locale)) this._currentLanguage = 'ru';
-        }
-    }
-    return this._currentLanguage;
+    return MainAppControllerInstance.getLanguage();
   }
 
   async setLanguage(lang: string) {
-    switch (lang) {
-        case 'ru':
-        case 'en':
-            break;
-        default:
-            lang = 'en';
-            break;
-    }
-    await storageSetKey('lang', lang);
-    this._currentLanguage = lang;
+    await MainAppControllerInstance.setLanguage(lang as MainSupportedLang);
   }
 
   async getLogFileLocation(): Promise<string | null> {

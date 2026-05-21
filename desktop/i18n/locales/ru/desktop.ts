@@ -180,6 +180,25 @@ export default {
     cloudOnlySection: {
       cloudOnlySectionHeader: "Раздел доступен только в облачных проектах",
       cloudOnlySectionBody: "Пожалуйста, откройте этот раздел в веб-версии проекта"
+    },
+    contextMenu: {
+      cut: 'Вырезать',
+      copy: 'Копировать',
+      paste: 'Вставить',
+      selectAll: 'Выбрать все',
+      save: 'Сохранить изображение',
+      saveImageAs: 'Сохранить изображение как…',
+      copyImage: 'Копировать изображение',
+      copyImageAddress: 'Копировать адрес изображения',
+      saveVideo: 'Сохранить видео',
+      saveVideoAs: 'Сохранить видео как…',
+      copyVideoAddress: 'Копировать адрес видео',
+      saveAudio: 'Сохранить аудио',
+      saveAudioAs: 'Сохранить аудио как…',
+      copyAudioAddress: 'Копировать адрес аудио',
+      copyLink: 'Копировать ссылку',
+      saveLinkAs: 'Сохранить ссылку как…',
+      inspect: 'Просмотреть код',
     }
   },
 };

@@ -11,6 +11,7 @@ const VUEDEVTOOLS_ID = 'nhdogjmejiglipccpnnnanhbledajbpd';
 import log from 'electron-log/main';
 import { closeAllProjectDb } from './project-file-db/project-registry';
 import { initMainTokenStorage } from './main-token-storage';
+import { MainAppControllerInstance } from './main-app-controller';
 
 function getDefaultWindowArgs(): WindowArgs {
   return {
@@ -48,7 +49,7 @@ async function initApp(){
         } 
       }
     ]);
-    
+
     app.on('window-all-closed', async () => {
       await closeAllProjectDb()
       if (process.platform !== 'darwin') {
@@ -58,6 +59,8 @@ async function initApp(){
 
     await app.whenReady().then(async () => {
       log.log("App ready")
+
+      await MainAppControllerInstance.init();
 
       initImsHostApi();
       await initMainTokenStorage();
