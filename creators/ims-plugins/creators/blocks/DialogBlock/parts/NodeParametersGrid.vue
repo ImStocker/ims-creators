@@ -90,7 +90,7 @@ export default defineComponent({
     },
     wrongParameterNames: {
       type: Set as PropType<Set<string>>,
-      required: true,
+      default: () => new Set(),
     },
     nodeDataController: {
       type: Object as PropType<NodeDataController>,

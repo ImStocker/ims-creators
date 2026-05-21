@@ -80,6 +80,7 @@ import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import ActionSelector from '../parts/ActionSelector.vue';
 import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
+import { getActionNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from './NodeParametersGrid.vue';
 
 export default defineComponent({
@@ -129,11 +130,6 @@ export default defineComponent({
       required: true,
     },
   },
-  data() {
-    return {
-      wrongParameterNames: new Set<string>(),
-    };
-  },
   computed: {
     Position() {
       return Position;
@@ -146,6 +142,23 @@ export default defineComponent({
     },
     ScriptBlockPlainActionTypes() {
       return ScriptBlockPlainActionTypes;
+    },
+    actionNodeParams() {
+      return getActionNodeParams(
+        this.nodeDataController.params,
+        this.actionVal,
+        this.dialogController.getActions(),
+        this.nodeDataController.values,
+      );
+    },
+    inputParameters(): DialogVariable[] {
+      return this.actionNodeParams.inputParameters;
+    },
+    outputParameters(): DialogVariable[] {
+      return this.actionNodeParams.outputParameters;
+    },
+    wrongParameterNames(): Set<string> {
+      return this.actionNodeParams.ownParamNames;
     },
     playWaitUser() {
       return (
@@ -193,81 +206,10 @@ export default defineComponent({
         },
       ];
     },
-    inputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [];
-
-      for (const legacy_param of this.nodeDataController.params['in'] ?? []) {
-        res.push(legacy_param);
-        this.wrongParameterNames.add('in-' + legacy_param.name);
-      }
-
-      if (this.actionVal) {
-        const existing_action = this.dialogController
-          .getActions()
-          .find((a) => a.name === this.actionVal);
-        if (existing_action) {
-          for (const param of existing_action.params?.['in'] ?? []) {
-            res.push(param);
-            if (this.wrongParameterNames.has('in-' + param.name)) {
-              this.wrongParameterNames.delete(param.name);
-            }
-          }
-        }
-      }
-
-      if (this.nodeDataController.values) {
-        for (const value of Object.keys(this.nodeDataController.values)) {
-          if (
-            !res.find((v) => v.name === value) &&
-            this.nodeDataController.values[value] &&
-            this.nodeDataController.values[value]['get']
-          ) {
-            res.push({
-              name: value,
-              title: value,
-              default: null,
-              description: null,
-              type: null,
-            });
-            this.wrongParameterNames.add('in-' + value);
-          }
-        }
-      }
-      return res;
-    },
-    outputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [];
-
-      for (const legacy_param of this.nodeDataController.params['out'] ?? []) {
-        res.push(legacy_param);
-        this.wrongParameterNames.add('out-' + legacy_param.name);
-      }
-
-      if (this.actionVal) {
-        const existing_action = this.dialogController
-          .getActions()
-          .find((a) => a.name === this.actionVal);
-        if (existing_action) {
-          for (const param of existing_action.params?.['out'] ?? []) {
-            res.push(param);
-            if (this.wrongParameterNames.has('out-' + param.name)) {
-              this.wrongParameterNames.delete(param.name);
-            }
-          }
-        }
-      }
-
-      return res;
-    },
     action() {
       return this.dialogController
         .getActions()
         .find((el) => el.name === this.actionVal);
-    },
-  },
-  watch: {
-    actionVal() {
-      this.wrongParameterNames = new Set();
     },
   },
 

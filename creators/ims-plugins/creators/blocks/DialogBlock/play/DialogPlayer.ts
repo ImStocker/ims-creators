@@ -13,6 +13,12 @@ import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { ScriptPlayNode } from './ScriptPlayNode';
 import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
+import {
+  getActionNodeParams,
+  getCallScriptNodeParams,
+} from '../logic/nodeParams';
+import { loadCallScriptController } from '../logic/callScriptLoader';
+import { castAssetPropValueToAsset } from '~ims-app-base/logic/types/Props';
 import DialogManager, {
   type DialogHandler,
 } from '~ims-app-base/logic/managers/DialogManager';
@@ -378,9 +384,35 @@ export class DialogPlayer {
       if (
         current_node.type === 'trigger' &&
         (!playing_state.debug ||
-          (current_node.params && current_node.params.out.length > 0))
+          getActionNodeParams(
+            current_node.params ?? { in: [], out: [] },
+            current_node.subject ?? null,
+            this.dialogController.getActions(),
+            current_node.values,
+          ).outputParameters.length > 0)
       ) {
         need_choose = true;
+      }
+      if (current_node.type === 'callScript') {
+        const asset = current_node.subject
+          ? castAssetPropValueToAsset(current_node.subject)
+          : null;
+
+        let hasParams = false;
+        if (asset) {
+          const controller = await loadCallScriptController(
+            this.appManager,
+            asset.AssetId,
+          );
+
+          const { outputParameters } = getCallScriptNodeParams(
+            current_node.params ?? { in: [], out: [] },
+            controller,
+            current_node.values,
+          );
+          hasParams = outputParameters.length > 0;
+        }
+        need_choose = !playing_state.debug || hasParams;
       }
       if (need_choose) {
         if (!playing_state.choosePromise) {
