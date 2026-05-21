@@ -181,6 +181,8 @@ export default {
       cloudOnlySectionHeader: "Раздел доступен только в облачных проектах",
       cloudOnlySectionBody: "Пожалуйста, откройте этот раздел в веб-версии проекта"
     },
+    confirmCloseUnsavedTitle: 'Несохраненные изменения',
+    confirmCloseUnsaved: 'У вас есть несохраненные изменения. Вы уверены, что хотите закрыть окно?',
     contextMenu: {
       cut: 'Вырезать',
       copy: 'Копировать',

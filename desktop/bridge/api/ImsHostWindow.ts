@@ -32,6 +32,11 @@ export class ImsHostWindow extends ImsHostBase{
     this._window.close();
   }
 
+  async forceClose(){
+    (this._window as any).__forceClosing = true;
+    this._window.close();
+  }
+
   async openNew(args: WindowArgs){
     await createWindow(args);
   }

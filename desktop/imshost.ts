@@ -13,6 +13,7 @@ declare global {
     imsGetPathForFile: (file: File) => Promise<string>;
     requestNewVersionAvailable: (func: (version: UpdateNewVersion | null) => void) => void;
     subscribeContentChange: (callback: (changes: ProjectContentChangeEventArg) => void) => void;
+    subscribeCloseRequested: (callback: () => void) => void;
     subscribeSyncState: (callback: (state: SyncCurrentState) => void) => void;
     imsToken: IApiTokenStorage
   }
