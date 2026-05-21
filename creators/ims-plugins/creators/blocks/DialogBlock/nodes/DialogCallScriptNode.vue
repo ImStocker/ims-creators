@@ -16,7 +16,7 @@
         <div class="DialogCallScriptNode-content">
           <select-asset-combo-box
             class="VariableTypeSelector-selectAsset"
-            :model-value="externalScriptForSelection"
+            :model-value="callScriptForSelection"
             :where="selectAssetWhere"
             @update:model-value="selectExternalAsset"
           >
@@ -28,11 +28,16 @@
         :dialog-player="dialogPlayer"
         :node-data-controller="nodeDataController"
         :readonly="readonly"
+        :play-wait-user="playWaitUser"
         :output-params="outputParameters"
         :input-params="inputParameters"
         :playing-node-data="playingNodeData"
-        :wrong-parameter-names="wrongParameterNames"
       ></node-parameters-grid>
+      <div v-if="playWaitUser" class="DialogCallScriptNode-play">
+        <button class="is-button" @click="dialogPlayer.playChoose(null)">
+          {{ $t('imsDialogEditor.play.continue') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -40,10 +45,11 @@
 import { defineComponent, type PropType } from 'vue';
 import type { NodeDescriptor } from './NodeDescriptor';
 import type { NodeDataController } from '../editor/NodeDataController';
-import {
+import type {
   DialogBlockController,
-  type DialogVariable,
+  DialogVariable,
 } from '../editor/DialogBlockController';
+
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
@@ -54,16 +60,16 @@ import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import type { AssetPropWhere } from '~ims-app-base/logic/types/PropsWhere';
 import { SCRIPT_ASSET_ID } from '~ims-app-base/logic/constants';
 import type { AssetForSelection } from '~ims-app-base/logic/types/AssetsType';
-import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
-import { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditorVM';
 import { generateDataPinId } from '../editor/DialogEditor';
 import {
   castAssetPropValueToAsset,
   type AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
 
-import UiManager from '~ims-app-base/logic/managers/UiManager';
+import { loadCallScriptController } from '../logic/callScriptLoader';
+import { getCallScriptNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
 
 export default defineComponent({
   name: 'DialogCallScriptNode',
@@ -111,20 +117,38 @@ export default defineComponent({
       calledScript: null as AssetForSelection | null,
       calledScriptController: null as null | DialogBlockController,
       loading: false,
-      wrongParameterNames: new Set<string>(),
     };
   },
   computed: {
-    externalScriptForSelection() {
-      if (!this.externalScript) return null;
+    playWaitUser() {
+      return (
+        this.dialogPlayer.currentPlayingNode?.id === this.id &&
+        this.outputParameters.length > 0
+      );
+    },
+    callScriptNodeParams() {
+      return getCallScriptNodeParams(
+        this.nodeDataController.params,
+        this.calledScriptController as DialogBlockController | null,
+        this.nodeDataController.values,
+      );
+    },
+    inputParameters(): DialogVariable[] {
+      return this.callScriptNodeParams.inputParameters;
+    },
+    outputParameters(): DialogVariable[] {
+      return this.callScriptNodeParams.outputParameters;
+    },
+    callScriptForSelection() {
+      if (!this.callScript) return null;
       return {
-        id: this.externalScript.AssetId,
-        name: this.externalScript.Name,
-        title: this.externalScript.Title,
+        id: this.callScript.AssetId,
+        name: this.callScript.Name,
+        title: this.callScript.Title,
         icon: null,
       };
     },
-    externalScript: {
+    callScript: {
       get(): AssetPropValueAsset | null {
         return this.nodeDataController.subject
           ? castAssetPropValueToAsset(this.nodeDataController.subject)
@@ -136,62 +160,6 @@ export default defineComponent({
     },
     Position() {
       return Position;
-    },
-    inputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [];
-
-      if (this.calledScriptController) {
-        const variables = this.calledScriptController.getVariables();
-        const in_params = variables.filter(
-          (el) => el.kind && ['in', 'in-out'].includes(el.kind),
-        );
-        if (in_params) {
-          for (const param of in_params) {
-            res.push(param);
-            if (this.wrongParameterNames.has('in-' + param.name)) {
-              this.wrongParameterNames.delete(param.name);
-            }
-          }
-        }
-      }
-      if (this.nodeDataController.values) {
-        for (const value of Object.keys(this.nodeDataController.values)) {
-          if (
-            !res.find((v) => v.name === value) &&
-            this.nodeDataController.values[value] &&
-            this.nodeDataController.values[value]['get']
-          ) {
-            res.push({
-              name: value,
-              title: value,
-              default: null,
-              description: null,
-              type: null,
-            });
-            this.wrongParameterNames.add('in-' + value);
-          }
-        }
-      }
-      return res;
-    },
-    outputParameters(): DialogVariable[] {
-      const res: DialogVariable[] = [];
-
-      if (this.calledScriptController) {
-        const variables = this.calledScriptController.getVariables();
-        const out_params = Object.values(variables).filter(
-          (el) => el.kind && ['out', 'in-out'].includes(el.kind),
-        );
-        if (out_params) {
-          for (const param of out_params) {
-            res.push(param);
-            if (this.wrongParameterNames.has('out-' + param.name)) {
-              this.wrongParameterNames.delete(param.name);
-            }
-          }
-        }
-      }
-      return res;
     },
     selectAssetWhere(): AssetPropWhere {
       const res: AssetPropWhere = {
@@ -205,15 +173,14 @@ export default defineComponent({
     },
   },
   watch: {
-    externalScript: {
+    callScript: {
       async handler(val: AssetPropValueAsset | null) {
         if (val) {
           await this.loadExternalScript(val);
         } else {
-          this.externalScript = null;
+          this.callScript = null;
           this.calledScriptController = null;
         }
-        this.wrongParameterNames = new Set();
       },
       immediate: true,
     },
@@ -229,7 +196,7 @@ export default defineComponent({
       this.nodeDataController.setValue(param.name, val);
     },
     selectExternalAsset(val: AssetForSelection | null) {
-      this.externalScript = val
+      this.callScript = val
         ? {
             AssetId: val.id,
             Title: val.title ?? '',
@@ -238,28 +205,12 @@ export default defineComponent({
         : null;
     },
     async loadExternalScript(val: AssetPropValueAsset) {
+      this.loading = true;
       try {
-        this.loading = true;
-        const asset_full = await this.$getAppManager()
-          .get(CreatorAssetManager)
-          .getAssetInstance(val.AssetId);
-        if (!asset_full) return;
-        asset_full.activate();
-        const asset_block_editor = AssetBlockEditorVM.CreateInstance(
+        this.calledScriptController = await loadCallScriptController(
           this.$getAppManager(),
-          asset_full,
+          val.AssetId,
         );
-        const controller = new DialogBlockController(
-          this.$getAppManager(),
-          () =>
-            asset_block_editor
-              .resolveBlocks()
-              .list.find((el) => el.name === 'content') ?? null,
-        );
-        controller.postCreate();
-        controller.mountEditor(asset_block_editor);
-
-        this.calledScriptController = controller;
       } catch (err: any) {
         this.$getAppManager().get(UiManager).showError(err);
       } finally {
@@ -303,5 +254,20 @@ export default defineComponent({
   position: relative;
   --local-text-color: var(--imsde-node-content-text-color);
   --input-text-color: var(--imsde-node-content-text-color);
+}
+.DialogCallScriptNode-play {
+  text-align: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 1px solid var(--imsde-node-playing-color);
+  & > .is-button {
+    --button-border-color: var(--imsde-node-playing-color);
+    &:not(:hover) {
+      --button-text-color: var(--imsde-node-playing-color);
+    }
+    &:hover {
+      --button-bg-color: var(--imsde-node-playing-color);
+    }
+  }
 }
 </style>

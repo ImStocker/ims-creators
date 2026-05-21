@@ -31,6 +31,7 @@
           <variable-list
             class="EnterActionDialog-params input tiny-scrollbars"
             :collection-controller="inputParametersController"
+            :show-search="false"
           ></variable-list>
         </div>
         <button class="is-button is-button-action" @click="addParameter('in')">
@@ -45,6 +46,7 @@
           <variable-list
             class="EnterActionDialog-params output tiny-scrollbars"
             :collection-controller="outputParametersController"
+            :show-search="false"
           ></variable-list>
         </div>
         <button class="is-button is-button-action" @click="addParameter('out')">

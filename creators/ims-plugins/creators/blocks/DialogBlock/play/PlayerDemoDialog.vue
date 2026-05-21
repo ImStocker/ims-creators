@@ -17,6 +17,12 @@
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-trigger-demo-play>
+        <dialog-call-script-demo-play
+          v-else-if="currentPlayingNode.type === 'callScript'"
+          :dialog-player="dialogPlayer"
+          :playing-node-data="currentPlayingNode"
+          :dialog-controller="dialogController"
+        ></dialog-call-script-demo-play>
         <div v-else class="PlayerDemoDialog-customNode">
           <div class="PlayerDemoDialog-customNode-content">
             {{
@@ -45,6 +51,7 @@ import DialogSpeechDemoPlay from './DialogSpeechDemoPlay.vue';
 import DialogTriggerDemoPlay from './DialogTriggerDemoPlay.vue';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import DialogCallScriptDemoPlay from './DialogCallScriptDemoPlay.vue';
 
 type DialogProps = {
   dialogPlayer: DialogPlayer;
@@ -61,6 +68,7 @@ export default defineComponent({
     DialogPlayToolbar,
     DialogSpeechDemoPlay,
     DialogTriggerDemoPlay,
+    DialogCallScriptDemoPlay,
   },
   provide() {
     return {

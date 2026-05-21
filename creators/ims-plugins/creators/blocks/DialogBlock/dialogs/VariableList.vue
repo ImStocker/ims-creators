@@ -8,7 +8,7 @@
         class="VariableList-filters-kind"
       ></variable-kind-selector>
       <form-search
-        v-if="filteredVariables && filteredVariables.length"
+        v-if="filteredVariables && filteredVariables.length && showSearch"
         class="VariableList-filters-query"
         :value="filters.query"
         @change="filters.query = $event"
@@ -94,6 +94,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showSearch: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     return {
@@ -156,15 +160,17 @@ export default defineComponent({
 }
 .VariableList-filters {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
 
   .VariableList-filters-kind {
+    width: auto;
     --ValueSwitcher-border-radius: 8px;
   }
   .VariableList-filters-query {
-    margin-left: auto;
     max-width: 150px;
   }
 }

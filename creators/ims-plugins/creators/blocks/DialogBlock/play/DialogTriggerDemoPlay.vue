@@ -74,6 +74,7 @@ import DataFieldInput from '../parts/DataFieldInput.vue';
 import DataFieldDisplay from '../parts/DataFieldDisplay.vue';
 import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
 import { AssetPropType } from '~ims-app-base/logic/types/Props';
+import { getActionNodeParams } from '../logic/nodeParams';
 
 export default defineComponent({
   name: 'DialogTriggerDemoPlay',
@@ -101,12 +102,19 @@ export default defineComponent({
     triggerVal() {
       return this.playingNodeData.subject ?? null;
     },
-
+    actionNodeParams() {
+      return getActionNodeParams(
+        this.playingNodeData?.params ?? { in: [], out: [] },
+        this.triggerVal,
+        this.dialogController.getActions(),
+        this.playingNodeData.values,
+      );
+    },
     inputParameters(): DialogVariable[] {
-      return this.playingNodeData?.params?.in ?? [];
+      return this.actionNodeParams.inputParameters;
     },
     outputParameters(): DialogVariable[] {
-      return this.playingNodeData?.params?.out ?? [];
+      return this.actionNodeParams.outputParameters;
     },
     parametersGrid(): {
       variable: DialogVariable;
