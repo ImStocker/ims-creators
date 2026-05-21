@@ -98,6 +98,15 @@ export async function createWindow(args: WindowArgs) {
     unregisterImsHostWindow(win);
   });
 
+  win.on('close', (e) => {
+    if ((win as any).__forceClosing) {
+      (win as any).__forceClosing = false;
+      return;
+    }
+    e.preventDefault();
+    win.webContents.send('close-requested');
+  });
+
   await initWindow(win);
   win.webContents.on('did-stop-loading', () => {
     initWindow(win);

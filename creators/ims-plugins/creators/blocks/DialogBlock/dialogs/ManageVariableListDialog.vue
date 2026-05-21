@@ -144,6 +144,10 @@ export default defineComponent({
       return this.dialogController.resolvedBlock;
     },
     tabs() {
+      if (!this.resolvedBlock) {
+        return [];
+      }
+
       const default_option = {
         id: this.resolvedBlock.assetId,
         title: this.$t('imsDialogEditor.var.currentScript'),
@@ -167,6 +171,9 @@ export default defineComponent({
   },
   watch: {
     async currentAssetId() {
+      if (!this.resolvedBlock) {
+        return;
+      }
       if (this.currentAssetId) {
         this.externalAssetBlockEditor?.saveChanges();
         this.$getAppManager()
@@ -181,8 +188,12 @@ export default defineComponent({
   },
   methods: {
     async createVariableController(asset_id: string) {
+      const resolvedBlock = this.resolvedBlock;
+      if (!resolvedBlock) {
+        return;
+      }
       this.controllerLoading = true;
-      if (asset_id === this.resolvedBlock.assetId) {
+      if (asset_id === resolvedBlock.assetId) {
         this.variableController = getVariableController(this.dialogController);
       } else {
         const asset_full = await this.$getAppManager()
@@ -201,8 +212,8 @@ export default defineComponent({
               .resolveBlocks()
               .list.find(
                 (b) =>
-                  (b.name ? b.name === this.resolvedBlock.name : false) ||
-                  b.id === this.resolvedBlock.id,
+                  (b.name ? b.name === resolvedBlock.name : false) ||
+                  b.id === resolvedBlock.id,
               ) ?? null,
         );
         controller.postCreate();
@@ -215,7 +226,7 @@ export default defineComponent({
     },
     async loadDialog() {
       try {
-        assert(this.resolvedBlock.assetId);
+        assert(this.resolvedBlock?.assetId);
         this.currentAssetId = this.resolvedBlock.assetId;
         const asset_short = await this.$getAppManager()
           .get(CreatorAssetManager)
@@ -238,6 +249,9 @@ export default defineComponent({
       }
     },
     async save() {
+      if (!this.resolvedBlock) {
+        return;
+      }
       this.saveDone = false;
       await this.externalAssetBlockEditor?.saveChanges();
       this.$getAppManager()

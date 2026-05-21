@@ -190,6 +190,10 @@ export class DialogBlockController extends BlockEditorController {
     const changer = this.changer;
     if (!changer) return;
 
+    if (!this.resolvedBlock) {
+      return;
+    }
+
     const pasted_data = await clipboardReadPlainText();
 
     try {
@@ -286,6 +290,7 @@ export class DialogBlockController extends BlockEditorController {
 
   private _onBlockUpdated() {
     if (this._expectPropsChange) return;
+    if (!this.resolvedBlock) return;
 
     this.state = extractDialogBlockData(this.resolvedBlock.computed);
 
@@ -530,7 +535,7 @@ export class DialogBlockController extends BlockEditorController {
         const node_data = ensure_node_data();
         if (!node_data.options) return;
         if (ind >= node_data.options.length) return;
-        node_data.options[ind].values[prop] = val;
+        node_data.options[ind].values[prop] = val ?? null;
         this.savePropsDelayed();
       },
       deleteOptionValue: (ind, prop) => {
@@ -883,6 +888,9 @@ export class DialogBlockController extends BlockEditorController {
     if (!changer) {
       return;
     }
+    if (!this.resolvedBlock) {
+      return;
+    }
     const exported = exportDialogBlockData(this.state);
 
     const changes = diffAssetPropObjects(exported, this.resolvedBlock.computed);
@@ -905,6 +913,9 @@ export class DialogBlockController extends BlockEditorController {
   }
 
   getOwnVariables() {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const props_state = extractDialogBlockData(this.resolvedBlock.props);
     const computed_state = this.state;
     const res: DialogVariable[] = [];
@@ -922,6 +933,9 @@ export class DialogBlockController extends BlockEditorController {
   }
 
   getOwnActions() {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const props_state = extractDialogBlockData(this.resolvedBlock.props);
     const computed_state = this.state;
     const res: DialogAction[] = [];
@@ -1311,6 +1325,9 @@ export class DialogBlockController extends BlockEditorController {
   }
 
   override getContentItems(): BlockContentItem<DialogBlockContentUserData>[] {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const root_anchor: BlockContentItem<DialogBlockContentUserData> = {
       blockId: this.resolvedBlock.id,
       itemId: 'root',
@@ -1406,6 +1423,9 @@ export class DialogBlockController extends BlockEditorController {
   }
 
   revealBlockContentItem(itemId: string) {
+    if (!this.resolvedBlock) {
+      return;
+    }
     if (!this.assetBlockEditor) {
       return;
     }

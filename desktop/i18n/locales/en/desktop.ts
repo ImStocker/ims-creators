@@ -181,6 +181,8 @@ export default {
       cloudOnlySectionHeader: "This section is only available in cloud projects",
       cloudOnlySectionBody: "Please open this section in web version of project."
     },
+    confirmCloseUnsavedTitle: 'Unsaved changes',
+    confirmCloseUnsaved: 'You have unsaved changes. Are you sure you want to close the window?',
     contextMenu: {
       cut: 'Cut',
       copy: 'Copy',
