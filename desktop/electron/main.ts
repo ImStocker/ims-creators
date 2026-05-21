@@ -5,6 +5,7 @@ import { initImsHostApi } from './imshost-api';
 import { installExtension } from 'electron-devtools-installer';
 import { pathToFileURL } from "node:url"
 import autoUpdateManager from './auto-update-manager';
+import contextMenu from 'electron-context-menu';
 
 const VUEDEVTOOLS_ID = 'nhdogjmejiglipccpnnnanhbledajbpd';
 
@@ -49,6 +50,10 @@ async function initApp(){
       }
     ]);
     
+    contextMenu({
+      showSearchWithGoogle: false
+    });
+
     app.on('window-all-closed', async () => {
       await closeAllProjectDb()
       if (process.platform !== 'darwin') {
