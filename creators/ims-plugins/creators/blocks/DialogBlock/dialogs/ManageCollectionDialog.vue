@@ -149,9 +149,12 @@ export default defineComponent({
           title:
             p_asset.id === SCRIPT_ASSET_ID
               ? this.$t('imsDialogEditor.var.baseScript')
-              : convertTranslatedTitle(p_asset.title ?? '', (key: any) =>
-                  this.$t(key),
-                ),
+              : this.$t('imsDialogEditor.var.ofScript', {
+                  script: convertTranslatedTitle(
+                    p_asset.title ?? '',
+                    (key: any) => this.$t(key),
+                  ),
+                }),
         });
       }
 
@@ -338,7 +341,7 @@ export default defineComponent({
   align-items: center;
 }
 .ManageCollectionDialog-assets {
-  min-width: 180px;
+  min-width: 210px;
   flex-shrink: 0;
 }
 .ManageCollectionDialog-loading {
