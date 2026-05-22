@@ -192,8 +192,7 @@ export default defineComponent({
         if(project_info && (project_info.license?.features.desktopSync || has_license)){
           const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
           if(res){
-            await this.$getAppManager().get(DesktopSyncManager).resyncAll();
-            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
+            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudConnectSuccess'));
           }
         }
         else {
