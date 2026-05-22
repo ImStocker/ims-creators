@@ -199,6 +199,7 @@ import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import ManageVariablesDropdown from '../parts/ManageVariablesDropdown.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import ManageActionsDropdown from '../parts/ManageActionsDropdown.vue';
+import { SCRIPT_ASSET_ID } from '~ims-app-base/logic/constants';
 
 type CreateNodeContext = {
   clickedAt: { x: number; y: number } | null;
@@ -800,37 +801,59 @@ export default defineComponent({
       };
 
       if (event_dt_asset) {
-        const const_asset_descr = this.nodeDescriptors.find(
-          (d) => d.name === 'constAsset',
-        );
-        if (const_asset_descr) {
-          await this.$getAppManager()
-            .get(UiManager)
-            .doTask(async () => {
-              const event_dt_asset_parsed = JSON.parse(event_dt_asset) as {
-                id: string;
-              };
-              if (!event_dt_asset_parsed.id) return;
-              const drop_asset_short = await this.$getAppManager()
-                .get(CreatorAssetManager)
-                .getAssetShortViaCache(event_dt_asset_parsed.id);
-              if (!drop_asset_short) {
-                throw new Error(this.$t('asset.assetNotFound'));
-              }
+        await this.$getAppManager()
+          .get(UiManager)
+          .doTask(async () => {
+            const event_dt_asset_parsed = JSON.parse(event_dt_asset) as {
+              id: string;
+            };
+            if (!event_dt_asset_parsed.id) return;
+            const drop_asset_short = await this.$getAppManager()
+              .get(CreatorAssetManager)
+              .getAssetShortViaCache(event_dt_asset_parsed.id);
+            if (!drop_asset_short) {
+              throw new Error(this.$t('asset.assetNotFound'));
+            }
+
+            const script_call_descr = this.nodeDescriptors.find(
+              (d) => d.name === 'callScript',
+            );
+            if (
+              drop_asset_short.typeIds.includes(SCRIPT_ASSET_ID) &&
+              script_call_descr
+            ) {
               this.createNodeContext = create_context;
-              const created = await this.createNode(const_asset_descr);
+              const created = await this.createNode(script_call_descr);
               if (!created) return;
 
               const node_instance = this.$refs['node-' + created.id] as any;
               if (node_instance) {
-                node_instance.value = {
+                node_instance.nodeDataController.setSubject({
                   AssetId: drop_asset_short.id,
                   Title: drop_asset_short.title,
                   Name: drop_asset_short.name,
-                } as AssetPropValueAsset;
+                } as AssetPropValueAsset);
               }
-            });
-        }
+            } else {
+              const const_asset_descr = this.nodeDescriptors.find(
+                (d) => d.name === 'constAsset',
+              );
+              if (const_asset_descr) {
+                this.createNodeContext = create_context;
+                const created = await this.createNode(const_asset_descr);
+                if (!created) return;
+
+                const node_instance = this.$refs['node-' + created.id] as any;
+                if (node_instance) {
+                  node_instance.value = {
+                    AssetId: drop_asset_short.id,
+                    Title: drop_asset_short.title,
+                    Name: drop_asset_short.name,
+                  } as AssetPropValueAsset;
+                }
+              }
+            }
+          });
       }
       if (event_dt_variable) {
         const get_var_descr = this.nodeDescriptors.find(
