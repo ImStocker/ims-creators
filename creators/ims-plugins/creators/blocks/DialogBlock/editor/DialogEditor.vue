@@ -9,7 +9,7 @@
       class="DialogEditor-wrapper"
       @pointerdown.capture="onMouseDown"
       @pointerup.capture="onMouseUp"
-      @contextmenu.prevent
+      @contextmenu.capture="onContextMenu"
       @dragover="onDragOver"
       @drop="onDrop"
     >
@@ -575,6 +575,17 @@ export default defineComponent({
       this.createNodeContext = null;
       this.isFocused = true;
       this.mouseDownTime = Date.now();
+    },
+    onContextMenu(ev: PointerEvent) {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      if (!target.closest('.vue-flow__pane')) {
+        return; // Clicked outside pane
+      }
+      if (target.closest('.vue-flow__node')) {
+        return; // Clicked inside the node
+      }
+      ev.preventDefault();
     },
     onMouseUp(ev: PointerEvent) {
       if (this.readonly) {
