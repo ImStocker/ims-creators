@@ -74,6 +74,13 @@ export default class DesktopSyncManager extends AppSubManagerBase {
         }
     }
 
+    async resyncAll(){
+        const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
+        if(local_path){
+            await window.imshost.sync.resyncAll(local_path);
+        }
+    }
+
     async changeAutoSynchronization(new_val: number){
         const local_path = this.appManager.get(ProjectManager).getProjectInfo()?.localPath; 
         if(local_path){

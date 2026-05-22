@@ -21,6 +21,7 @@ export default {
         syncNowEndWithErrors: 'Synchronization was finished with errors',
         resume: 'Resume',
         resumeEnd: 'Synchronization was resumed',
+        resyncAll: 'Resynchronize all',
         syncWithCloud: 'Synchronize with cloud',
         syncWithCloudEnd: 'Synchronization with cloud is completed',
         openInCloud: 'Open in cloud',
@@ -179,6 +180,27 @@ export default {
     cloudOnlySection: {
       cloudOnlySectionHeader: "This section is only available in cloud projects",
       cloudOnlySectionBody: "Please open this section in web version of project."
+    },
+    confirmCloseUnsavedTitle: 'Unsaved changes',
+    confirmCloseUnsaved: 'You have unsaved changes. Are you sure you want to close the window?',
+    contextMenu: {
+      cut: 'Cut',
+      copy: 'Copy',
+      paste: 'Paste',
+      selectAll: 'Select all',
+      save: 'Save Image',
+      saveImageAs: 'Save Image As…',
+      copyImage: 'Copy Image',
+      copyImageAddress: 'Copy Image Address',
+      saveVideo: 'Save Video',
+      saveVideoAs: 'Save Video As…',
+      copyVideoAddress: 'Copy Video Address',
+      saveAudio: 'Save Audio',
+      saveAudioAs: 'Save Audio As…',
+      copyAudioAddress: 'Copy Audio Address',
+      copyLink: 'Copy Link',
+      saveLinkAs: 'Save Link As…',
+      inspect: 'Inspect Element',
     }
   },
 };

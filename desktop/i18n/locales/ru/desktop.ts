@@ -21,6 +21,7 @@ export default {
         syncNowEndWithErrors: 'Синхронизация завершена с ошибками',
         resume: 'Возобновить',
         resumeEnd: 'Синхронизация возобновлена',
+        resyncAll: 'Пересинхронизировать полностью',
         syncWithCloud: 'Синхронизировать с облаком',
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
         openInCloud: 'Открыть в облаке',
@@ -179,6 +180,27 @@ export default {
     cloudOnlySection: {
       cloudOnlySectionHeader: "Раздел доступен только в облачных проектах",
       cloudOnlySectionBody: "Пожалуйста, откройте этот раздел в веб-версии проекта"
+    },
+    confirmCloseUnsavedTitle: 'Несохраненные изменения',
+    confirmCloseUnsaved: 'У вас есть несохраненные изменения. Вы уверены, что хотите закрыть окно?',
+    contextMenu: {
+      cut: 'Вырезать',
+      copy: 'Копировать',
+      paste: 'Вставить',
+      selectAll: 'Выбрать все',
+      save: 'Сохранить изображение',
+      saveImageAs: 'Сохранить изображение как…',
+      copyImage: 'Копировать изображение',
+      copyImageAddress: 'Копировать адрес изображения',
+      saveVideo: 'Сохранить видео',
+      saveVideoAs: 'Сохранить видео как…',
+      copyVideoAddress: 'Копировать адрес видео',
+      saveAudio: 'Сохранить аудио',
+      saveAudioAs: 'Сохранить аудио как…',
+      copyAudioAddress: 'Копировать адрес аудио',
+      copyLink: 'Копировать ссылку',
+      saveLinkAs: 'Сохранить ссылку как…',
+      inspect: 'Просмотреть код',
     }
   },
 };

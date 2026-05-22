@@ -7,7 +7,7 @@ import type { ProjectFileDbWorkspace, ProjectFileDbAsset, ProjectFileDb } from '
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import { WORKSPACE_EXT } from '../services/FileSystemService';
 
-export const forbiddenFilenameCharsRegexp = /[<>:"/\\|?*\x00-\x1f]/;
+export const forbiddenFilenameCharsRegexp = /[<>:"/\\|?*\x00-\x1f]/g;
 export const forbiddenFilenameValuesRegexp = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
 export const trailingDotsOrSpaces = /[\s.]$/;
 export const maxFilenameLen = 128;
@@ -60,11 +60,11 @@ export function getAssetLocalPathById(asset_id: string, db: ProjectFileDb): stri
 
 export function getWorkspaceLocalPathFolder(workspace: { id: string, localName?: string, parentId: string | null} | null, db: ProjectFileDb): string {
   if (!workspace || workspace.id === db.RootGddFolder.id){
-    return db.localPath;
+    return db.localPath.replace(/(\.imw\.json)+$/gm, '');
   }
   
   const parent_local_path = getWorkspaceLocalPathFolderById(workspace.parentId, db)
-  return path.join(parent_local_path, workspace?.localName ?? '').replace(/\.imw\.json$/, '');
+  return path.join(parent_local_path, workspace?.localName ?? '').replace(/(\.imw\.json)+$/gm, '');
 }
 
 export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db: ProjectFileDb): string {

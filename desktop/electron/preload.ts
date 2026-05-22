@@ -127,6 +127,13 @@ contextBridge.exposeInMainWorld('subscribeContentChange', (callback: (changes: P
   }
 )
 
+contextBridge.exposeInMainWorld('subscribeCloseRequested', (callback: () => void) => {
+    ipcRenderer.on('close-requested', () => {
+      callback();
+    });
+  }
+)
+
 contextBridge.exposeInMainWorld('subscribeSyncState', (callback: (state: SyncCurrentState) => void) => {
     ipcRenderer.on('syncState', (event, state: SyncCurrentState) => {
       callback(state)

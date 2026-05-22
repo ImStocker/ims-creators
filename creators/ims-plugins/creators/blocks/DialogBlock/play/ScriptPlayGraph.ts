@@ -11,6 +11,7 @@ import {
   type ScriptPlayContext,
 } from './ScriptPlayContext';
 import type { ScriptPlayNode, ScriptPlayNodeProps } from './ScriptPlayNode';
+import type { DialogVariable } from '../editor/DialogBlockController';
 
 export class ScriptPlayGraph {
   constructor(public scriptPlain: ScriptBlockPlain) {}
@@ -56,15 +57,71 @@ export class ScriptPlayGraph {
   ): ScriptPlayNode | null {
     const node = this.scriptPlain.nodes[node_id];
     if (!node) return null;
-    return {
+
+    let default_option_values;
+    if (this.scriptPlain.__settings[node.type]?.option) {
+      default_option_values = Object.entries(
+        this.scriptPlain.__settings[node.type].option,
+      ).reduce(
+        (acc, [key, value]) => {
+          acc[key] = (value as DialogVariable).default;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+    }
+
+    let main_values_computed = node.values;
+    if (
+      node.type === 'speech' &&
+      this.scriptPlain.__settings[node.type]?.main
+    ) {
+      const default_main_values = Object.entries(
+        this.scriptPlain.__settings[node.type].main,
+      ).reduce(
+        (acc, [key, value]) => {
+          acc[key] = (value as DialogVariable).default;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+      main_values_computed = {
+        ...default_main_values,
+        ...main_values_computed,
+      };
+    } else if (
+      (node.type === 'function' || node.type === 'trigger') &&
+      this.scriptPlain.actions.own &&
+      node.subject
+    ) {
+      const action = this.scriptPlain.actions.own[node.subject];
+      if (action) {
+        const default_main_values = action.params?.in.reduce(
+          (acc, item) => {
+            acc[item.name] = item.default;
+            return acc;
+          },
+          {} as Record<string, any>,
+        );
+        main_values_computed = {
+          ...default_main_values,
+          ...main_values_computed,
+        };
+      }
+    }
+    const res = {
       id: node_id,
       type: node.type,
       next: node.next,
       options: node.options
         ? node.options.map((opt) => {
+            const values = {
+              ...default_option_values,
+              ...opt.values,
+            };
             return {
-              values: opt.values
-                ? this.evaluateInputParams(context, opt.values, visited_pins)
+              values: values
+                ? this.evaluateInputParams(context, values, visited_pins)
                 : undefined,
               next: opt.next,
             };
@@ -72,10 +129,12 @@ export class ScriptPlayGraph {
         : undefined,
       params: node.params,
       subject: node.subject,
-      values: node.values
-        ? this.evaluateInputParams(context, node.values, visited_pins)
+      values: main_values_computed
+        ? this.evaluateInputParams(context, main_values_computed, visited_pins)
         : undefined,
     };
+
+    return res;
   }
 
   evaluateInputParams(

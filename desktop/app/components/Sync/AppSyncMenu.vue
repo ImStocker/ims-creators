@@ -80,6 +80,7 @@ export default defineComponent({
       if(!this.isCloudProject){
         list.push({
           title: this.$t('desktop.fsSync.menu.syncWithCloud'),
+          icon: 'ri-refresh-line',
           action: async () => {
               await this.syncWithCloud();
             }
@@ -88,6 +89,7 @@ export default defineComponent({
       else if (!this.userInfo){
         list.push({
           title: this.$t('desktop.fsSync.menu.resume'),
+          icon: 'ri-refresh-line',
           action: async () => {
               const logged = await this.$getAppManager()
                 .get(AuthManager)
@@ -103,6 +105,7 @@ export default defineComponent({
         if(this.projectInfo?.id && !this.inProcess && !this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.syncNow'),
+            icon: 'ri-refresh-line',
             action: async () => {
                 if(!this.userInfo){
                   await this.$getAppManager()
@@ -123,19 +126,17 @@ export default defineComponent({
         if(this.projectInfo?.id && !this.inProcess && this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.resume'),
+            icon: 'ri-clipboard-fill',
             action: async () => {
               await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
               this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.resumeEnd'));
             }
           });
         }
-        list.push({
-          title: this.$t('desktop.fsSync.menu.errors'),
-          action: async () => await this.openSyncManageDialog(),
-        });
         if(this.projectInfo?.id && !this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.pauseSyncing'),
+            icon: 'ri-pause-circle-line',
             action: async () => {
               await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
               this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
@@ -143,7 +144,27 @@ export default defineComponent({
           });
         }
         list.push({
+          type: 'separator',
+        });
+        list.push({
+          title: this.$t('desktop.fsSync.menu.errors'),
+          icon: 'ri-error-warning-line',
+          action: async () => await this.openSyncManageDialog(),
+        });
+        list.push({
+          title: this.$t('desktop.fsSync.menu.resyncAll'),
+          icon: 'ri-loop-right-line',
+          action: async () => {
+            await this.$getAppManager().get(DesktopSyncManager).resyncAll()
+            this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
+          }
+        });
+        list.push({
+          type: 'separator',
+        });
+        list.push({
           title: this.$t('desktop.fsSync.menu.openInCloud'),
+          icon: 'ri-cloud-line',
           action: async () => {
             window.open(this.$getAppManager().$env.CREATORS_HOST + 'app/p/' +
                     encodeURIComponent(this.projectInfo?.id ?? '') + '/' + this.projectInfo?.title)
@@ -171,6 +192,7 @@ export default defineComponent({
         if(project_info && (project_info.license?.features.desktopSync || has_license)){
           const res = await this.$getAppManager().get(DialogManager).show(SyncWithCloudDialog, {});
           if(res){
+            await this.$getAppManager().get(DesktopSyncManager).resyncAll();
             this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncWithCloudEnd'));
           }
         }

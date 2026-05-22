@@ -164,6 +164,18 @@ export class SyncService {
         }
     }
 
+    async resyncAll(){
+        await this.db.dataSource.createQueryRunner().query(`
+            UPDATE workspaces
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
+        `, []);
+        await this.db.dataSource.createQueryRunner().query(`
+            UPDATE assets
+            SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
+        `, []);
+        await this.syncProject();
+    }
+
     async resyncAssetsAndWorkspaces(
         asset_ids: string[],
         workspace_ids: string[],
