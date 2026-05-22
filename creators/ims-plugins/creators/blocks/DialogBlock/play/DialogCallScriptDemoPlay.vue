@@ -1,29 +1,32 @@
 <template>
-  <div class="DialogTriggerDemoPlay">
-    <div class="DialogTriggerDemoPlay-content">
-      <div class="DialogTriggerDemoPlay-trigger">
-        <div class="DialogTriggerDemoPlay-trigger-header">
-          <i class="ri-flashlight-line"></i>
+  <div class="DialogCallScriptDemoPlay">
+    <div class="DialogCallScriptDemoPlay-content">
+      <div class="DialogCallScriptDemoPlay-asset">
+        <div class="DialogCallScriptDemoPlay-asset-header">
+          <i class="ri-file-paper-2-line"></i>
         </div>
-        <div class="DialogTriggerDemoPlay-trigger-value">
-          {{ triggerVal }}
+        <div v-if="callScript" class="DialogCallScriptDemoPlay-asset-value">
+          {{ callScript.Title }}
         </div>
       </div>
     </div>
+    <div v-if="loading" class="DialogCallScriptDemoPlay-loading">
+      <div class="loaderSpinner"></div>
+    </div>
     <div
-      v-if="inputParameters.length > 0 || outputParameters.length > 0"
-      class="DialogTriggerDemoPlay-parameters"
+      v-else-if="inputParameters.length > 0 || outputParameters.length > 0"
+      class="DialogCallScriptDemoPlay-parameters"
     >
       <div
         v-for="param_gr of parametersGrid"
         :key="(param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name"
-        class="DialogTriggerDemoPlay-parameters-one"
+        class="DialogCallScriptDemoPlay-parameters-one"
         :class="param_gr.isOutput ? 'type-output' : 'type-input'"
       >
-        <div class="DialogTriggerDemoPlay-parameters-one-caption">
+        <div class="DialogCallScriptDemoPlay-parameters-one-caption">
           <caption-string :value="param_gr.variable.title"></caption-string>
         </div>
-        <div class="DialogTriggerDemoPlay-parameters-one-field">
+        <div class="DialogCallScriptDemoPlay-parameters-one-field">
           <data-field-input
             v-if="param_gr.isOutput"
             :data-type="param_gr.variable.type ?? StringAssetPropType"
@@ -51,7 +54,7 @@
         </div>
       </div>
     </div>
-    <div class="DialogTriggerDemoPlay-options">
+    <div class="DialogCallScriptDemoPlay-options">
       <button
         class="PlayerDemoDialog-option-button"
         @click="dialogPlayer.playChoose(null)"
@@ -73,11 +76,16 @@ import type {
 import DataFieldInput from '../parts/DataFieldInput.vue';
 import DataFieldDisplay from '../parts/DataFieldDisplay.vue';
 import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
-import { AssetPropType } from '~ims-app-base/logic/types/Props';
-import { getActionNodeParams } from '../logic/nodeParams';
+import {
+  AssetPropType,
+  castAssetPropValueToAsset,
+} from '~ims-app-base/logic/types/Props';
+import { getCallScriptNodeParams } from '../logic/nodeParams';
+import { loadCallScriptController } from '../logic/callScriptLoader';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
 
 export default defineComponent({
-  name: 'DialogTriggerDemoPlay',
+  name: 'DialogCallScriptDemoPlay',
   components: { DataFieldDisplay, DataFieldInput, CaptionString },
   props: {
     playingNodeData: {
@@ -93,28 +101,36 @@ export default defineComponent({
       required: true,
     },
   },
+  data() {
+    return {
+      callScriptController: null as null | DialogBlockController,
+      loading: false,
+      error: null as any,
+    };
+  },
   computed: {
     StringAssetPropType() {
       return {
         Type: AssetPropType.STRING,
       };
     },
-    triggerVal() {
-      return this.playingNodeData.subject ?? null;
+    callScript() {
+      return this.playingNodeData.subject
+        ? castAssetPropValueToAsset(this.playingNodeData.subject)
+        : null;
     },
-    actionNodeParams() {
-      return getActionNodeParams(
-        this.playingNodeData?.params ?? { in: [], out: [] },
-        this.triggerVal,
-        this.dialogController.getActions(),
+    callScriptNodeParams() {
+      return getCallScriptNodeParams(
+        this.playingNodeData.params ?? { in: [], out: [] },
+        this.callScriptController as DialogBlockController | null,
         this.playingNodeData.values,
       );
     },
     inputParameters(): DialogVariable[] {
-      return this.actionNodeParams.inputParameters;
+      return this.callScriptNodeParams.inputParameters;
     },
     outputParameters(): DialogVariable[] {
-      return this.actionNodeParams.outputParameters;
+      return this.callScriptNodeParams.outputParameters;
     },
     parametersGrid(): {
       variable: DialogVariable;
@@ -149,34 +165,63 @@ export default defineComponent({
       return res;
     },
   },
-  methods: {},
+  watch: {
+    async callScript() {
+      await this.loadCallScript();
+    },
+  },
+  async mounted() {
+    await this.loadCallScript();
+  },
+  methods: {
+    async loadCallScript() {
+      if (!this.callScript) return;
+      this.loading = true;
+      try {
+        this.callScriptController = await loadCallScriptController(
+          this.$getAppManager(),
+          this.callScript.AssetId,
+        );
+      } catch (err: any) {
+        this.$getAppManager().get(UiManager).showError(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
 });
 </script>
 
 <style lang="scss" scoped>
-.DialogTriggerDemoPlay-prop-line-caption,
-.DialogTriggerDemoPlay-options-one-param-caption {
+.DialogCallScriptDemoPlay-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.DialogCallScriptDemoPlay-prop-line-caption,
+.DialogCallScriptDemoPlay-options-one-param-caption {
   font-weight: bold;
   font-size: 12px;
   color: var(--local-sub-text-color);
 }
-.DialogTriggerDemoPlay-content {
+.DialogCallScriptDemoPlay-content {
   margin-bottom: 20px;
 }
-.DialogTriggerDemoPlay-options-one {
+.DialogCallScriptDemoPlay-options-one {
   &.state-unavailable {
     opacity: 0.5;
   }
 }
-.DialogTriggerDemoPlay-trigger {
+.DialogCallScriptDemoPlay-asset {
   text-align: center;
 }
-.DialogTriggerDemoPlay-trigger-header {
+.DialogCallScriptDemoPlay-asset-header {
   font-size: 24px;
-  color: #ea9595;
+  color: #afc8ff;
 }
 
-.DialogTriggerDemoPlay-parameters {
+.DialogCallScriptDemoPlay-parameters {
   display: grid;
   gap: 10px;
   align-items: center;
@@ -184,7 +229,7 @@ export default defineComponent({
   margin-bottom: 20px;
 }
 
-.DialogTriggerDemoPlay-parameters-one {
+.DialogCallScriptDemoPlay-parameters-one {
   margin-bottom: 5px;
   &.type-input {
     grid-column: 1;
@@ -194,7 +239,7 @@ export default defineComponent({
     justify-self: flex-end;
   }
 }
-.DialogTriggerDemoPlay-parameters-one-caption {
+.DialogCallScriptDemoPlay-parameters-one-caption {
   font-weight: bold;
   font-size: 12px;
   color: var(--local-sub-text-color);

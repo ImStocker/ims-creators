@@ -30,13 +30,13 @@ import {
 import type { NodeData, NodeDataController } from './NodeDataController';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import ManageVariableListDialog from '../dialogs/ManageVariableListDialog.vue';
 import type {
+  ScriptBlockPlainAction,
+  ScriptBlockPlainActionTypes,
   ScriptBlockPlainNode,
   ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import type { IDialogVariableController } from './DialogVariableController';
 import {
   clipboardCopyPlainText,
   clipboardReadPlainText,
@@ -44,29 +44,52 @@ import {
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import { v4 as uuidv4 } from 'uuid';
 import { BlockEditorController } from '~ims-app-base/logic/types/BlockEditorController';
-import { watch } from 'vue';
+import { defineAsyncComponent, watch, markRaw } from 'vue';
 import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefinition';
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptiors';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
+import type { IDialogCollectionController } from './DialogVariableController';
+import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
+import { nodeVariableAdd } from '../logic/nodeVariables';
 
 export type DialogVariable = ScriptBlockPlainVariable;
+export type DialogAction = ScriptBlockPlainAction;
 
 export type DialogBlockContentUserData = {
   type: 'node';
   id: string;
 };
 
-export function sortVariables(variables: DialogVariable[]) {
-  return variables
+export type DialogBlockCollectionItem = {
+  index?: number;
+  name: string;
+  [key: string]: any;
+};
+
+export function sortCollectionItems<T extends DialogBlockCollectionItem>(
+  items: T[],
+) {
+  return items
     .sort((a, b) => a.name?.localeCompare(b.name))
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 }
 
-export class DialogBlockController
-  extends BlockEditorController
-  implements IDialogVariableController
-{
+export function pickMoreSpecificType(
+  a: AssetPropValueType,
+  b: AssetPropValueType,
+) {
+  if (a.Type !== b.Type) return a;
+  if (a.Kind && !b.Kind) return a;
+  if (b.Kind && !a.Kind) return b;
+  if (a.Of && !b.Of) return a;
+  if (b.Of && !a.Of) return b;
+  if (a.Of && b.Of) return pickMoreSpecificType(a.Of, b.Of);
+  return a;
+}
+
+export class DialogBlockController extends BlockEditorController {
   state!: DialogBlockState;
   private _expectPropsChange = false;
   readonly savePropsDelayed: () => void;
@@ -167,6 +190,10 @@ export class DialogBlockController
     const changer = this.changer;
     if (!changer) return;
 
+    if (!this.resolvedBlock) {
+      return;
+    }
+
     const pasted_data = await clipboardReadPlainText();
 
     try {
@@ -263,9 +290,10 @@ export class DialogBlockController
 
   private _onBlockUpdated() {
     if (this._expectPropsChange) return;
+    if (!this.resolvedBlock) return;
 
     this.state = extractDialogBlockData(this.resolvedBlock.computed);
-    debugger;
+
     if (this._newNodeToSelectIds.size !== 0) {
       const edge_to_select = new Set<string>();
       for (const node_id of this._newNodeToSelectIds) {
@@ -291,24 +319,43 @@ export class DialogBlockController
     node_id: string,
     pin_id: string,
   ): AssetPropValueType[] | null {
-    const assigned = this._assignedDataTypePins.get(node_id + '|' + pin_id);
-    if (assigned) return assigned.length > 0 ? assigned : null;
+    const own = this._assignedDataTypePins.get(node_id + '|' + pin_id);
+    const own_valid = own?.length ? own : null;
 
+    const connected: AssetPropValueType[] = [];
     for (const e of this.state.edges) {
       if (e.target === node_id && e.targetHandle === pin_id) {
-        const assigned = this._assignedDataTypePins.get(
+        const type = this._assignedDataTypePins.get(
           e.source + '|' + e.sourceHandle,
         );
-        if (assigned) return assigned.length > 0 ? assigned : null;
+        if (type?.length) connected.push(...type);
       }
       if (e.source === node_id && e.sourceHandle === pin_id) {
-        const assigned = this._assignedDataTypePins.get(
+        const type = this._assignedDataTypePins.get(
           e.target + '|' + e.targetHandle,
         );
-        if (assigned) return assigned.length > 0 ? assigned : null;
+        if (type?.length) connected.push(...type);
       }
     }
-    return null;
+    const connected_valid = connected.length ? connected : null;
+
+    if (!own_valid && !connected_valid) return null;
+    if (!own_valid) return connected_valid;
+    if (!connected_valid) return own_valid;
+
+    const merged = [...own_valid];
+    for (const c_type of connected_valid) {
+      const existing = merged.find((t) => t.Type === c_type.Type);
+      if (!existing) {
+        merged.push(c_type);
+      } else {
+        merged[merged.indexOf(existing)] = pickMoreSpecificType(
+          c_type,
+          existing,
+        );
+      }
+    }
+    return merged;
   }
 
   getNodeDataController(node_id: string): NodeDataController {
@@ -488,7 +535,7 @@ export class DialogBlockController
         const node_data = ensure_node_data();
         if (!node_data.options) return;
         if (ind >= node_data.options.length) return;
-        node_data.options[ind].values[prop] = val;
+        node_data.options[ind].values[prop] = val ?? null;
         this.savePropsDelayed();
       },
       deleteOptionValue: (ind, prop) => {
@@ -574,7 +621,7 @@ export class DialogBlockController
         if (!node_data.params) node_data.params = { in: [], out: [] };
         if (!node_data.params[scope]) node_data.params[scope] = [];
         if (node_data.params[scope].some((p) => p.name === variable.name)) {
-          throw new Error('Paramter already exists');
+          throw new Error('Parameter already exists');
         }
         node_data.params[scope].push(variable);
         this.savePropsDelayed();
@@ -841,6 +888,9 @@ export class DialogBlockController
     if (!changer) {
       return;
     }
+    if (!this.resolvedBlock) {
+      return;
+    }
     const exported = exportDialogBlockData(this.state);
 
     const changes = diffAssetPropObjects(exported, this.resolvedBlock.computed);
@@ -863,6 +913,9 @@ export class DialogBlockController
   }
 
   getOwnVariables() {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const props_state = extractDialogBlockData(this.resolvedBlock.props);
     const computed_state = this.state;
     const res: DialogVariable[] = [];
@@ -876,7 +929,38 @@ export class DialogBlockController
       res.push(v_data);
     }
 
-    return sortVariables(res);
+    return sortCollectionItems(res);
+  }
+
+  getOwnActions() {
+    if (!this.resolvedBlock) {
+      return [];
+    }
+    const props_state = extractDialogBlockData(this.resolvedBlock.props);
+    const computed_state = this.state;
+    const res: DialogAction[] = [];
+    for (const [v_key, v_data] of Object.entries(props_state.actions.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      if (computed_state.actions.own[v_key]) {
+        Object.assign(v_data, computed_state.actions.own[v_key]);
+      }
+      res.push(v_data);
+    }
+
+    return sortCollectionItems(res);
+  }
+
+  getActions(): DialogAction[] {
+    const res: DialogAction[] = [];
+    for (const v_data of Object.values(this.state.actions.own)) {
+      if (Object.keys(v_data).length === 1 && v_data['index']) {
+        continue;
+      }
+      res.push(v_data);
+    }
+    return sortCollectionItems(res);
   }
 
   getVariables(): DialogVariable[] {
@@ -887,7 +971,7 @@ export class DialogBlockController
       }
       res.push(v_data);
     }
-    return sortVariables(res);
+    return sortCollectionItems(res);
   }
 
   getVariableByName(variable_name: string): DialogVariable | null {
@@ -904,6 +988,14 @@ export class DialogBlockController
     this.savePropsDelayed();
   }
 
+  addAction(action: DialogAction) {
+    this.state.actions.own = {
+      ...this.state.actions.own,
+      [action.name]: action,
+    };
+    this.savePropsDelayed();
+  }
+
   changeVariable(variable_name, variable: DialogVariable) {
     if (this.state.variables.own.hasOwnProperty(variable_name)) {
       const res = {
@@ -912,6 +1004,18 @@ export class DialogBlockController
       delete res[variable_name];
       res[variable.name] = variable;
       this.state.variables.own = res;
+      this.savePropsDelayed();
+    }
+  }
+
+  changeAction(action_name: string, action: DialogAction) {
+    if (this.state.actions.own.hasOwnProperty(action_name)) {
+      const res = {
+        ...this.state.actions.own,
+      };
+      delete res[action_name];
+      res[action.name] = action;
+      this.state.actions.own = res;
       this.savePropsDelayed();
     }
   }
@@ -930,6 +1034,20 @@ export class DialogBlockController
     }
     this.savePropsDelayed();
   }
+  reorderActions(actions: DialogAction[]): void {
+    if (!this.state.actions) {
+      this.state.actions = {
+        own: {} as any,
+      };
+    }
+    for (let i = 0; i < actions.length; i++) {
+      this.state.actions.own[actions[i].name] = {
+        ...actions[i],
+        index: i,
+      };
+    }
+    this.savePropsDelayed();
+  }
 
   deleteVariable(variable_name: string) {
     if (this.state.variables.own.hasOwnProperty(variable_name)) {
@@ -941,15 +1059,121 @@ export class DialogBlockController
       this.savePropsDelayed();
     }
   }
+  deleteAction(action_name: string) {
+    if (this.state.actions.own.hasOwnProperty(action_name)) {
+      const res = {
+        ...this.state.actions.own,
+      };
+      delete res[action_name];
+      this.state.actions.own = res;
+      this.savePropsDelayed();
+    }
+  }
 
   canDeleteVariable(_variable_name: string) {
     return true;
   }
+  canDeleteAction(_action_name: string) {
+    return true;
+  }
 
   async manageVariables(projectContext: IProjectContext) {
-    await this.appManager.get(DialogManager).show(ManageVariableListDialog, {
+    await this.appManager.get(DialogManager).show(ManageCollectionDialog, {
       dialogController: this,
       projectContext,
+      header: this.appManager.$t('imsDialogEditor.var.manageVariables'),
+      createButtonCaption: this.appManager.$t(
+        'imsDialogEditor.var.createVariable',
+      ),
+      getCollectionController: (
+        dialogController: DialogBlockController,
+      ): IDialogCollectionController<DialogVariable> => ({
+        getEntities: () => dialogController.getOwnVariables(),
+        addEntity: (variable: DialogVariable) =>
+          dialogController.addVariable(variable),
+        changeEntity: (variable_name: string, variable: DialogVariable) =>
+          dialogController.changeVariable(variable_name, variable),
+        deleteEntity: (variable_name: string) =>
+          dialogController.deleteVariable(variable_name),
+        canDeleteEntity: (variable_name: string) =>
+          dialogController.canDeleteVariable(variable_name),
+        reorderEntities: (variables: DialogVariable[]) =>
+          dialogController.reorderVariables(variables),
+        createEntity: async () =>
+          await nodeVariableAdd(
+            this.appManager,
+            this.getOwnVariables(),
+            {
+              alreadyExist: this.appManager.$t(
+                'imsDialogEditor.var.variableAlreadyExists',
+              ),
+            },
+            false,
+            true,
+          ),
+      }),
+      viewComponent: markRaw(
+        defineAsyncComponent(() => import('../dialogs/VariableList.vue')),
+      ),
+      viewComponentProps: {
+        showKindControl: true,
+      },
+    });
+  }
+
+  async manageActions(
+    projectContext: IProjectContext,
+    actionType?: ScriptBlockPlainActionTypes,
+  ) {
+    await this.appManager.get(DialogManager).show(ManageCollectionDialog, {
+      dialogController: this,
+      projectContext,
+      header: this.appManager.$t('imsDialogEditor.actions.manageActions'),
+      createButtonCaption: this.appManager.$t(
+        'imsDialogEditor.actions.createAction',
+      ),
+      getCollectionController: (
+        dialogController: DialogBlockController,
+      ): IDialogCollectionController<DialogAction> => ({
+        getEntities: () => dialogController.getOwnActions(),
+        addEntity: (action: DialogAction) => dialogController.addAction(action),
+        changeEntity: (action_name: string, action: DialogAction) =>
+          dialogController.changeAction(action_name, action),
+        deleteEntity: (action_name: string) =>
+          dialogController.deleteAction(action_name),
+        canDeleteEntity: (action_name: string) =>
+          dialogController.canDeleteAction(action_name),
+        reorderEntities: (actions: DialogAction[]) =>
+          dialogController.reorderActions(actions),
+        createEntity: async () => {
+          const res = await this.appManager
+            .get(DialogManager)
+            .show(EnterActionDialog, {
+              validate: (action) => {
+                const list = this.getActions().some(
+                  (a) => a.name === action.name,
+                );
+                if (list) {
+                  throw new Error(
+                    this.appManager.$t(
+                      'imsDialogEditor.actions.actionAlreadyExists',
+                    ),
+                  );
+                }
+              },
+            });
+          if (!res) return null;
+          return res;
+        },
+      }),
+      viewComponent: markRaw(
+        defineAsyncComponent(() => import('../dialogs/ActionsList.vue')),
+      ),
+      viewComponentProps: {
+        initialFilters: {
+          type: actionType,
+        },
+      },
     });
   }
 
@@ -1101,6 +1325,9 @@ export class DialogBlockController
   }
 
   override getContentItems(): BlockContentItem<DialogBlockContentUserData>[] {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const root_anchor: BlockContentItem<DialogBlockContentUserData> = {
       blockId: this.resolvedBlock.id,
       itemId: 'root',
@@ -1196,6 +1423,9 @@ export class DialogBlockController
   }
 
   revealBlockContentItem(itemId: string) {
+    if (!this.resolvedBlock) {
+      return;
+    }
     if (!this.assetBlockEditor) {
       return;
     }

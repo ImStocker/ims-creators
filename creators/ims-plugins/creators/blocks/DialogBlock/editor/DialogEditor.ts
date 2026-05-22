@@ -13,7 +13,7 @@ import type {
   ScriptBlockPlainPropValueBind,
   ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
-import type { DialogVariable } from './DialogBlockController';
+import type { DialogAction, DialogVariable } from './DialogBlockController';
 import type { NodeData, NodeDataOption } from './NodeDataController';
 
 export function generateDataPinId(
@@ -51,6 +51,11 @@ export type DialogBlockState = {
       [name: string]: DialogVariable;
     };
   };
+  actions: {
+    own: {
+      [name: string]: DialogAction;
+    };
+  };
   __settings: {
     speech: {
       main: {
@@ -71,7 +76,10 @@ export function isEdgeBelongToNode(edge_id: string, node_id: string) {
 }
 
 export function extractDialogBlockPlain(props: AssetProps): ScriptBlockPlain {
-  return convertAssetPropsToPlainObject<ScriptBlockPlain>(props);
+  const plain = convertAssetPropsToPlainObject<ScriptBlockPlain>(props);
+  if (!plain.variables) plain.variables = { own: {} };
+  if (!plain.actions) plain.actions = { own: {} };
+  return plain;
 }
 
 export function extractDialogBlockData(props: AssetProps): DialogBlockState {
@@ -261,6 +269,9 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
     variables: {
       own: plain?.variables?.own ?? {},
     },
+    actions: {
+      own: plain?.actions?.own ?? {},
+    },
     __settings: {
       speech: {
         main: speech_main,
@@ -302,7 +313,8 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
   const res: ScriptBlockPlain = {
     start: null,
     nodes: {},
-    variables: state.variables,
+    variables: state.variables ?? { own: {} },
+    actions: state.actions ?? { own: {} },
     __settings: state.__settings,
   };
   for (const node of state.nodes) {

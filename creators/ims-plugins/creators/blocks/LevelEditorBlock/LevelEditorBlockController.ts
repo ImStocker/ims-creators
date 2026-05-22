@@ -32,8 +32,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   }
 
   override postCreate(): void {
+    super.postCreate();
     watch(
-      () => this.resolvedBlock.computed,
+      () => this.resolvedBlock?.computed,
       () => this._onBlockUpdated(),
       {
         immediate: true,
@@ -42,6 +43,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   }
 
   private _onBlockUpdated() {
+    if (!this.resolvedBlock) {
+      return;
+    }
     this.shapes = extractSubObjectAsPlainValue(
       this.resolvedBlock.computed,
       'objects',
@@ -58,6 +62,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   ) {
     const changer = this.changer;
     if (!changer) return;
+    if (!this.resolvedBlock) {
+      return;
+    }
 
     const prepared_object = assignPlainValueToAssetProps(
       {},
@@ -80,6 +87,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   ) {
     const changer = this.changer;
     if (!changer) return;
+    if (!this.resolvedBlock) {
+      return;
+    }
 
     const op = params?.opId ? params.opId : changer.makeOpId();
 
@@ -99,6 +109,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   ) {
     const changer = this.changer;
     if (!changer) return;
+    if (!this.resolvedBlock) {
+      return;
+    }
 
     const prepared_changes = assignPlainValueToAssetProps(
       {},
@@ -117,6 +130,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
   }
 
   override getContentItems(): BlockContentItem<LevelEditorBlockContentUserData>[] {
+    if (!this.resolvedBlock) {
+      return [];
+    }
     const root_anchor: BlockContentItem<LevelEditorBlockContentUserData> = {
       blockId: this.resolvedBlock.id,
       itemId: 'root',
@@ -215,6 +231,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
 
   revealBlockContentItems(itemIds: string[]) {
     if (!this.assetBlockEditor) {
+      return;
+    }
+    if (!this.resolvedBlock) {
       return;
     }
     this.assetBlockEditor.revealBlockContentIds(this.resolvedBlock.id, itemIds);

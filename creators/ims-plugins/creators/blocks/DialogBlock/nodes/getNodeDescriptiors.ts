@@ -4,6 +4,7 @@ import DialogStartNode from './DialogStartNode.vue';
 import DialogTriggerNode from './DialogTriggerNode.vue';
 import DialogSetVarNode from './DialogSetVarNode.vue';
 import DialogGetVarNode from './DialogGetVarNode.vue';
+import DialogFunctionNode from './DialogFunctionNode.vue';
 import { NodeType, type NodeDescriptor } from './NodeDescriptor';
 import DialogEndNode from './DialogEndNode.vue';
 import DialogOpNode from './DialogOpNode.vue';
@@ -24,6 +25,13 @@ import {
   playNodeExecuteBranch,
   playNodeExecuteSetVar,
 } from '../play/playNodeExecuteFunctions';
+import type { DialogBlockController } from '../editor/DialogBlockController';
+import { ScriptBlockPlainActionTypes } from '../logic/nodeStoring';
+import type { NodeDataController } from '../editor/NodeDataController';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
+import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import DialogCallScriptNode from './DialogCallScriptNode.vue';
 
 const opOptionsEq = {
   opEqual: {
@@ -152,7 +160,101 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       color: '#ea9595',
       type: NodeType.EXEC,
       playDataCompute: playDataComputeTrigger,
+      getTemplateController: (dialogController: DialogBlockController) => {
+        return {
+          getTemplates: () => {
+            const triggers = dialogController
+              .getActions()
+              .filter((el) => el.type === ScriptBlockPlainActionTypes.TRIGGER);
+            if (!triggers) return [];
+            return triggers.map((el) => {
+              return {
+                title: el.name,
+                apply: (nodeDataController: NodeDataController) =>
+                  nodeDataController.setSubject(el.name),
+              };
+            });
+          },
+          createTemplate: async (_name?: string) => {
+            const res = await dialogController.appManager
+              .get(DialogManager)
+              .show(EnterActionDialog);
+            if (!res) return null;
+            dialogController.addAction(res);
+            return {
+              title: res.name,
+              apply: (nodeDataController: NodeDataController) =>
+                nodeDataController.setSubject(res.name),
+            };
+          },
+          manageTemplates: async (projectContext: IProjectContext) => {
+            await dialogController.manageActions(
+              projectContext,
+              ScriptBlockPlainActionTypes.TRIGGER,
+            );
+          },
+        };
+      },
     },
+    {
+      name: 'function',
+      icon: 'ri-code-s-slash-line',
+      node: DialogFunctionNode,
+      color: '#ea95ea',
+      type: NodeType.DATA_START,
+      playDataCompute: playDataComputeTrigger,
+      getTemplateController: (dialogController: DialogBlockController) => {
+        return {
+          getTemplates: () => {
+            const functions = dialogController
+              .getActions()
+              .filter((el) => el.type === ScriptBlockPlainActionTypes.FUNCTION);
+            if (!functions) return [];
+            return functions.map((el) => {
+              return {
+                title: el.name,
+                apply: (nodeDataController: NodeDataController) =>
+                  nodeDataController.setSubject(el.name),
+              };
+            });
+          },
+          createTemplate: async (_name?: string) => {
+            const res = await dialogController.appManager
+              .get(DialogManager)
+              .show(EnterActionDialog);
+            if (!res) return null;
+            dialogController.addAction(res);
+            return {
+              title: res.name,
+              apply: (nodeDataController: NodeDataController) =>
+                nodeDataController.setSubject(res.name),
+            };
+          },
+          manageTemplates: async (projectContext: IProjectContext) => {
+            await dialogController.manageActions(
+              projectContext,
+              ScriptBlockPlainActionTypes.FUNCTION,
+            );
+          },
+        };
+      },
+    },
+    {
+      name: 'callScript',
+      icon: 'ri-file-paper-2-line',
+      node: DialogCallScriptNode,
+      color: '#afc8ff',
+      type: NodeType.EXEC,
+    },
+    // {
+    //   name: 'getProps',
+    //   icon: 'ri-braces-line',
+    //   node: DialogGetPropsNode,
+    //   color: '#affaff',
+    //   type: NodeType.DATA_START,
+    //   playDataCompute: playDataComputeGetProps,
+    // },
+
     /*{
       name: 'timer',
       icon: 'ri-time-line',

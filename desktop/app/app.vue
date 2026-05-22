@@ -114,6 +114,7 @@ provide('getDropdownHost', () => {
 @use '~ims-app-base/style/new-vars.scss';
 @use '~ims-app-base/style/app';
 @use '~ims-app-base/style/load-page';
+@use './style/desktop';
 @import '~ims-app-base/style/fonts/Ubuntu/stylesheet.css';
 @import '~ims-app-base/style/fonts/Montserrat/stylesheet.css';
 @import 'remixicon/fonts/remixicon.css';

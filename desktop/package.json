@@ -1,7 +1,7 @@
 {
   "name": "ims-creators-desktop",
   "productName": "ImscDesktop",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "author": "ImStocker <support@cr5.space>",
@@ -139,6 +139,7 @@
     "axios": "^1.13.4",
     "better-sqlite3": "^11.10.0",
     "dotenv": "^17.2.3",
+    "electron-context-menu": "^4.1.2",
     "electron-json-storage": "^4.6.0",
     "electron-log": "^5.4.0",
     "electron-updater": "^6.7.3",
