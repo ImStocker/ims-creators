@@ -521,7 +521,7 @@ export class FileSystemService{
                     continue;
                 }
                 const local_path = node_path.relative(this.db.localPath, event.path);
-                if (local_path === ATTACHMENTS_FOLDER || this.db.localPath === event.path){
+                if (local_path === ATTACHMENTS_FOLDER || local_path === ''){
                     continue;
                 }
                 const segments = event.path.split(/[\/\\]/g);
