@@ -1,7 +1,7 @@
 # IMS Creators Desktop
 
 ![GitHub License](https://img.shields.io/github/license/ImStocker/ims-creators)
-![GitHub Release](https://img.shields.io/github/v/release/ImStocker/ims-creators)
+[![GitHub Release](https://img.shields.io/github/v/release/ImStocker/ims-creators)](https://github.com/ImStocker/ims-creators/releases)
 
 Local application to develop and store your game ideas: **edit documents, add cross-references, create dialogues, prototype levels, easily export data to game engines** to speed up the path from concept to release.
 
