@@ -7,8 +7,9 @@
   >
     <div
       class="DialogEditor-wrapper"
-      @mousedown.capture="onMouseDown"
-      @contextmenu.capture="onContextMenu($event as PointerEvent)"
+      @pointerdown.capture="onMouseDown"
+      @pointerup.capture="onMouseUp"
+      @contextmenu.prevent
       @dragover="onDragOver"
       @drop="onDrop"
     >
@@ -575,8 +576,12 @@ export default defineComponent({
       this.isFocused = true;
       this.mouseDownTime = Date.now();
     },
-    onContextMenu(ev: PointerEvent) {
+    onMouseUp(ev: PointerEvent) {
       if (this.readonly) {
+        return;
+      }
+      if (ev.button !== 2) {
+        // This only for right mouse button
         return;
       }
       const target = ev.target as HTMLElement | null;
