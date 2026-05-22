@@ -296,9 +296,9 @@ export default defineComponent({
       );
     },
     flowViewportTransformPreferenceKey() {
-      const preference_id = getPreferenceKeyForBlock(
-        this.blockController.resolvedBlock,
-      );
+      const preference_id = this.blockController.resolvedBlock
+        ? getPreferenceKeyForBlock(this.blockController.resolvedBlock)
+        : '';
       return `ScriptBlock.viewportTransform.` + preference_id;
     },
     flowViewportTransform: {
