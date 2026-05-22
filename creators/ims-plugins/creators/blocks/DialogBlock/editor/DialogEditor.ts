@@ -76,7 +76,10 @@ export function isEdgeBelongToNode(edge_id: string, node_id: string) {
 }
 
 export function extractDialogBlockPlain(props: AssetProps): ScriptBlockPlain {
-  return convertAssetPropsToPlainObject<ScriptBlockPlain>(props);
+  const plain = convertAssetPropsToPlainObject<ScriptBlockPlain>(props);
+  if (!plain.variables) plain.variables = { own: {} };
+  if (!plain.actions) plain.actions = { own: {} };
+  return plain;
 }
 
 export function extractDialogBlockData(props: AssetProps): DialogBlockState {
@@ -310,8 +313,8 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
   const res: ScriptBlockPlain = {
     start: null,
     nodes: {},
-    variables: state.variables,
-    actions: state.actions,
+    variables: state.variables ?? { own: {} },
+    actions: state.actions ?? { own: {} },
     __settings: state.__settings,
   };
   for (const node of state.nodes) {

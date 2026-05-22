@@ -520,6 +520,9 @@ export class DialogPlayer {
           const activated_context =
             playing_state.history[playing_state.historyPointer]; // NOTE: can be chnaged if user use back/forward
 
+          if (!this.dialogController.resolvedBlock) {
+            throw new Error('Script block not found');
+          }
           const graph = new ScriptPlayGraph(
             extractDialogBlockPlain(
               this.dialogController.resolvedBlock.computed,

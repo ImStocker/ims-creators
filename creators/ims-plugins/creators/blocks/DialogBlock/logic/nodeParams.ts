@@ -33,9 +33,10 @@ export function getActionNodeParams(
     const existing_action = actions.find((a) => a.name === actionName);
     if (existing_action) {
       for (const param of existing_action.params?.['in'] ?? []) {
-        inputParameters.push(param);
         if (ownParamNames.has('in-' + param.name)) {
-          ownParamNames.delete(param.name);
+          ownParamNames.delete('in-' + param.name);
+        } else {
+          inputParameters.push(param);
         }
       }
     }
@@ -71,9 +72,10 @@ export function getActionNodeParams(
     const existing_action = actions.find((a) => a.name === actionName);
     if (existing_action) {
       for (const param of existing_action.params?.['out'] ?? []) {
-        outputParameters.push(param);
         if (ownParamNames.has('out-' + param.name)) {
-          ownParamNames.delete(param.name);
+          ownParamNames.delete('out-' + param.name);
+        } else {
+          outputParameters.push(param);
         }
       }
     }
