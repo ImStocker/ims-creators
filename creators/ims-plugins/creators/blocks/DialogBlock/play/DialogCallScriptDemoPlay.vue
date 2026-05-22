@@ -1,69 +1,67 @@
 <template>
   <div class="DialogCallScriptDemoPlay">
+    <div class="DialogCallScriptDemoPlay-content">
+      <div class="DialogCallScriptDemoPlay-asset">
+        <div class="DialogCallScriptDemoPlay-asset-header">
+          <i class="ri-file-paper-2-line"></i>
+        </div>
+        <div v-if="callScript" class="DialogCallScriptDemoPlay-asset-value">
+          {{ callScript.Title }}
+        </div>
+      </div>
+    </div>
     <div v-if="loading" class="DialogCallScriptDemoPlay-loading">
       <div class="loaderSpinner"></div>
     </div>
-    <template v-else>
-      <div class="DialogCallScriptDemoPlay-content">
-        <div class="DialogCallScriptDemoPlay-asset">
-          <div class="DialogCallScriptDemoPlay-asset-header">
-            <i class="ri-file-paper-2-line"></i>
-          </div>
-          <div v-if="callScript" class="DialogCallScriptDemoPlay-asset-value">
-            {{ callScript.Title }}
-          </div>
-        </div>
-      </div>
+    <div
+      v-else-if="inputParameters.length > 0 || outputParameters.length > 0"
+      class="DialogCallScriptDemoPlay-parameters"
+    >
       <div
-        v-if="inputParameters.length > 0 || outputParameters.length > 0"
-        class="DialogCallScriptDemoPlay-parameters"
+        v-for="param_gr of parametersGrid"
+        :key="(param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name"
+        class="DialogCallScriptDemoPlay-parameters-one"
+        :class="param_gr.isOutput ? 'type-output' : 'type-input'"
       >
-        <div
-          v-for="param_gr of parametersGrid"
-          :key="(param_gr.isOutput ? 'out-' : 'in-') + param_gr.variable.name"
-          class="DialogCallScriptDemoPlay-parameters-one"
-          :class="param_gr.isOutput ? 'type-output' : 'type-input'"
-        >
-          <div class="DialogCallScriptDemoPlay-parameters-one-caption">
-            <caption-string :value="param_gr.variable.title"></caption-string>
-          </div>
-          <div class="DialogCallScriptDemoPlay-parameters-one-field">
-            <data-field-input
-              v-if="param_gr.isOutput"
-              :data-type="param_gr.variable.type ?? StringAssetPropType"
-              :model-value="
-                dialogPlayer.playGetCurrentNodeParam(param_gr.variable.name)
-              "
-              :title="param_gr.variable.description ?? ''"
-              @update:model-value="
-                dialogPlayer.playSetCurrentNodeParam(
-                  param_gr.variable.name,
-                  $event,
-                )
-              "
-            ></data-field-input>
-            <data-field-display
-              v-else
-              :data-type="param_gr.variable.type"
-              :model-value="
-                playingNodeData?.values
-                  ? playingNodeData?.values[param_gr.variable.name]
-                  : null
-              "
-              :title="param_gr.variable.description ?? ''"
-            ></data-field-display>
-          </div>
+        <div class="DialogCallScriptDemoPlay-parameters-one-caption">
+          <caption-string :value="param_gr.variable.title"></caption-string>
+        </div>
+        <div class="DialogCallScriptDemoPlay-parameters-one-field">
+          <data-field-input
+            v-if="param_gr.isOutput"
+            :data-type="param_gr.variable.type ?? StringAssetPropType"
+            :model-value="
+              dialogPlayer.playGetCurrentNodeParam(param_gr.variable.name)
+            "
+            :title="param_gr.variable.description ?? ''"
+            @update:model-value="
+              dialogPlayer.playSetCurrentNodeParam(
+                param_gr.variable.name,
+                $event,
+              )
+            "
+          ></data-field-input>
+          <data-field-display
+            v-else
+            :data-type="param_gr.variable.type"
+            :model-value="
+              playingNodeData?.values
+                ? playingNodeData?.values[param_gr.variable.name]
+                : null
+            "
+            :title="param_gr.variable.description ?? ''"
+          ></data-field-display>
         </div>
       </div>
-      <div class="DialogCallScriptDemoPlay-options">
-        <button
-          class="PlayerDemoDialog-option-button"
-          @click="dialogPlayer.playChoose(null)"
-        >
-          {{ $t('imsDialogEditor.play.continue') }}
-        </button>
-      </div>
-    </template>
+    </div>
+    <div class="DialogCallScriptDemoPlay-options">
+      <button
+        class="PlayerDemoDialog-option-button"
+        @click="dialogPlayer.playChoose(null)"
+      >
+        {{ $t('imsDialogEditor.play.continue') }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -167,8 +165,17 @@ export default defineComponent({
       return res;
     },
   },
+  watch: {
+    async callScript() {
+      await this.loadCallScript();
+    },
+  },
   async mounted() {
-    if (this.callScript) {
+    await this.loadCallScript();
+  },
+  methods: {
+    async loadCallScript() {
+      if (!this.callScript) return;
       this.loading = true;
       try {
         this.callScriptController = await loadCallScriptController(
@@ -180,9 +187,8 @@ export default defineComponent({
       } finally {
         this.loading = false;
       }
-    }
+    },
   },
-  methods: {},
 });
 </script>
 
@@ -191,6 +197,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 20px;
 }
 .DialogCallScriptDemoPlay-prop-line-caption,
 .DialogCallScriptDemoPlay-options-one-param-caption {

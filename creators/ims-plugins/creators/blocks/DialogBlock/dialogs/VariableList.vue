@@ -162,7 +162,6 @@ export default defineComponent({
 }
 .VariableList-filters {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -179,7 +178,7 @@ export default defineComponent({
     --ValueSwitcher-border-radius: 8px;
   }
   .VariableList-filters-query {
-    max-width: 150px;
+    min-width: 0;
   }
 }
 .VariableList-grid {
