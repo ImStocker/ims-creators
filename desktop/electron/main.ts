@@ -50,9 +50,21 @@ async function initApp(){
       }
     ]);
 
+
+    let quitRequested = false;
+    app.on('before-quit', async (event) => {
+      if (!quitRequested){
+        event.preventDefault();
+          
+        await closeAllProjectDb()
+        
+        quitRequested = true;
+        app.quit();
+      }
+    });
+
     app.on('window-all-closed', async () => {
-      await closeAllProjectDb()
-      if (process.platform !== 'darwin') {
+      if (process.platform !== 'darwin' || quitRequested) {
         app.quit();
       }
     });

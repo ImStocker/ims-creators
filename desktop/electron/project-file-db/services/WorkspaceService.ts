@@ -193,11 +193,11 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         if(!workspace) {
             throw new Error("Workspace doesn't exist");
         }
-        const props = params.props ? convertAssetPropsToPlainObject(params.props) : {};
+        const props = params.props ? convertAssetPropsToPlainObject(params.props) : workspace.props;
         const new_workspace_info: ProjectFileDbWorkspace = {
             ...workspace,
-            ...params,
-            props,
+            ...params, 
+            props, 
             id: workspace.id,
         }
         const tx = new ProjectFileDbTransaction(this.db)

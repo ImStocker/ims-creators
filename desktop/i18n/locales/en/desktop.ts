@@ -24,6 +24,7 @@ export default {
         resyncAll: 'Resynchronize all',
         syncWithCloud: 'Synchronize with cloud',
         syncWithCloudEnd: 'Synchronization with cloud is completed',
+        syncWithCloudConnectSuccess: 'Project is successfully connected to cloud',
         openInCloud: 'Open in cloud',
         repeat: 'Repeat',
         pauseSyncing: 'Pause syncing',

@@ -234,6 +234,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             rootWorkspaceId = new_project_info.rootWorkspaces.find((w: Workspace) => w.name === 'gdd')?.id;
         }
         assert(this._loadedForProjectPath)
+        await this.appManager.get(DesktopSyncManager).resyncAll(); // Mark all object to be synced
         await this.appManager.get(DesktopProjectManager).initializeLocalProject(this._loadedForProjectPath, {
             id: new_project_info.id ?? null,
             title: new_project_info.title,

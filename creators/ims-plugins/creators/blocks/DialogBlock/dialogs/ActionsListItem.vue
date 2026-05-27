@@ -174,7 +174,7 @@ export default defineComponent({
         ...(this.actionsController.canDeleteEntity(this.action.name)
           ? [
               {
-                title: this.$t('imsDialogEditor.var.deleteVariable'),
+                title: this.$t('imsDialogEditor.actions.deleteAction'),
                 danger: true,
                 icon: 'delete',
                 action: async () => {
