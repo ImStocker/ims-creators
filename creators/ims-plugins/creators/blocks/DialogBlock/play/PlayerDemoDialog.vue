@@ -4,7 +4,20 @@
       <dialog-play-toolbar :dialog-player="dialogPlayer"></dialog-play-toolbar>
     </div>
     <div class="PlayerDemoDialog-body">
-      <template v-if="currentPlayingNode">
+      <template v-if="dialogPlayer.scriptEnded">
+        <div class="PlayerDemoDialog-scriptEnded">
+          <div class="PlayerDemoDialog-scriptEnded-text">
+            {{ $t('imsDialogEditor.play.scriptCompleted') }}
+          </div>
+          <button
+            class="PlayerDemoDialog-option-button"
+            @click="dialogPlayer.finishPlay()"
+          >
+            {{ $t('imsDialogEditor.play.finishExecution') }}
+          </button>
+        </div>
+      </template>
+      <template v-else-if="currentPlayingNode">
         <dialog-speech-demo-play
           v-if="currentPlayingNode.type === 'speech'"
           :dialog-player="dialogPlayer"
@@ -133,6 +146,16 @@ export default defineComponent({
 .PlayerDemoDialog-customNode-content {
   margin-bottom: 20px;
   text-align: center;
+}
+.PlayerDemoDialog-scriptEnded {
+  text-align: center;
+  margin-top: 100px;
+}
+.PlayerDemoDialog-scriptEnded-text {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--local-text-color);
+  margin-bottom: 30px;
 }
 </style>
 <style lang="scss" rel="stylesheet/scss">

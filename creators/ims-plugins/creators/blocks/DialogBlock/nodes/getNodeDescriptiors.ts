@@ -10,21 +10,6 @@ import DialogEndNode from './DialogEndNode.vue';
 import DialogOpNode from './DialogOpNode.vue';
 import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import DialogConstNode from './DialogConstNode.vue';
-import {
-  playDataComputeOpFabric,
-  playDataComputeGetVar,
-  playDataComputeTrigger,
-  playDataComputeConstBoolean,
-  playDataComputeConstFloat,
-  playDataComputeConstInteger,
-  playDataComputeConstString,
-  playDataComputeConstText,
-  playDataComputeConstAsset,
-} from '../play/playDataComputeFunctions';
-import {
-  playNodeExecuteBranch,
-  playNodeExecuteSetVar,
-} from '../play/playNodeExecuteFunctions';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import { ScriptBlockPlainActionTypes } from '../logic/nodeStoring';
 import type { NodeDataController } from '../editor/NodeDataController';
@@ -151,7 +136,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           values: {},
         };
       },
-      playNodeExecute: playNodeExecuteBranch,
     },
     {
       name: 'trigger',
@@ -159,7 +143,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       node: DialogTriggerNode,
       color: '#ea9595',
       type: NodeType.EXEC,
-      playDataCompute: playDataComputeTrigger,
       getTemplateController: (dialogController: DialogBlockController) => {
         return {
           getTemplates: () => {
@@ -202,7 +185,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       node: DialogFunctionNode,
       color: '#ea95ea',
       type: NodeType.DATA_START,
-      playDataCompute: playDataComputeTrigger,
       getTemplateController: (dialogController: DialogBlockController) => {
         return {
           getTemplates: () => {
@@ -252,7 +234,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
     //   node: DialogGetPropsNode,
     //   color: '#affaff',
     //   type: NodeType.DATA_START,
-    //   playDataCompute: playDataComputeGetProps,
     // },
 
     /*{
@@ -276,7 +257,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       color: '#afb2ff',
       type: NodeType.EXEC,
       dataInTypes: null,
-      playNodeExecute: playNodeExecuteSetVar,
     },
     {
       name: 'getVar',
@@ -285,7 +265,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       color: '#afb2ff',
       type: NodeType.DATA_START,
       dataOutTypes: null,
-      playDataCompute: playDataComputeGetVar,
     },
     {
       name: 'end',
@@ -310,7 +289,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
             Type: AssetPropType.BOOLEAN,
           },
         ],
-        playDataCompute: playDataComputeOpFabric(op),
       };
     }),
     ...(Object.keys(opOptionsCompare) as NodeDescriptorOpCompare[]).map(
@@ -343,7 +321,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
               Type: AssetPropType.BOOLEAN,
             },
           ],
-          playDataCompute: playDataComputeOpFabric(op),
         };
       },
     ),
@@ -373,7 +350,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
             Type: AssetPropType.FLOAT,
           },
         ],
-        playDataCompute: playDataComputeOpFabric(op),
       };
     }),
     ...(Object.keys(opOptionsLogical) as NodeDescriptorOpLogical[]).map(
@@ -397,7 +373,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
               Type: AssetPropType.BOOLEAN,
             },
           ],
-          playDataCompute: playDataComputeOpFabric(op),
         };
       },
     ),
@@ -417,7 +392,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.BOOLEAN,
         },
       ],
-      playDataCompute: playDataComputeConstBoolean,
     },
     {
       name: 'constFloat',
@@ -435,7 +409,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.FLOAT,
         },
       ],
-      playDataCompute: playDataComputeConstFloat,
     },
     {
       name: 'constInteger',
@@ -453,7 +426,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.INTEGER,
         },
       ],
-      playDataCompute: playDataComputeConstInteger,
     },
     {
       name: 'constString',
@@ -471,7 +443,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.STRING,
         },
       ],
-      playDataCompute: playDataComputeConstString,
     },
     {
       name: 'constText',
@@ -489,7 +460,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.TEXT,
         },
       ],
-      playDataCompute: playDataComputeConstText,
     },
     {
       name: 'constAsset',
@@ -507,7 +477,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.ASSET,
         },
       ],
-      playDataCompute: playDataComputeConstAsset,
     },
   ];
 }

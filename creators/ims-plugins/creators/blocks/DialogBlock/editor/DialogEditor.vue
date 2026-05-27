@@ -82,12 +82,24 @@
         </template>
         <Background :offset="19"></Background>
         <MiniMap zoomable pannable class="DialogEditor-minimap"></MiniMap>
+        <div
+          v-if="scriptEndedPopup"
+          class="DialogEditor-scriptEnded is-dropdown"
+          :style="scriptEndedPopupStyle"
+        >
+          <div class="DialogEditor-scriptEnded-content">
+            <div class="DialogEditor-scriptEnded-text">
+              {{ $t('imsDialogEditor.play.scriptCompleted') }}
+            </div>
+            <button
+              class="is-button is-button-primary"
+              @click="dialogPlayer.finishPlay()"
+            >
+              {{ $t('imsDialogEditor.play.finishExecution') }}
+            </button>
+          </div>
+        </div>
       </VueFlow>
-    </div>
-    <div v-if="!hasStart && !readonly" class="DialogEditor-hint">
-      <div class="DialogEditor-hint-inner">
-        {{ $t('imsDialogEditor.addStartLevelHint') }}
-      </div>
     </div>
     <div
       v-if="createNodeContext && createNodeContext.clickedAt"
@@ -260,7 +272,7 @@ export default defineComponent({
     const projectContext = this.projectContext as IProjectContext | undefined;
     assert(projectContext, 'Project context is not provided');
     const viewportHelper = new FlowViewportHelper();
-    const dialogPlayer = new DialogPlayer(
+    const dialogPlayer = DialogPlayer.CreateInstance(
       this.$getAppManager(),
       this.blockController,
       viewportHelper,
@@ -311,6 +323,29 @@ export default defineComponent({
           .get(UiPreferenceManager)
           .setPreference(this.flowViewportTransformPreferenceKey, value);
       },
+    },
+    scriptEndedPopupStyle() {
+      if (!this.dialogPlayer.currentPlayingNode) return {};
+      const nodeId = this.dialogPlayer.currentPlayingNode.id;
+      const node = this.blockControllerMut.state.nodes.find(
+        (n: any) => n.id === nodeId,
+      );
+      if (!node) return {};
+      const flow = this.$refs['flow'] as VueFlowStore;
+
+      const editor_bbox = this.$el.getBoundingClientRect();
+
+      const coords = flow.flowToScreenCoordinate({
+        x: node.position.x - editor_bbox.left,
+        y: node.position.y - editor_bbox.top + (node.dimensions.height ?? 0),
+      });
+      return {
+        left: coords.x + 'px',
+        top: coords.y + 'px',
+      };
+    },
+    scriptEndedPopup() {
+      return this.dialogPlayer.scriptEnded && this.dialogPlayer.isPlayDebug;
     },
   },
   watch: {
@@ -1052,5 +1087,34 @@ export default defineComponent({
   border-radius: 4px;
   background: var(--dropdown-bg-color);
   pointer-events: all;
+}
+.DialogEditor-scriptEnded {
+  --local-text-color: var(--imsde-node-playing-color);
+  padding: var(--dropdown-padding);
+  position: absolute;
+  z-index: 200;
+  min-width: 200px;
+
+  .is-button {
+    --button-border-color: var(--local-text-color);
+
+    &:not(:hover) {
+      --button-text-color: var(--local-text-color);
+    }
+
+    &:hover {
+      --button-bg-color: var(--imsde-node-playing-color);
+    }
+  }
+}
+.DialogEditor-scriptEnded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.DialogEditor-scriptEnded-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--local-text-color);
 }
 </style>

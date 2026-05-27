@@ -1,14 +1,9 @@
 import type { Component } from 'vue';
-import type {
-  AssetPropValue,
-  AssetPropValueType,
-} from '~ims-app-base/logic/types/Props';
+import type { AssetPropValueType } from '~ims-app-base/logic/types/Props';
 import type {
   NodeData,
   NodeDataController,
 } from '../editor/NodeDataController';
-import type { ScriptPlayNode } from '../play/ScriptPlayNode';
-import type { ScriptPlayContext } from '../play/ScriptPlayContext';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 
@@ -40,17 +35,7 @@ export type NodeDescriptor = {
   type: NodeType;
   dataInTypes?: AssetPropValueType[] | null;
   dataOutTypes?: AssetPropValueType[] | null;
-  initData?: () => NodeData;
-  playDataCompute?: (
-    context: ScriptPlayContext,
-    playNode: ScriptPlayNode,
-    param: string,
-  ) => AssetPropValue;
-  playNodeExecute?: (
-    context: ScriptPlayContext,
-    playNode: ScriptPlayNode,
-    choice: number | null,
-  ) => string | null;
+  initData?: () => Omit<NodeData, 'index'>;
   getTemplateController?: (
     dialogController: DialogBlockController,
   ) => NodeDescriptorTemplateController;

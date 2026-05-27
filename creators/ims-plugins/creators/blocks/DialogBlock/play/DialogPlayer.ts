@@ -1,65 +1,115 @@
 import type { GraphNode } from '@vue-flow/core';
-import {
-  createScriptPlayContext,
-  getScriptPlayContextNodeParam,
-  setScriptPlayContextNodeParam,
-  type ScriptPlayContext,
-} from './ScriptPlayContext';
-import { ScriptPlayGraph } from './ScriptPlayGraph';
-import { extractDialogBlockPlain } from '../editor/DialogEditor';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { FlowViewportHelper } from '../editor/FlowViewportHelper';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
-import UiManager from '~ims-app-base/logic/managers/UiManager';
-import type { ScriptPlayNode } from './ScriptPlayNode';
-import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
+import type { ScriptPlayNode, ScriptPlayNodeProps } from './ScriptPlayNode';
 import {
-  getActionNodeParams,
-  getCallScriptNodeParams,
-} from '../logic/nodeParams';
-import { loadCallScriptController } from '../logic/callScriptLoader';
-import { castAssetPropValueToAsset } from '~ims-app-base/logic/types/Props';
+  convertAssetPropsToPlainObject,
+  type AssetPropsPlainObjectValue,
+  type AssetPropValue,
+} from '~ims-app-base/logic/types/Props';
 import DialogManager, {
   type DialogHandler,
 } from '~ims-app-base/logic/managers/DialogManager';
 import PlayerDialog from './PlayerDemoDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import type { ImscScriptPlayerSpeech } from 'imsc-script';
+import { ImscScriptPlayer } from 'imsc-script';
+import type {
+  ImscScriptGraphNodeTrigger,
+  ImscScriptGraphNodeSpeech,
+} from 'imsc-script/Graph';
+import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { reactive } from 'vue';
+import { getActionNodeParams } from '../logic/nodeParams';
 
 type DialogPlayingState = {
-  history: ScriptPlayContext[];
+  history: ScriptPlayNode[];
   historyPointer: number;
-  pausePromise: Promise<void> | null;
-  pauseResolve: (() => void) | null;
-  choosePromise: Promise<{ choice: number | null; cancelled: boolean }> | null;
-  chooseResolve:
-    | ((res: { choice: number | null; cancelled: boolean }) => void)
-    | null;
   stop: boolean;
   moveInterrupted: boolean;
   debug: boolean;
-  dialog: DialogHandler<void> | null;
+  dialog: DialogHandler<void, any> | null;
 };
 
 export class DialogPlayer {
   private _playingState: DialogPlayingState | null = null;
   private _debugNodeSwitchTime = 1000;
+  private _player!: ImscScriptPlayer;
+  private _waitingForSpeech = false;
+  private _triggerResolve: ((outputs: Record<string, any>) => void) | null =
+    null;
+  private _triggerOutputs: Record<string, AssetPropValue> = {};
+  private _externalPause = false;
+  private _scriptEnded = false;
 
-  constructor(
+  private constructor(
     protected appManager: IAppManager,
     protected dialogController: DialogBlockController,
     protected viewportHelper: FlowViewportHelper,
     protected projectContext: IProjectContext,
   ) {}
 
+  postCreate() {
+    assert(this.dialogController.resolvedBlock?.assetId);
+    const prepared_asset = {
+      id: this.dialogController.resolvedBlock.assetId,
+      blocks: [
+        {
+          ...this.dialogController.resolvedBlock,
+          computed: {
+            ...convertAssetPropsToPlainObject(
+              this.dialogController.resolvedBlock.computed,
+            ),
+          },
+        },
+      ],
+    };
+
+    const defaultVariableValues = this.dialogController.getVariables().reduce(
+      (acc, variable) => {
+        acc[variable.name] = variable.default;
+        return acc;
+      },
+      {} as Record<string, AssetPropValue>,
+    );
+
+    this._player = new ImscScriptPlayer(prepared_asset, {
+      blockName: this.dialogController.resolvedBlock.name ?? undefined,
+      initialVariables: defaultVariableValues,
+      events: {
+        onSpeech: (speech, node) => this._onSpeech(speech, node),
+        onTrigger: (subject, inputs, node) =>
+          this._onTrigger(subject, inputs, node),
+        onNodeEnter: (nodeId, node) => this._onNodeEnter(nodeId, node),
+      },
+    });
+  }
+
+  static CreateInstance(
+    appManager: IAppManager,
+    dialogController: DialogBlockController,
+    viewportHelper: FlowViewportHelper,
+    projectContext: IProjectContext,
+  ): DialogPlayer {
+    const raw = new DialogPlayer(
+      appManager,
+      dialogController,
+      viewportHelper,
+      projectContext,
+    );
+    const res = reactive(raw);
+    res.postCreate();
+    return res as unknown as DialogPlayer;
+  }
+
   get isPlaying() {
     return !!this._playingState;
   }
 
   get isPaused() {
-    return (
-      !!this._playingState &&
-      (!!this._playingState.pausePromise || !!this._playingState.choosePromise)
-    );
+    if (!this._playingState) return false;
+    return this._externalPause;
   }
 
   get isPlayDebug() {
@@ -67,45 +117,26 @@ export class DialogPlayer {
   }
 
   get canResume() {
-    return (
-      this.isPaused &&
-      ((!!this._playingState && !!this._playingState.pausePromise) ||
-        this._getFirstAvailableChoice() !== false)
-    );
+    if (!this._playingState) return false;
+    if (this._externalPause) return true;
+    if (this._waitingForSpeech)
+      return this._getFirstAvailableChoice() !== false;
+    if (this._triggerResolve) return true;
+    return false;
+  }
+
+  get scriptEnded() {
+    return this._scriptEnded;
   }
 
   get canHistoryBack() {
-    return !!this._playingState && this._playingState.historyPointer > 1;
+    return !!this._playingState && this._playingState.historyPointer > 0;
   }
 
   get canHistoryForward() {
     return (
       !!this._playingState &&
       this._playingState.historyPointer < this._playingState.history.length - 1
-    );
-  }
-
-  goHistoryBack() {
-    if (!this._playingState || !this.canHistoryBack) {
-      return;
-    }
-    this.pause();
-    this._playingState.historyPointer--;
-    this._playStepActivate(
-      this._playingState,
-      this._playingState.history[this._playingState.historyPointer],
-    );
-  }
-
-  goHistoryForward() {
-    if (!this._playingState || !this.canHistoryForward) {
-      return;
-    }
-    this.pause();
-    this._playingState.historyPointer++;
-    this._playStepActivate(
-      this._playingState,
-      this._playingState.history[this._playingState.historyPointer],
     );
   }
 
@@ -116,197 +147,145 @@ export class DialogPlayer {
       return null;
     }
     for (
-      let option_index = 0;
-      option_index < node.options.length;
-      option_index++
+      let optionIndex = 0;
+      optionIndex < node.options.length;
+      optionIndex++
     ) {
-      const option_values = node.options[option_index].values;
+      const optionValues = node.options[optionIndex].values;
       if (
-        !option_values ||
-        option_values.condition === undefined ||
-        option_values.condition
+        !optionValues ||
+        optionValues.condition === undefined ||
+        optionValues.condition
       ) {
-        return option_index;
+        return optionIndex;
       }
     }
     return false;
   }
 
   get currentPlayingNode(): ScriptPlayNode | null {
-    if (!this._playingState || this._playingState.historyPointer < 0) {
+    if (
+      !this._playingState ||
+      this._playingState.historyPointer < 0 ||
+      this._playingState.history.length === 0
+    ) {
       return null;
     }
-    return this._playingState.history[this._playingState.historyPointer]
-      .currentNode;
+    return this._playingState.history[this._playingState.historyPointer];
   }
 
-  getLastPlayNode(node_id: string): ScriptPlayNode | null {
-    if (!this._playingState) {
-      return null;
-    }
+  getLastPlayNode(nodeId: string): ScriptPlayNode | null {
+    if (!this._playingState) return null;
     for (let p = this._playingState.historyPointer; p >= 0; p--) {
-      if (this._playingState.history[p].currentNode?.id === node_id) {
-        return this._playingState.history[p].currentNode;
+      if (this._playingState.history[p].id === nodeId) {
+        return this._playingState.history[p];
       }
     }
     return null;
   }
 
   getFlowEdgePlayState(
-    source_id: string,
-    target_id: string,
+    sourceId: string,
+    targetId: string,
   ): 'current' | 'visited' | null {
-    if (!this._playingState) {
-      return null;
-    }
+    if (!this._playingState) return null;
     for (
-      let target_h = this._playingState.historyPointer;
-      target_h >= 1;
-      target_h--
+      let targetH = this._playingState.historyPointer;
+      targetH >= 1;
+      targetH--
     ) {
-      const source_h = target_h - 1;
-      const target_context = this._playingState.history[target_h];
-      if (target_context.currentNode?.id !== target_id) {
-        continue;
-      }
-      const source_context = this._playingState.history[source_h];
-      if (source_context.currentNode?.id !== source_id) {
-        continue;
-      }
-      return target_h === this._playingState.historyPointer
+      const sourceH = targetH - 1;
+      const targetContext = this._playingState.history[targetH];
+      if (targetContext.id !== targetId) continue;
+      const sourceContext = this._playingState.history[sourceH];
+      if (sourceContext.id !== sourceId) continue;
+      return targetH === this._playingState.historyPointer
         ? 'current'
         : 'visited';
     }
     return null;
   }
 
-  public pause() {
-    if (!this._playingState) {
-      return;
-    }
-    const playing_state = this._playingState;
-    if (playing_state.pausePromise) {
-      return;
-    }
-    playing_state.pausePromise = new Promise<void>((resolve) => {
-      playing_state.pauseResolve = resolve;
-    });
-    this._playChooseImpl({
-      cancelled: true,
-      choice: null,
-    });
+  goHistoryBack() {
+    if (!this._playingState || !this.canHistoryBack) return;
+    this._externalPause = true;
+    this._playingState.historyPointer--;
+    this._moveViewportToNode(
+      this._playingState.history[this._playingState.historyPointer].id,
+    );
   }
 
-  private _unpause() {
-    if (!this._playingState) {
-      return;
-    }
-    if (this._playingState.pauseResolve) {
-      this._playingState.pauseResolve();
-      this._playingState.pausePromise = null;
-      this._playingState.pauseResolve = null;
-    }
+  goHistoryForward() {
+    if (!this._playingState || !this.canHistoryForward) return;
+    this._externalPause = true;
+    this._playingState.historyPointer++;
+    this._moveViewportToNode(
+      this._playingState.history[this._playingState.historyPointer].id,
+    );
+  }
+
+  public pause() {
+    if (!this._playingState) return;
+    this._externalPause = true;
   }
 
   public resume() {
-    if (!this._playingState) {
-      return;
-    }
-    this._unpause();
-    if (this._playingState.chooseResolve) {
+    if (!this._playingState) return;
+    this._externalPause = false;
+    if (this._waitingForSpeech) {
       const option = this._getFirstAvailableChoice();
       if (option !== false) {
-        this._playChooseImpl({
-          choice: option,
-          cancelled: false,
-        });
+        this.playChoose(option);
       }
     }
   }
 
   public stop() {
-    if (!this._playingState) {
-      return;
-    }
-    this._playingState.stop = true;
-    this.resume();
-    this._playChooseImpl({
-      cancelled: true,
-      choice: null,
-    });
+    if (!this._playingState) return;
+    this._player.end();
     this._destroyDemoMode();
     this._playingState = null;
+    this._waitingForSpeech = false;
+    this._triggerResolve = null;
+    this._externalPause = false;
+    this._scriptEnded = false;
+  }
+
+  public finishPlay() {
+    this.stop();
   }
 
   public async restart() {
-    const was_debug = !!this._playingState?.debug;
+    const wasDebug = !!this._playingState?.debug;
     this.stop();
     await new Promise((resolve) => setTimeout(resolve, 1));
-    await this.play(was_debug);
-  }
-
-  private _playChooseImpl(choose: {
-    choice: number | null;
-    cancelled: boolean;
-  }) {
-    if (!this._playingState) {
-      return;
-    }
-    if (!this._playingState.chooseResolve) {
-      return;
-    }
-    this._playingState.chooseResolve(choose);
-    this._playingState.choosePromise = null;
-    this._playingState.chooseResolve = null;
+    await this.play(wasDebug);
   }
 
   public async playChoose(choice: number | null) {
-    this._unpause();
-    await new Promise((res) => setTimeout(res, 1));
-    this._playChooseImpl({
-      choice,
-      cancelled: false,
-    });
+    if (this._triggerResolve) {
+      const outputs = { ...this._triggerOutputs };
+      this._triggerOutputs = {};
+      const resolve = this._triggerResolve;
+      this._triggerResolve = null;
+      this._waitingForSpeech = false;
+      resolve(outputs);
+    } else if (this._waitingForSpeech) {
+      this._waitingForSpeech = false;
+      this._player.continue(choice ?? undefined);
+    }
   }
 
   public playGetCurrentNodeParam(param: string): AssetPropValue {
-    if (!this._playingState) {
-      return null;
-    }
-    if (this._playingState.historyPointer < 0) {
-      return null;
-    }
-    const last = this._playingState.history[this._playingState.historyPointer];
-    if (!last.currentNode) {
-      return null;
-    }
-    return getScriptPlayContextNodeParam(last, last.currentNode.id, param);
+    return this._triggerOutputs[param] ?? null;
   }
 
   public playSetCurrentNodeParam(param: string, value: AssetPropValue): void {
-    if (!this._playingState) {
-      return;
-    }
-    if (this._playingState.historyPointer < 0) {
-      return;
-    }
-    const last = this._playingState.history[this._playingState.historyPointer];
-    if (!last.currentNode) {
-      return;
-    }
-    return setScriptPlayContextNodeParam(
-      last,
-      last.currentNode.id,
-      param,
-      value,
-    );
+    this._triggerOutputs[param] = value;
   }
 
   private _initDemoMode() {
-    if (!this._playingState) {
-      return;
-    }
-
+    if (!this._playingState) return;
     this._playingState.dialog = this.appManager
       .get(DialogManager)
       .create(PlayerDialog, {
@@ -318,10 +297,7 @@ export class DialogPlayer {
   }
 
   private _destroyDemoMode() {
-    if (!this._playingState) {
-      return;
-    }
-
+    if (!this._playingState) return;
     if (this._playingState.dialog) {
       this._playingState.dialog.close();
       this._playingState.dialog = null;
@@ -329,33 +305,27 @@ export class DialogPlayer {
   }
 
   public setPlayMode(debug: boolean) {
-    if (!this._playingState) {
-      return;
-    }
-
-    if (this._playingState.debug === debug) {
-      return;
-    }
-
+    if (!this._playingState) return;
+    if (this._playingState.debug === debug) return;
     this._playingState.debug = debug;
     if (debug) {
       this._destroyDemoMode();
-      const current_node = this.currentPlayingNode;
+      const currentNode = this.currentPlayingNode;
       this._playingState.moveInterrupted = false;
-      if (current_node) {
-        this._moveViewportToNode(current_node.id);
+      if (currentNode) {
+        this._moveViewportToNode(currentNode.id);
       }
     } else {
       this._initDemoMode();
     }
   }
 
-  private async _moveViewportToNode(node_id: string) {
-    const flow_node = this.dialogController.state.nodes.find(
-      (n) => n.id === node_id,
+  private async _moveViewportToNode(nodeId: string) {
+    const flowNode = this.dialogController.state.nodes.find(
+      (n) => n.id === nodeId,
     ) as GraphNode | undefined;
-    if (flow_node) {
-      return await this.viewportHelper.moveToNodes([flow_node], {
+    if (flowNode) {
+      return await this.viewportHelper.moveToNodes([flowNode], {
         duration: this._debugNodeSwitchTime,
         interpolate: 'linear',
         maxZoom: Math.min(
@@ -367,171 +337,125 @@ export class DialogPlayer {
     return false;
   }
 
-  private async _playStepActivate(
-    playing_state: DialogPlayingState,
-    context: ScriptPlayContext,
+  private _onSpeech(
+    speech: ImscScriptPlayerSpeech,
+    node: ImscScriptGraphNodeSpeech,
   ) {
-    const current_node = context.currentNode;
+    if (!this._playingState) return;
 
-    if (current_node) {
-      let need_choose = false;
-      if (
-        current_node.type === 'speech' &&
-        (!playing_state.debug || current_node.options?.length)
-      ) {
-        need_choose = true;
-      }
-      if (
-        current_node.type === 'trigger' &&
-        (!playing_state.debug ||
-          getActionNodeParams(
-            current_node.params ?? { in: [], out: [] },
-            current_node.subject ?? null,
-            this.dialogController.getActions(),
-            current_node.values,
-          ).outputParameters.length > 0)
-      ) {
-        need_choose = true;
-      }
-      if (current_node.type === 'callScript') {
-        const asset = current_node.subject
-          ? castAssetPropValueToAsset(current_node.subject)
-          : null;
+    const isDebug = this._playingState.debug;
 
-        let hasParams = false;
-        if (asset) {
-          const controller = await loadCallScriptController(
-            this.appManager,
-            asset.AssetId,
-          );
+    if (isDebug && (!node.options || node.options.length === 0)) {
+      this._waitingForSpeech = false;
+      setTimeout(() => {
+        this._player.continue();
+      }, this._debugNodeSwitchTime);
+    } else {
+      this._waitingForSpeech = true;
+    }
+  }
 
-          const { outputParameters } = getCallScriptNodeParams(
-            current_node.params ?? { in: [], out: [] },
-            controller,
-            current_node.values,
-          );
-          hasParams = outputParameters.length > 0;
-        }
-        need_choose = !playing_state.debug || hasParams;
-      }
-      if (need_choose) {
-        if (!playing_state.choosePromise) {
-          playing_state.choosePromise = new Promise<{
-            choice: number | null;
-            cancelled: boolean;
-          }>((resolve) => {
-            playing_state.chooseResolve = resolve;
-          });
-        }
-      } else {
-        this._playChooseImpl({
-          choice: null,
-          cancelled: true,
-        });
-      }
+  private _onTrigger(
+    subject: string,
+    inputs: Record<string, AssetPropsPlainObjectValue>,
+    node: ImscScriptGraphNodeTrigger,
+  ): void | Record<string, any> | Promise<Record<string, any> | void> {
+    if (!this._playingState) return;
+
+    const isDebug = this._playingState.debug;
+    const params = getActionNodeParams(
+      (node.params as any | undefined) ?? { in: [], out: [] },
+      subject,
+      this.dialogController.getActions(),
+      node.values as any,
+    );
+    const hasOutputParams = params.outputParameters.length;
+    const needWait = !isDebug || hasOutputParams;
+
+    if (needWait) {
+      this._triggerOutputs = {};
+      return new Promise<Record<string, any>>((resolve) => {
+        this._triggerResolve = resolve;
+      });
     }
 
-    if (current_node && playing_state.debug) {
-      if (playing_state.moveInterrupted) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, this._debugNodeSwitchTime),
+    return {};
+  }
+
+  private _onNodeEnter(nodeId: string, node: any) {
+    if (!this._playingState) return;
+    const playingState = this._playingState;
+
+    const playNode: ScriptPlayNode = {
+      id: nodeId,
+      type: node.type,
+      subject: node.subject,
+      values: node.values as ScriptPlayNodeProps | undefined,
+      next: node.next,
+      options: node.options?.map((o: any) => ({
+        values: o.values as ScriptPlayNodeProps | undefined,
+        next: o.next,
+      })),
+      params: node.params,
+    };
+    this._pushHistory(playNode);
+
+    if (playingState.debug && playingState.moveInterrupted) {
+      setTimeout(() => {}, this._debugNodeSwitchTime);
+    } else if (playingState.debug) {
+      const flowNode = this.dialogController.state.nodes.find(
+        (n) => n.id === nodeId,
+      ) as GraphNode | undefined;
+      if (flowNode) {
+        playingState.moveInterrupted = !this.viewportHelper.moveToNodes(
+          [flowNode],
+          {
+            duration: this._debugNodeSwitchTime,
+            interpolate: 'linear',
+            maxZoom: Math.min(
+              this.viewportHelper.zoom,
+              this.viewportHelper.maxZoom,
+            ),
+          },
         );
-      } else {
-        const flow_node = this.dialogController.state.nodes.find(
-          (n) => n.id === current_node.id,
-        ) as GraphNode | undefined;
-        if (flow_node) {
-          playing_state.moveInterrupted =
-            !(await this.viewportHelper.moveToNodes([flow_node], {
-              duration: this._debugNodeSwitchTime,
-              interpolate: 'linear',
-              maxZoom: Math.min(
-                this.viewportHelper.zoom,
-                this.viewportHelper.maxZoom,
-              ),
-            }));
-        }
       }
     }
   }
 
+  private _pushHistory(playNode: ScriptPlayNode) {
+    if (!this._playingState) return;
+    const pointer = ++this._playingState.historyPointer;
+    this._playingState.history.splice(pointer);
+    this._playingState.history.push(playNode);
+  }
+
   public async play(debug: boolean = false) {
-    if (this._playingState) {
-      return;
+    if (this._playingState) return;
+
+    this._waitingForSpeech = false;
+    this._triggerResolve = null;
+    this._triggerOutputs = {};
+    this._externalPause = false;
+
+    this._playingState = {
+      history: [],
+      historyPointer: -1,
+      stop: false,
+      moveInterrupted: false,
+      debug,
+      dialog: null,
+    };
+
+    if (!debug) {
+      this._initDemoMode();
     }
-    await this.appManager.get(UiManager).doTask(async () => {
-      this._playingState = {
-        pausePromise: null,
-        pauseResolve: null,
-        choosePromise: null,
-        chooseResolve: null,
-        history: [],
-        historyPointer: -1,
-        stop: false,
-        moveInterrupted: false,
-        debug,
-        dialog: null,
-      };
-      const playing_state = this._playingState; // NOTE: take reactive ref
-      if (!debug) {
-        this._initDemoMode();
+
+    try {
+      await this._player.play();
+    } finally {
+      if (this._playingState && !this._playingState.stop) {
+        this._scriptEnded = true;
       }
-      try {
-        let context = createScriptPlayContext(
-          this.dialogController.getVariables(),
-        );
-
-        while (!context.ended) {
-          playing_state.history = [
-            ...playing_state.history.slice(0, playing_state.historyPointer + 1),
-            context,
-          ];
-          playing_state.historyPointer++;
-
-          await this._playStepActivate(playing_state, context);
-
-          let choice: number | null = null;
-          while (true) {
-            if (playing_state.pausePromise) {
-              await playing_state.pausePromise;
-            }
-
-            if (playing_state.stop) {
-              return;
-            }
-
-            if (playing_state.choosePromise) {
-              const choose_res = await playing_state.choosePromise;
-              playing_state.moveInterrupted = false;
-              playing_state.choosePromise = null;
-              playing_state.chooseResolve = null;
-              if (choose_res.cancelled) {
-                continue;
-              }
-              choice = choose_res.choice;
-            }
-            if (playing_state.stop) {
-              return;
-            }
-
-            break;
-          }
-
-          const activated_context =
-            playing_state.history[playing_state.historyPointer]; // NOTE: can be chnaged if user use back/forward
-
-          const graph = new ScriptPlayGraph(
-            extractDialogBlockPlain(
-              this.dialogController.resolvedBlock.computed,
-            ),
-          );
-          context = graph.step(activated_context, choice);
-        }
-      } finally {
-        if (!playing_state.stop) {
-          this.stop();
-        }
-      }
-    });
+    }
   }
 }
