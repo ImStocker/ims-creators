@@ -60,8 +60,7 @@
             }"
             :class="{
               'state-selected': params.selected,
-              'state-playing':
-                params.id === dialogPlayer.currentPlayingNode?.id,
+              'state-playing': params.id === dialogPlayer.currentPlayingNodeId,
             }"
             :dialog-controller="blockControllerMut"
             :node-data-controller="
@@ -94,7 +93,7 @@
             </div>
             <button
               class="is-button is-button-primary"
-              @click="dialogPlayer.finishPlay()"
+              @click="dialogPlayer.stop()"
             >
               {{ $t('imsDialogEditor.play.finishExecution') }}
             </button>
@@ -274,7 +273,7 @@ export default defineComponent({
     const projectContext = this.projectContext as IProjectContext | undefined;
     assert(projectContext, 'Project context is not provided');
     const viewportHelper = new FlowViewportHelper();
-    const dialogPlayer = DialogPlayer.CreateInstance(
+    const dialogPlayer = new DialogPlayer(
       this.$getAppManager(),
       this.blockController,
       viewportHelper,
@@ -327,8 +326,8 @@ export default defineComponent({
       },
     },
     scriptEndedPopupStyle() {
-      if (!this.dialogPlayer.currentPlayingNode) return {};
-      const nodeId = this.dialogPlayer.currentPlayingNode.id;
+      if (!this.dialogPlayer.lastVisitedNodeId) return {};
+      const nodeId = this.dialogPlayer.lastVisitedNodeId;
       const node = this.blockControllerMut.state.nodes.find(
         (n: any) => n.id === nodeId,
       );

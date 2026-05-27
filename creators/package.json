@@ -29,6 +29,7 @@
     "h3": "^1.14.0",
     "hash-wasm": "^4.11.0",
     "highlight.js": "^11.11.1",
+    "imsc-script": "^2.0.0",
     "ink-mde": "^0.34.0",
     "jszip": "^3.10.1",
     "mxgraph": "4.2.2",

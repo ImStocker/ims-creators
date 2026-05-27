@@ -30,8 +30,8 @@
         "
         :play-value="
           !param_gr.isOutput
-            ? playingNodeData?.values
-              ? playingNodeData?.values[param_gr.variable.name]
+            ? playingNodeData?.inputs
+              ? playingNodeData?.inputs[param_gr.variable.name]
               : null
             : dialogPlayer.playGetCurrentNodeParam(param_gr.variable.name)
         "

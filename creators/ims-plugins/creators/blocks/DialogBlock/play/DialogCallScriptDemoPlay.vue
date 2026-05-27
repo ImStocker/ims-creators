@@ -45,8 +45,8 @@
             v-else
             :data-type="param_gr.variable.type"
             :model-value="
-              playingNodeData?.values
-                ? playingNodeData?.values[param_gr.variable.name]
+              playingNodeData?.inputs
+                ? playingNodeData?.inputs[param_gr.variable.name]
                 : null
             "
             :title="param_gr.variable.description ?? ''"
@@ -79,6 +79,7 @@ import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
 import {
   AssetPropType,
   castAssetPropValueToAsset,
+  type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import { getCallScriptNodeParams } from '../logic/nodeParams';
 import { loadCallScriptController } from '../logic/callScriptLoader';
@@ -116,14 +117,16 @@ export default defineComponent({
     },
     callScript() {
       return this.playingNodeData.subject
-        ? castAssetPropValueToAsset(this.playingNodeData.subject)
+        ? castAssetPropValueToAsset(
+            this.playingNodeData.subject as AssetPropValue,
+          )
         : null;
     },
     callScriptNodeParams() {
       return getCallScriptNodeParams(
-        this.playingNodeData.params ?? { in: [], out: [] },
+        (this.playingNodeData.node as any).params ?? { in: [], out: [] },
         this.callScriptController as DialogBlockController | null,
-        this.playingNodeData.values,
+        (this.playingNodeData.node as any).values,
       );
     },
     inputParameters(): DialogVariable[] {

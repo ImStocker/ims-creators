@@ -126,7 +126,7 @@ export default defineComponent({
       return generateDataPinId(true, 'result');
     },
     arg1PlayVal() {
-      return this.playingNodeData?.values?.arg1 ?? null;
+      return this.playingNodeData?.inputs?.arg1 ?? null;
     },
     arg1Val: {
       get() {
@@ -137,7 +137,7 @@ export default defineComponent({
       },
     },
     arg2PlayVal() {
-      return this.playingNodeData?.values?.arg2 ?? null;
+      return this.playingNodeData?.inputs?.arg2 ?? null;
     },
     arg2Val: {
       get() {

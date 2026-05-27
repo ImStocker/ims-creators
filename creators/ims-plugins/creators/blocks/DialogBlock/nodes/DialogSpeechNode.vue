@@ -58,8 +58,8 @@
                 : nodeDataController.values[variable.name]
             "
             :play-value="
-              playingNodeData?.values
-                ? playingNodeData.values[variable.name]
+              playingNodeData?.inputs
+                ? playingNodeData.inputs[variable.name]
                 : null
             "
             :in-id="generateDataPinId(false, variable.name)"
@@ -113,12 +113,10 @@
                   :readonly="readonly"
                   :model-value="option.values['condition'] ?? null"
                   :play-value="
-                    playingNodeData?.options &&
-                    playingNodeData.options[option_index] &&
-                    playingNodeData.options[option_index].values
-                      ? playingNodeData.options[option_index].values[
-                          'condition'
-                        ]
+                    playingNodeData?.optionsInputs &&
+                    playingNodeData.optionsInputs[option_index] &&
+                    playingNodeData.optionsInputs[option_index]
+                      ? playingNodeData.optionsInputs[option_index]['condition']
                       : null
                   "
                   @update:model-value="
@@ -153,10 +151,10 @@
                         )
                   "
                   :play-value="
-                    playingNodeData?.options &&
-                    playingNodeData.options[option_index] &&
-                    playingNodeData.options[option_index].values
-                      ? playingNodeData.options[option_index].values[
+                    playingNodeData?.optionsInputs &&
+                    playingNodeData.optionsInputs[option_index] &&
+                    playingNodeData.optionsInputs[option_index]
+                      ? playingNodeData.optionsInputs[option_index][
                           variable.name
                         ]
                       : null
@@ -336,7 +334,7 @@ export default defineComponent({
       return this.dialogController.getOptionSpeech();
     },
     isPlaying() {
-      return this.dialogPlayer.currentPlayingNode?.id === this.id;
+      return this.dialogPlayer.currentPlayingNodeId === this.id;
     },
     coverValue: {
       get() {
@@ -589,17 +587,14 @@ export default defineComponent({
       if (!this.playingNodeData) {
         return true;
       }
-      if (
-        !this.playingNodeData.options ||
-        !this.playingNodeData.options[option_index]
-      ) {
+      if (!this.playingNodeData.optionsInputs[option_index]) {
         return true;
       }
-      const option = this.playingNodeData.options[option_index];
-      if (!option.values) {
+      const optionValues = this.playingNodeData.optionsInputs[option_index];
+      if (!optionValues) {
         return true;
       }
-      return option.values.condition === undefined || option.values.condition;
+      return optionValues.condition === undefined || optionValues.condition;
     },
     sameAssetPropValues,
   },

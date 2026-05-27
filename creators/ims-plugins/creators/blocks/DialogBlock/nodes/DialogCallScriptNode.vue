@@ -122,7 +122,7 @@ export default defineComponent({
   computed: {
     playWaitUser() {
       return (
-        this.dialogPlayer.currentPlayingNode?.id === this.id &&
+        this.dialogPlayer.currentPlayingNodeId === this.id &&
         this.outputParameters.length > 0
       );
     },

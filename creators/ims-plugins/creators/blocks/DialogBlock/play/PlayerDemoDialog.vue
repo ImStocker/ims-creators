@@ -11,7 +11,7 @@
           </div>
           <button
             class="PlayerDemoDialog-option-button"
-            @click="dialogPlayer.finishPlay()"
+            @click="dialogPlayer.stop()"
           >
             {{ $t('imsDialogEditor.play.finishExecution') }}
           </button>
@@ -19,19 +19,19 @@
       </template>
       <template v-else-if="currentPlayingNode">
         <dialog-speech-demo-play
-          v-if="currentPlayingNode.type === 'speech'"
+          v-if="currentPlayingNode.node.type === 'speech'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-speech-demo-play>
         <dialog-trigger-demo-play
-          v-else-if="currentPlayingNode.type === 'trigger'"
+          v-else-if="currentPlayingNode.node.type === 'trigger'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-trigger-demo-play>
         <dialog-call-script-demo-play
-          v-else-if="currentPlayingNode.type === 'callScript'"
+          v-else-if="currentPlayingNode.node.type === 'callScript'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
@@ -39,7 +39,11 @@
         <div v-else class="PlayerDemoDialog-customNode">
           <div class="PlayerDemoDialog-customNode-content">
             {{
-              $t('imsDialogEditor.nodes.' + currentPlayingNode.type + '.title')
+              $t(
+                'imsDialogEditor.nodes.' +
+                  currentPlayingNode.node.type +
+                  '.title',
+              )
             }}
           </div>
           <button
