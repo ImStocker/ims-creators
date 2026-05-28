@@ -31,6 +31,7 @@ import {
 } from './ScriptPlayNode';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 
 type DialogPlayingState = {
   history: ImscScriptPlayerState[];
@@ -39,6 +40,13 @@ type DialogPlayingState = {
   moveInterrupted: boolean;
   debug: boolean;
   dialog: DialogHandler<void, any> | null;
+};
+
+type DialogPlayerLoadedScript = {
+  id: string;
+  graph: ImscScriptGraph;
+  controller: DialogBlockController;
+  release: () => void;
 };
 
 export class DialogPlayer {
@@ -50,6 +58,8 @@ export class DialogPlayer {
     | null = null;
   private _triggerOutputs: Record<string, AssetPropsPlainObjectValue> = {};
   private _scriptEnded = false;
+  private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
+  private _playEpoch = 0;
 
   constructor(
     protected appManager: IAppManager,
@@ -59,10 +69,11 @@ export class DialogPlayer {
   ) {}
 
   private _createPlayer() {
-    assert(this.dialogController.resolvedBlock?.assetId);
-    const script_graph = convertAssetPropsToPlainObject(
-      this.dialogController.resolvedBlock.computed,
-    );
+    const assetId = this.dialogController.resolvedBlock?.assetId;
+    assert(assetId);
+
+    const loadedScript = this._loadedScripts.get(assetId);
+    assert(loadedScript);
 
     const defaultVariableValues = this.dialogController.getVariables().reduce(
       (acc, variable) => {
@@ -72,7 +83,8 @@ export class DialogPlayer {
       {} as Record<string, AssetPropValue>,
     );
 
-    return new ImscScriptPlayer(script_graph as ImscScriptGraph, {
+    return new ImscScriptPlayer(loadedScript.graph as ImscScriptGraph, {
+      scriptId: assetId,
       initialVariables: defaultVariableValues,
       events: {
         onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
@@ -93,16 +105,49 @@ export class DialogPlayer {
           this.appManager.get(UiManager).showError(error);
         },
         onLoadScript: async ({ scriptId }) => {
-          const asset = await this.appManager
-            .get(CreatorAssetManager)
-            .getAssetInstance(scriptId);
-          if (!asset) throw new Error('Script asset not found');
-          const blocks = await asset.resolveBlocks();
-          const content_block = blocks.mapNames['content'];
-          if (content_block?.type !== 'script') {
-            throw new Error('Script not found in asset');
+          const playEpoch = this._playEpoch;
+          let loadedScript = this._loadedScripts.get(scriptId);
+          if (!loadedScript) {
+            const asset = await this.appManager
+              .get(CreatorAssetManager)
+              .getAssetInstance(scriptId);
+            if (!asset) throw new Error('Script asset not found');
+            if (playEpoch !== this._playEpoch) {
+              throw new Error('Play is aborted');
+            }
+            const blocks = await asset.resolveBlocks();
+            const content_block = blocks.mapNames['content'];
+            if (content_block?.type !== 'script') {
+              throw new Error('Script not found in asset');
+            }
+            const context_request = this.appManager
+              .get(EditorManager)
+              .requestEditorContextForAsset(asset.id);
+            const controller = await context_request.promise;
+            if (playEpoch !== this._playEpoch) {
+              context_request.release();
+              throw new Error('Play is aborted');
+            }
+            if (!controller) {
+              throw new Error('Cannot get editor controller');
+            }
+            const block_controller = controller.getBlockController(
+              content_block.id,
+            );
+            if (!block_controller) {
+              throw new Error('Cannot get block controller');
+            }
+            loadedScript = {
+              id: scriptId,
+              graph: convertAssetPropsToPlainObject(content_block.computed),
+              release: () => context_request.release(),
+              controller: block_controller as DialogBlockController,
+            };
+            this._loadedScripts.set(loadedScript.id, loadedScript);
           }
-          return convertAssetPropsToPlainObject(content_block.computed);
+          assert(loadedScript);
+
+          return loadedScript.graph;
         },
       },
     });
@@ -175,6 +220,15 @@ export class DialogPlayer {
     const record =
       this._playingState.history[this._playingState.historyPointer];
     return getScriptPlayNodeFromState(record);
+  }
+
+  get currentPlayingDialogController(): DialogBlockController | null {
+    if (!this._player) return null;
+    const loadedScript = this._loadedScripts.get(
+      this._player.currentFrame.scriptId ?? '',
+    );
+    if (!loadedScript) return null;
+    return loadedScript.controller;
   }
 
   get currentPlayingNodeId(): string | null {
@@ -304,6 +358,11 @@ export class DialogPlayer {
     this._playingState = null;
     this._triggerResolve = null;
     this._scriptEnded = false;
+    this._player = null;
+    for (const loadedScript of this._loadedScripts.values()) {
+      loadedScript.release();
+    }
+    this._loadedScripts = new Map();
   }
 
   public async restart() {
@@ -415,12 +474,17 @@ export class DialogPlayer {
     | { outputs: Record<string, any> }
     | Promise<{ outputs: Record<string, any> } | void> {
     if (!this._playingState) return;
+    if (!this._player) return;
 
+    const loadedScript = this._loadedScripts.get(
+      this._player.currentFrame.scriptId ?? '',
+    );
+    assert(loadedScript);
     const isDebug = this._playingState.debug;
     const params = getActionNodeParams(
       (node as any).params ?? { in: [], out: [] },
       subject,
-      this.dialogController.getActions(),
+      loadedScript.controller.getActions(),
       node.values as any,
     );
     const hasOutputParams = params.outputParameters.length;
@@ -482,8 +546,17 @@ export class DialogPlayer {
 
   public play(debug: boolean = false) {
     if (this._playingState) return;
+    if (!this.dialogController.resolvedBlock) return;
 
-    this._waitingForSpeech = null;
+    this._loadedScripts = new Map<string, DialogPlayerLoadedScript>();
+    this._loadedScripts.set(this.dialogController.resolvedBlock.assetId, {
+      id: this.dialogController.resolvedBlock.assetId,
+      controller: this.dialogController,
+      graph: convertAssetPropsToPlainObject(
+        this.dialogController.resolvedBlock.computed,
+      ),
+      release: () => {},
+    });
     this._triggerResolve = null;
     this._triggerOutputs = {};
 
@@ -502,6 +575,7 @@ export class DialogPlayer {
       this._initDemoMode();
     }
 
+    ++this._playEpoch;
     this._player.play();
   }
 }

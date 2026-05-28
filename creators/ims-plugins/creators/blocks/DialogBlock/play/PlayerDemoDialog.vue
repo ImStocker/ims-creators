@@ -1,5 +1,8 @@
 <template>
-  <dialog-content class="PlayerDemoDialog tiny-scrollbars">
+  <dialog-content
+    v-if="dialogController"
+    class="PlayerDemoDialog tiny-scrollbars"
+  >
     <div class="PlayerDemoDialog-toolbar">
       <dialog-play-toolbar :dialog-player="dialogPlayer"></dialog-play-toolbar>
     </div>
@@ -66,13 +69,11 @@ import type { DialogPlayer } from './DialogPlayer';
 import DialogPlayToolbar from './DialogPlayToolbar.vue';
 import DialogSpeechDemoPlay from './DialogSpeechDemoPlay.vue';
 import DialogTriggerDemoPlay from './DialogTriggerDemoPlay.vue';
-import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptDemoPlay from './DialogCallScriptDemoPlay.vue';
 
 type DialogProps = {
   dialogPlayer: DialogPlayer;
-  dialogController: DialogBlockController;
   projectContext: IProjectContext;
 };
 
@@ -101,7 +102,7 @@ export default defineComponent({
   emits: ['dialog-parameters'],
   computed: {
     dialogController() {
-      return this.dialog.state.dialogController;
+      return this.dialogPlayer.currentPlayingDialogController;
     },
     dialogPlayer() {
       return this.dialog.state.dialogPlayer;
