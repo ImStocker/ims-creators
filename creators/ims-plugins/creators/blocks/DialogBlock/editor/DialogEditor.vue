@@ -27,9 +27,9 @@
         :pan-on-drag="[2]"
         :connection-mode="ConnectionMode.Strict"
         :delete-key-code="['Delete', 'Backspace']"
-        :edges-updatable="!readonly"
-        :nodes-draggable="!readonly"
-        :nodes-connectable="!readonly"
+        :edges-updatable="!readonlyComp"
+        :nodes-draggable="!readonlyComp"
+        :nodes-connectable="!readonlyComp"
         :snap-to-grid="true"
         :snap-grid="[10, 10]"
         :min-zoom="0.1"
@@ -67,7 +67,7 @@
               blockControllerMut.getNodeDataController(params.id)
             "
             :node-descriptor="node_desc"
-            :readonly="readonly"
+            :readonly="readonlyComp"
             :playing-node-data="dialogPlayer.getLastPlayNode(params.id)"
             :dialog-player="dialogPlayer"
             @change-type="changeNodeType(params.id, $event)"
@@ -130,7 +130,7 @@
         </template>
         <manage-variables-dropdown
           :dialog-controller="blockControllerMut"
-          :readonly="readonly"
+          :readonly="readonlyComp"
         ></manage-variables-dropdown>
       </menu-button>
       <menu-button class="DialogEditor-actions">
@@ -142,7 +142,7 @@
         </template>
         <manage-actions-dropdown
           :dialog-controller="blockControllerMut"
-          :readonly="readonly"
+          :readonly="readonlyComp"
         ></manage-actions-dropdown>
       </menu-button>
     </div>
@@ -292,7 +292,13 @@ export default defineComponent({
     ConnectionMode() {
       return ConnectionMode;
     },
+    readonlyComp() {
+      return this.readonly || this.dialogPlayer.isPlaying;
+    },
     blockControllerMut() {
+      const playingBlockController =
+        this.dialogPlayer.currentPlayingDialogController;
+      if (playingBlockController) return playingBlockController;
       return this.blockController;
     },
     nodeDescriptors() {
@@ -448,7 +454,7 @@ export default defineComponent({
       params.template.apply(node_data_controller);
     },
     async createNode(descriptor: NodeDescriptor) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return null;
       }
       if (!this.createNodeContext) {
@@ -592,19 +598,19 @@ export default defineComponent({
       };
     },
     saveProps() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.blockControllerMut.saveProps();
     },
     savePropsDelayed() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.blockControllerMut.savePropsDelayed();
     },
     onMouseDown() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.createNodeContext = null;
@@ -623,7 +629,7 @@ export default defineComponent({
       ev.preventDefault();
     },
     onMouseUp(ev: PointerEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       if (ev.button !== 2) {
@@ -773,7 +779,7 @@ export default defineComponent({
       }
     },
     onDragOver(event: DragEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       const target = event.target as HTMLElement | null;
@@ -800,7 +806,7 @@ export default defineComponent({
       event.preventDefault();
     },
     async onDrop(event: DragEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       const target = event.target as HTMLElement | null;

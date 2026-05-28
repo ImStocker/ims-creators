@@ -245,12 +245,15 @@ export class DialogPlayer {
   }
 
   get lastVisitedNodeId(): string | null {
-    if (!this._playingState) {
+    if (!this._playingState || !this._player) {
       return null;
     }
     for (let p = this._playingState.historyPointer; p >= 0; p--) {
       const record = this._playingState.history[p];
-      if (record.frames[0].currentNode) {
+      if (
+        record.frames[0].currentNode &&
+        record.frames.length === this._player.frames.length
+      ) {
         return record.frames[0].currentNode.id;
       }
     }
@@ -278,11 +281,19 @@ export class DialogPlayer {
       targetH >= 1;
       targetH--
     ) {
-      const sourceH = targetH - 1;
       const targetContext = getScriptPlayNodeFromState(
         this._playingState.history[targetH],
       );
       if (targetContext?.id !== targetId) continue;
+      let sourceH = targetH - 1;
+      while (
+        sourceH >= 0 &&
+        this._playingState.history[sourceH].frames.length >
+          this._playingState.history[targetH].frames.length
+      ) {
+        sourceH--; // Look for sourceH in case of subscript call
+      }
+      if (sourceH < 0) continue;
       const sourceContext = getScriptPlayNodeFromState(
         this._playingState.history[sourceH],
       );
@@ -403,7 +414,6 @@ export class DialogPlayer {
       .get(DialogManager)
       .create(PlayerDialog, {
         dialogPlayer: this,
-        dialogController: this.dialogController,
         projectContext: this.projectContext,
       });
     this._playingState.dialog.open();
@@ -434,7 +444,9 @@ export class DialogPlayer {
   }
 
   private async _moveViewportToNode(nodeId: string) {
-    const flowNode = this.dialogController.state.nodes.find(
+    const currentController = this.currentPlayingDialogController;
+    if (!currentController) return false;
+    const flowNode = currentController.state.nodes.find(
       (n) => n.id === nodeId,
     ) as GraphNode | undefined;
     if (flowNode) {
@@ -515,24 +527,25 @@ export class DialogPlayer {
 
     this._pushHistory(this._player.serialize());
 
-    if (playingState.debug && playingState.moveInterrupted) {
-      await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
-    } else if (playingState.debug) {
-      const flowNode = this.dialogController.state.nodes.find(
-        (n) => n.id === nodeId,
-      ) as GraphNode | undefined;
-      if (flowNode) {
-        playingState.moveInterrupted = !(await this.viewportHelper.moveToNodes(
-          [flowNode],
-          {
-            duration: this._debugNodeSwitchTime,
-            interpolate: 'linear',
-            maxZoom: Math.min(
-              this.viewportHelper.zoom,
-              this.viewportHelper.maxZoom,
-            ),
-          },
-        ));
+    if (playingState.debug) {
+      const currentController = this.currentPlayingDialogController;
+      if (playingState.moveInterrupted || !currentController) {
+        await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
+      } else {
+        const flowNode = currentController.state.nodes.find(
+          (n) => n.id === nodeId,
+        ) as GraphNode | undefined;
+        if (flowNode) {
+          playingState.moveInterrupted =
+            !(await this.viewportHelper.moveToNodes([flowNode], {
+              duration: this._debugNodeSwitchTime,
+              interpolate: 'linear',
+              maxZoom: Math.min(
+                this.viewportHelper.zoom,
+                this.viewportHelper.maxZoom,
+              ),
+            }));
+        }
       }
     }
   }
@@ -546,15 +559,14 @@ export class DialogPlayer {
 
   public play(debug: boolean = false) {
     if (this._playingState) return;
-    if (!this.dialogController.resolvedBlock) return;
+    const resolvedBlock = this.dialogController.resolvedBlock;
+    if (!resolvedBlock) return;
 
     this._loadedScripts = new Map<string, DialogPlayerLoadedScript>();
-    this._loadedScripts.set(this.dialogController.resolvedBlock.assetId, {
-      id: this.dialogController.resolvedBlock.assetId,
+    this._loadedScripts.set(resolvedBlock.assetId, {
+      id: resolvedBlock.assetId,
       controller: this.dialogController,
-      graph: convertAssetPropsToPlainObject(
-        this.dialogController.resolvedBlock.computed,
-      ),
+      graph: convertAssetPropsToPlainObject(resolvedBlock.computed),
       release: () => {},
     });
     this._triggerResolve = null;
