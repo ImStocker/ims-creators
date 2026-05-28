@@ -60,6 +60,7 @@ export class DialogPlayer {
   private _scriptEnded = false;
   private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
   private _playEpoch = 0;
+  public viewingFrameIndex = 0;
 
   constructor(
     protected appManager: IAppManager,
@@ -149,6 +150,12 @@ export class DialogPlayer {
 
           return loadedScript.graph;
         },
+        onSubScriptExit: () => {
+          if (!this._player) return;
+          if (this.viewingFrameIndex >= this._player.frames.length) {
+            this.viewingFrameIndex = this._player.frames.length - 1;
+          }
+        },
       },
     });
   }
@@ -220,6 +227,14 @@ export class DialogPlayer {
     const record =
       this._playingState.history[this._playingState.historyPointer];
     return getScriptPlayNodeFromState(record);
+  }
+
+  get viewingDialogController(): DialogBlockController | null {
+    if (!this._player) return null;
+    const scriptId = this._player.frames[this.viewingFrameIndex]?.scriptId;
+    const loadedScript = this._loadedScripts.get(scriptId ?? '');
+    if (!loadedScript) return null;
+    return loadedScript.controller;
   }
 
   get currentPlayingDialogController(): DialogBlockController | null {
@@ -352,6 +367,7 @@ export class DialogPlayer {
     if (!this._player) return;
     this._scriptEnded = false;
     const currentNode = this._player.currentFrame.currentNode;
+    this.viewingFrameIndex = 0;
     this._player.resume();
     if (currentNode) {
       const option = this._getFirstAvailableChoice(currentNode);
@@ -596,5 +612,22 @@ export class DialogPlayer {
 
     ++this._playEpoch;
     this._player.play();
+  }
+
+  get playingFramesInfos() {
+    if (!this.isPlaying || !this._player) return [];
+    return this._player.frames.map((frame, ind) => {
+      const asset = frame.scriptId
+        ? this.appManager
+            .get(CreatorAssetManager)
+            .getAssetShortViaCacheSync(frame.scriptId)
+        : null;
+      return {
+        id: (frame.scriptId ?? '') + '_' + ind,
+        title: asset ? asset.title : (frame.scriptId ?? ''),
+        scriptId: frame.scriptId,
+        frameIndex: ind,
+      };
+    });
   }
 }

@@ -120,6 +120,36 @@
         ></CreateNodeDropdown>
       </dropdown-element>
     </div>
+    <div class="DialogEditor-topButtons">
+      <menu-button
+        v-if="playingFramesInfos.length > 1"
+        class="DialogEdtior-frameSelector"
+      >
+        <template #button="{ toggle }">
+          <button
+            class="is-button is-button-action DialogEdtior-frameSelector-button"
+            @click="toggle"
+          >
+            <i class="ri-arrow-down-s-line"></i>
+            {{ playingFramesInfos[dialogPlayer.viewingFrameIndex]?.title }}
+          </button>
+        </template>
+        <div class="DialogEdtior-frameSelector-options is-dropdown">
+          <div
+            v-for="frame of playingFramesInfos"
+            :key="frame.id"
+            class="DialogEdtior-frameSelector-options-one"
+            @click="dialogPlayer.viewingFrameIndex = frame.frameIndex"
+          >
+            <i
+              v-if="frame.frameIndex === dialogPlayer.viewingFrameIndex"
+              class="ri-arrow-right-s-fill"
+            ></i>
+            {{ frame.title }}
+          </div>
+        </div>
+      </menu-button>
+    </div>
     <div class="DialogEditor-buttons">
       <menu-button class="DialogEditor-variables">
         <template #button="{ toggle }">
@@ -296,8 +326,7 @@ export default defineComponent({
       return this.readonly || this.dialogPlayer.isPlaying;
     },
     blockControllerMut() {
-      const playingBlockController =
-        this.dialogPlayer.currentPlayingDialogController;
+      const playingBlockController = this.dialogPlayer.viewingDialogController;
       if (playingBlockController) return playingBlockController;
       return this.blockController;
     },
@@ -353,6 +382,9 @@ export default defineComponent({
     },
     scriptEndedPopup() {
       return this.dialogPlayer.scriptEnded && this.dialogPlayer.isPlayDebug;
+    },
+    playingFramesInfos() {
+      return this.dialogPlayer.playingFramesInfos;
     },
   },
   watch: {
@@ -1111,19 +1143,52 @@ export default defineComponent({
   justify-content: center;
   pointer-events: none;
 }
-.DialogEditor-buttons {
+.DialogEditor-buttons,
+.DialogEditor-topButtons {
   display: flex;
   gap: 5px;
   position: absolute;
+}
+.DialogEditor-buttons {
   bottom: 5px;
   left: 5px;
 }
-.DialogEditor-buttons {
+.DialogEditor-topButtons {
+  top: 5px;
+  left: 5px;
+}
+.DialogEditor-buttons,
+.DialogEditor-topButtons {
   .is-button {
     padding-left: 18px;
     &:not(:hover):not(:focus) {
       --button-bg-color: var(--local-bg-color);
     }
+  }
+}
+.DialogEdtior-frameSelector-button {
+  --button-text-color: var(--imsde-node-playing-color);
+  --button-border-color: var(--imsde-node-playing-color);
+}
+
+.DialogEdtior-frameSelector-options {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  overflow: auto;
+  min-width: 100px;
+}
+.DialogEdtior-frameSelector-options-one {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  padding: 5px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--local-hl-bg-color);
   }
 }
 .DialogEditor-hint-inner {
