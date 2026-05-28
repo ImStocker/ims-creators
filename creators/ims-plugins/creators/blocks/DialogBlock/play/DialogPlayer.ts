@@ -322,7 +322,7 @@ export class DialogPlayer {
     }
     const node_id = getScriptPlayNodeFromState(record)?.id ?? null;
     if (node_id) {
-      this._moveViewportToNode(node_id);
+      this._moveViewportToNode(node_id, this._debugNodeSwitchTime);
     }
   }
 
@@ -436,14 +436,14 @@ export class DialogPlayer {
       const currentNode = this.currentPlayingNode;
       this._playingState.moveInterrupted = false;
       if (currentNode) {
-        this._moveViewportToNode(currentNode.id);
+        this._moveViewportToNode(currentNode.id, this._debugNodeSwitchTime);
       }
     } else {
       this._initDemoMode();
     }
   }
 
-  private async _moveViewportToNode(nodeId: string) {
+  private async _moveViewportToNode(nodeId: string, duration: number) {
     const currentController = this.currentPlayingDialogController;
     if (!currentController) return false;
     const flowNode = currentController.state.nodes.find(
@@ -451,7 +451,7 @@ export class DialogPlayer {
     ) as GraphNode | undefined;
     if (flowNode) {
       return await this.viewportHelper.moveToNodes([flowNode], {
-        duration: this._debugNodeSwitchTime,
+        duration,
         interpolate: 'linear',
         maxZoom: Math.min(
           this.viewportHelper.zoom,
@@ -529,23 +529,30 @@ export class DialogPlayer {
 
     if (playingState.debug) {
       const currentController = this.currentPlayingDialogController;
+      if (
+        currentController &&
+        this._playingState.history.length >= 2 &&
+        this._playingState.history[this._playingState.history.length - 1].frames
+          .length !==
+          this._playingState.history[this._playingState.history.length - 2]
+            .frames.length
+      ) {
+        // Switched between frames
+        playingState.moveInterrupted = !(await this._moveViewportToNode(
+          nodeId,
+          0,
+        ));
+        await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
+        return;
+      }
+
       if (playingState.moveInterrupted || !currentController) {
         await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
       } else {
-        const flowNode = currentController.state.nodes.find(
-          (n) => n.id === nodeId,
-        ) as GraphNode | undefined;
-        if (flowNode) {
-          playingState.moveInterrupted =
-            !(await this.viewportHelper.moveToNodes([flowNode], {
-              duration: this._debugNodeSwitchTime,
-              interpolate: 'linear',
-              maxZoom: Math.min(
-                this.viewportHelper.zoom,
-                this.viewportHelper.maxZoom,
-              ),
-            }));
-        }
+        playingState.moveInterrupted = !(await this._moveViewportToNode(
+          nodeId,
+          this._debugNodeSwitchTime,
+        ));
       }
     }
   }

@@ -28,16 +28,11 @@
         :dialog-player="dialogPlayer"
         :node-data-controller="nodeDataController"
         :readonly="readonly"
-        :play-wait-user="playWaitUser"
+        :play-wait-user="false"
         :output-params="outputParameters"
         :input-params="inputParameters"
         :playing-node-data="playingNodeData"
       ></node-parameters-grid>
-      <div v-if="playWaitUser" class="DialogCallScriptNode-play">
-        <button class="is-button" @click="dialogPlayer.playChoose(null)">
-          {{ $t('imsDialogEditor.play.continue') }}
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -120,12 +115,6 @@ export default defineComponent({
     };
   },
   computed: {
-    playWaitUser() {
-      return (
-        this.dialogPlayer.currentPlayingNodeId === this.id &&
-        this.outputParameters.length > 0
-      );
-    },
     callScriptNodeParams() {
       return getCallScriptNodeParams(
         this.nodeDataController.params,
