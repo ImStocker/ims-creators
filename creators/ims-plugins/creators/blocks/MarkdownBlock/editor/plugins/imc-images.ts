@@ -3,7 +3,7 @@ import type { EditorState, Extension, Range } from '@codemirror/state';
 import { RangeSet, StateField } from '@codemirror/state';
 import type { DecorationSet } from '@codemirror/view';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
-import { getSrcByFileId } from '~ims-app-base/logic/utils/files';
+import FileManager from '~ims-app-base/logic/managers/FileManager';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import type { AssetPropValueFile } from '~ims-app-base/logic/types/Props';
 
@@ -87,9 +87,8 @@ export const imagesExtension = (config: PluginConfig): Extension => {
     if (!url.startsWith('http') && !url.startsWith('data')) {
       const file = parseImagePathToFile(url);
       if (file) {
-        url = getSrcByFileId(
-          config.appManager,
-          parseImagePathToFile(url) as AssetPropValueFile,
+        url = config.appManager.get(FileManager).getFileUrl(
+          file as AssetPropValueFile,
         );
       }
     }

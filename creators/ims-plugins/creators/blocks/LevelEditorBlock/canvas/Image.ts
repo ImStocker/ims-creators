@@ -1,7 +1,7 @@
 import * as fabric from 'fabric';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import type { AssetPropValueFile } from '~ims-app-base/logic/types/Props';
-import { getSrcByFileId } from '~ims-app-base/logic/utils/files';
+import FileManager from '~ims-app-base/logic/managers/FileManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 
 export default class Image extends fabric.FabricImage {
@@ -13,7 +13,7 @@ export default class Image extends fabric.FabricImage {
     file: AssetPropValueFile,
     renderProps: Partial<fabric.ImageProps>,
   ) {
-    const imageURL = getSrcByFileId(appManager, file);
+    const imageURL = appManager.get(FileManager).getFileUrl(file);
 
     super(document.createElement('img'), {
       ...renderProps,
