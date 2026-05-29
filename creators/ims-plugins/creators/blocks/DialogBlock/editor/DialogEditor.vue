@@ -60,7 +60,11 @@
             }"
             :class="{
               'state-selected': params.selected,
-              'state-playing': params.id === dialogPlayer.currentPlayingNodeId,
+              'state-playing-now':
+                params.id === dialogPlayer.currentPlayingNodeId &&
+                dialogPlayer.displayingFrameIndex === 0,
+              'state-playing':
+                params.id === dialogPlayer.displayingFrameCurrentPlayingNodeId,
             }"
             :dialog-controller="blockControllerMut"
             :node-data-controller="
@@ -131,7 +135,7 @@
             @click="toggle"
           >
             <i class="ri-arrow-down-s-line"></i>
-            {{ playingFramesInfos[dialogPlayer.viewingFrameIndex]?.title }}
+            {{ playingFramesInfos[dialogPlayer.displayingFrameIndex]?.title }}
           </button>
         </template>
         <div class="DialogEdtior-frameSelector-options is-dropdown">
@@ -139,10 +143,10 @@
             v-for="frame of playingFramesInfos"
             :key="frame.id"
             class="DialogEdtior-frameSelector-options-one"
-            @click="dialogPlayer.viewingFrameIndex = frame.frameIndex"
+            @click="dialogPlayer.displayingFrameIndex = frame.frameIndex"
           >
             <i
-              v-if="frame.frameIndex === dialogPlayer.viewingFrameIndex"
+              v-if="frame.frameIndex === dialogPlayer.displayingFrameIndex"
               class="ri-arrow-right-s-fill"
             ></i>
             {{ frame.title }}
@@ -326,7 +330,8 @@ export default defineComponent({
       return this.readonly || this.dialogPlayer.isPlaying;
     },
     blockControllerMut() {
-      const playingBlockController = this.dialogPlayer.viewingDialogController;
+      const playingBlockController =
+        this.dialogPlayer.displayingFrameDialogController;
       if (playingBlockController) return playingBlockController;
       return this.blockController;
     },

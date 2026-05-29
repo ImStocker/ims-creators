@@ -334,7 +334,10 @@ export default defineComponent({
       return this.dialogController.getOptionSpeech();
     },
     isPlaying() {
-      return this.dialogPlayer.currentPlayingNodeId === this.id;
+      return (
+        this.dialogPlayer.currentPlayingNodeId === this.id &&
+        this.dialogPlayer.displayingFrameIndex === 0
+      );
     },
     coverValue: {
       get() {

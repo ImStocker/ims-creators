@@ -60,7 +60,7 @@ export class DialogPlayer {
   private _scriptEnded = false;
   private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
   private _playEpoch = 0;
-  public viewingFrameIndex = 0;
+  public displayingFrameIndex = 0;
 
   constructor(
     protected appManager: IAppManager,
@@ -152,8 +152,8 @@ export class DialogPlayer {
         },
         onSubScriptExit: () => {
           if (!this._player) return;
-          if (this.viewingFrameIndex >= this._player.frames.length) {
-            this.viewingFrameIndex = this._player.frames.length - 1;
+          if (this.displayingFrameIndex >= this._player.frames.length) {
+            this.displayingFrameIndex = this._player.frames.length - 1;
           }
         },
       },
@@ -229,12 +229,44 @@ export class DialogPlayer {
     return getScriptPlayNodeFromState(record);
   }
 
-  get viewingDialogController(): DialogBlockController | null {
+  get displayingFrameDialogController(): DialogBlockController | null {
     if (!this._player) return null;
-    const scriptId = this._player.frames[this.viewingFrameIndex]?.scriptId;
+    const scriptId = this._player.frames[this.displayingFrameIndex]?.scriptId;
     const loadedScript = this._loadedScripts.get(scriptId ?? '');
     if (!loadedScript) return null;
     return loadedScript.controller;
+  }
+
+  get displayingFrameLastHistoryRecord(): {
+    index: number | null;
+    record: ImscScriptPlayerState | null;
+  } {
+    if (
+      !this._playingState ||
+      !this._player ||
+      this._playingState.historyPointer < 0 ||
+      this._playingState.history.length === 0
+    ) {
+      return { index: null, record: null };
+    }
+    let p = this._playingState.historyPointer;
+    while (
+      p >= 0 &&
+      this._playingState.history[p].frames.length !==
+        this._player.frames.length - this.displayingFrameIndex
+    ) {
+      p--;
+    }
+    if (p < 0) return { index: null, record: null };
+    return {
+      index: p,
+      record: this._playingState.history[p],
+    };
+  }
+
+  get displayingFrameCurrentPlayingNodeId(): string | null {
+    const { record } = this.displayingFrameLastHistoryRecord;
+    return record ? (record.frames[0].currentNode?.id ?? null) : null;
   }
 
   get currentPlayingDialogController(): DialogBlockController | null {
@@ -367,7 +399,7 @@ export class DialogPlayer {
     if (!this._player) return;
     this._scriptEnded = false;
     const currentNode = this._player.currentFrame.currentNode;
-    this.viewingFrameIndex = 0;
+    this.displayingFrameIndex = 0;
     this._player.resume();
     if (currentNode) {
       const option = this._getFirstAvailableChoice(currentNode);
