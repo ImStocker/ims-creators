@@ -617,6 +617,13 @@ export class DialogPlayer {
     const resolvedBlock = this.dialogController.resolvedBlock;
     if (!resolvedBlock) return;
 
+    const start = this.dialogController.hasStart;
+    if (!start) {
+      throw new Error(
+        this.appManager.$t('imsDialogEditor.play.noStartNodeError'),
+      );
+    }
+
     this._loadedScripts = new Map<string, DialogPlayerLoadedScript>();
     this._loadedScripts.set(resolvedBlock.assetId, {
       id: resolvedBlock.assetId,

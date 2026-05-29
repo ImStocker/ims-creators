@@ -11,6 +11,11 @@
         :help-text="$t('imsDialogEditor.speech.autoSubstitutionHelpText')"
         @input="changeVariable(variable, { autoFill: $event })"
       />
+      <i
+        v-if="showKindControl"
+        :class="kindIcon"
+        class="VariableListItem-kind-icon"
+      ></i>
       <div
         class="VariableListItem-name-input"
         @click="editMode = true"
@@ -76,7 +81,10 @@ import FormBuilderFieldTooltip from '~ims-app-base/components/Form/FormBuilderFi
 import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
 import type { IDialogVariableController } from '../editor/DialogVariableController';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
-import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
+import {
+  ScriptBlockPlainVariableKinds,
+  type ScriptBlockPlainVariable,
+} from '../logic/nodeStoring';
 import FormCheckBox from '~ims-app-base/components/Form/FormCheckBox.vue';
 import DataFieldInput from '../parts/DataFieldInput.vue';
 
@@ -118,6 +126,20 @@ export default defineComponent({
   computed: {
     variableList() {
       return [...this.variableController.getEntities()];
+    },
+    kindIcon() {
+      switch (this.variable.kind) {
+        case ScriptBlockPlainVariableKinds.LOCAL:
+          return 'ri-terminal-line';
+        case ScriptBlockPlainVariableKinds.IN:
+          return 'ri-contract-right-line';
+        case ScriptBlockPlainVariableKinds.OUT:
+          return 'ri-expand-right-line';
+        case ScriptBlockPlainVariableKinds.INOUT:
+          return 'ri-expand-horizontal-line';
+        default:
+          return 'ri-global-line';
+      }
     },
   },
   methods: {
@@ -304,6 +326,11 @@ export default defineComponent({
 .VariableListItem-drag {
   color: var(--local-sub-text-color);
   cursor: grab;
+}
+.VariableListItem-kind-icon {
+  color: var(--local-sub-text-color);
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .VariableListItem-list,

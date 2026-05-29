@@ -189,6 +189,8 @@ export default {
     actions: {
       actionsTitle: 'Действия',
       createAction: 'Создать действие',
+      createTrigger: 'Создать триггер',
+      createFunction: 'Создать функцию',
       manageActions: 'Управлять действиями',
       enterName: 'Введите название',
       selectType: 'Выберите тип',
@@ -271,6 +273,7 @@ export default {
       stepForward: 'Шаг вперед',
       scriptCompleted: 'Сценарий завершен',
       finishExecution: 'Завершить выполнение',
+      noStartNodeError: 'В сценарии нет начального узла',
     },
     contents: {
       varGet: 'Получить',

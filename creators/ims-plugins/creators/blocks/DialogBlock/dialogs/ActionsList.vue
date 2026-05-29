@@ -4,16 +4,17 @@
       <div class="ActionsList-filters-group">
         <slot name="prepend-filters"></slot>
         <action-type-selector
-          v-model="filters.type"
+          :model-value="filters?.type ?? null"
           class="ActionsList-filters-type"
           nullable
+          @update:model-value="changeFilters('type', $event)"
         ></action-type-selector>
       </div>
       <form-search
         v-if="actionsList && actionsList.length"
         class="ActionsList-filters-query"
-        :value="filters.query"
-        @change="filters.query = $event"
+        :value="filters?.query ?? ''"
+        @change="changeFilters('query', $event)"
       ></form-search>
     </div>
     <div v-if="filteredActions.length > 0" class="ActionsList-grid">
@@ -54,7 +55,7 @@
       {{
         $t(
           'imsDialogEditor.actions.' +
-            (filters.query ? 'noActionsFound' : 'noActionsYet'),
+            (filters?.query ? 'noActionsFound' : 'noActionsYet'),
         )
       }}
     </div>
@@ -75,8 +76,8 @@ import { getAvailableActionTypes } from '../logic/nodeActions';
 import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
 
 type ActionsListFilters = {
-  query: string;
-  type: ScriptBlockPlainActionTypes;
+  query?: string;
+  type?: ScriptBlockPlainActionTypes;
 };
 
 export default defineComponent({
@@ -92,19 +93,12 @@ export default defineComponent({
       type: Object as PropType<IDialogCollectionController>,
       required: true,
     },
-    initialFilters: {
-      type: Object as PropType<ActionsListFilters>,
+    filters: {
+      type: [Object, null] as PropType<ActionsListFilters | null>,
       default: null,
     },
   },
-  data() {
-    return {
-      filters: {
-        query: this.initialFilters?.query ?? '',
-        type: this.initialFilters?.type ?? null,
-      },
-    };
-  },
+  emits: ['update:filters'],
   computed: {
     actionsList() {
       return this.collectionController.getEntities();
@@ -112,8 +106,9 @@ export default defineComponent({
     filteredActions() {
       return this.actionsList.filter(
         (a) =>
-          a.name.toLowerCase().includes(this.filters.query.toLowerCase()) &&
-          (this.filters.type ? a.type === this.filters.type : true),
+          (!this.filters?.query ||
+            a.name.toLowerCase().includes(this.filters.query.toLowerCase())) &&
+          (this.filters?.type ? a.type === this.filters.type : true),
       );
     },
     availableActionTypes() {
@@ -121,6 +116,16 @@ export default defineComponent({
     },
   },
   methods: {
+    changeFilters<N extends keyof ActionsListFilters>(
+      name: N,
+      val: ActionsListFilters[N],
+    ) {
+      const newFilters = {
+        ...this.filters,
+        [name]: val,
+      };
+      this.$emit('update:filters', newFilters);
+    },
     async changeList(reordered_actions: ScriptBlockPlainAction[]) {
       await this.$getAppManager()
         .get(UiManager)

@@ -190,6 +190,8 @@ export default {
     actions: {
       actionsTitle: 'Actions',
       createAction: 'Create action',
+      createTrigger: 'Create trigger',
+      createFunction: 'Create function',
       manageActions: 'Manage actions',
       enterName: 'Enter name',
       selectType: 'Select type',
@@ -272,6 +274,7 @@ export default {
       stepForward: 'Step forward',
       scriptCompleted: 'Script completed',
       finishExecution: 'Finish execution',
+      noStartNodeError: 'Script has no start node',
     },
     contents: {
       varGet: 'Get',

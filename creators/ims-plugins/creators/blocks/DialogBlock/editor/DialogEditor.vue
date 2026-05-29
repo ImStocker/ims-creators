@@ -105,6 +105,11 @@
         </div>
       </VueFlow>
     </div>
+    <div v-if="!hasStart && !readonly" class="DialogEditor-hint">
+      <div class="DialogEditor-hint-inner">
+        {{ $t('imsDialogEditor.addStartLevelHint') }}
+      </div>
+    </div>
     <div
       v-if="createNodeContext && createNodeContext.clickedAt"
       class="DialogEditor-createNode"
