@@ -163,9 +163,14 @@ export default {
       value: 'Value',
       yes: 'Yes',
       no: 'No',
+      random: 'Random',
+      else: 'Else',
     },
     common: {
       noValue: 'Not set',
+    },
+    chance: {
+      sumExceeds: 'Sum of chances exceeds 100%',
     },
     addStartLevelHint:
       'There is no start node in the script. Right-click on the field to create a node.',
