@@ -14,9 +14,11 @@
       @drop="onDrop"
     >
       <teleport v-if="toolbarTarget" :to="toolbarTarget">
-        <dialog-play-toolbar
-          :dialog-player="dialogPlayer"
-        ></dialog-play-toolbar>
+        <slot name="play-toolbar" :dialog-player="dialogPlayer">
+          <dialog-play-toolbar
+            :dialog-player="dialogPlayer"
+          ></dialog-play-toolbar>
+        </slot>
       </teleport>
       <VueFlow
         ref="flow"
