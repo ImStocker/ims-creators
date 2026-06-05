@@ -160,7 +160,7 @@ export default defineComponent({
       return generateDataPinId(false, 'value');
     },
     valuePlayVal() {
-      return this.playingNodeData?.values?.value ?? null;
+      return this.playingNodeData?.inputs?.value ?? null;
     },
     assetType() {
       return this.nodeDataController

@@ -162,7 +162,8 @@ export default defineComponent({
     },
     playWaitUser() {
       return (
-        this.dialogPlayer.currentPlayingNode?.id === this.id &&
+        this.dialogPlayer.currentPlayingNodeId === this.id &&
+        this.dialogPlayer.displayingFrameIndex === 0 &&
         this.outputParameters.length > 0 &&
         this.nodeDescriptor.type === NodeType.EXEC
       );

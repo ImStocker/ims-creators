@@ -1,4 +1,4 @@
-import type { UploadingJob } from '~ims-app-base/logic/managers/FileManager';
+import type { UploadingJob } from '~ims-app-base/logic/managers/EditorManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
@@ -7,7 +7,7 @@ import Tool from './base/Tool';
 import type { AssetPropValueFile } from '~ims-app-base/logic/types/Props';
 import { v4 as uuidv4 } from 'uuid';
 import { loadImage } from '~ims-app-base/logic/utils/imageUtils';
-import { getSrcByFileId } from '~ims-app-base/logic/utils/files';
+import FileManager from '~ims-app-base/logic/managers/FileManager';
 import type { ToolSection } from '../ToolManager';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 
@@ -135,7 +135,7 @@ export default class ImageTool extends Tool {
 
   private async _addImageToCanvas(imageFile: AssetPropValueFile) {
     const vpCenter = this.controller.canvas.getVpCenter();
-    const imageURL = getSrcByFileId(this.appManager, imageFile);
+    const imageURL = this.appManager.get(FileManager).getFileUrl(imageFile);
 
     await this.appManager.get(UiManager).doTask(async () => {
       this._loading = true;

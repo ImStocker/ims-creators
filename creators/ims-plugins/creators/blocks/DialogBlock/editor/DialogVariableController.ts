@@ -17,5 +17,5 @@ export interface IDialogCollectionController<
   deleteEntity(entity_name: string): void;
   canDeleteEntity(entity_name: string): boolean;
   reorderEntities(entities: T[]): void;
-  createEntity: () => Promise<T | null>;
+  createEntity: (initialVals?: Partial<T>) => Promise<T | null>;
 }

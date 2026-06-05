@@ -93,7 +93,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
 
 type DialogProps = {
-  initial?: DialogAction;
+  initial?: Partial<DialogAction>;
   validate?: (variable: DialogAction) => void | Promise<void>;
   params?: {
     disableTypeChange?: boolean;

@@ -3,7 +3,7 @@ import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { AssetPreviewInfo } from '~ims-app-base/logic/types/AssetsType';
-import { getSrcByFileId } from '~ims-app-base/logic/utils/files';
+import FileManager from '~ims-app-base/logic/managers/FileManager';
 import type { AssetPropValueFile } from '~ims-app-base/logic/types/Props';
 import type { LevelEditorShape } from '../editor/LevelEditor';
 
@@ -119,7 +119,7 @@ export default class Pointer extends fabric.Group {
         }
 
         const asset_image_file = asset.mainImage.value as AssetPropValueFile;
-        const image_url = getSrcByFileId(this.appManager, asset_image_file);
+        const image_url = this.appManager.get(FileManager).getFileUrl(asset_image_file);
 
         fabric.FabricImage.fromURL(image_url, undefined).then((img) => {
           if (this.image) {

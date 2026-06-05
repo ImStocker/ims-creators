@@ -10,6 +10,7 @@
         <component
           :is="dialog.state.viewComponent"
           v-if="collectionController && !controllerLoading"
+          v-model:filters="filters"
           :collection-controller="collectionController"
           v-bind="dialog.state.viewComponentProps"
         >
@@ -42,7 +43,7 @@
             :class="{ loading: creationLoading }"
             @click="addEntity"
           >
-            {{ dialog.state.createButtonCaption }}
+            {{ createButtonCaption }}
           </button>
           <button
             type="button"
@@ -78,7 +79,12 @@ import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 type DialogProps = {
   header: string;
-  createButtonCaption: string;
+  createButtonCaption:
+    | string
+    | ((state: { filters: Record<string, any> }) => string);
+  createEntityInitalVals?: (state: {
+    filters: Record<string, any>;
+  }) => Record<string, any>;
   dialogController: DialogBlockController;
   projectContext: IProjectContext;
   getCollectionController: (
@@ -86,6 +92,7 @@ type DialogProps = {
   ) => IDialogCollectionController;
   viewComponent: Component;
   viewComponentProps?: Record<string, any>;
+  initialFilters?: Record<string, any>;
 };
 
 type DialogResult = void;
@@ -121,6 +128,9 @@ export default defineComponent({
       creationLoading: false,
       controllerLoading: false,
       needSaveBlockIds: [] as string[],
+      filters: this.dialog.state.initialFilters
+        ? { ...this.dialog.state.initialFilters }
+        : ({} as Record<string, any>),
     };
   },
   computed: {
@@ -132,6 +142,11 @@ export default defineComponent({
     },
     dialogController() {
       return this.dialog.state.dialogController;
+    },
+    createButtonCaption() {
+      if (typeof this.dialog.state.createButtonCaption === 'function') {
+        return this.dialog.state.createButtonCaption({ filters: this.filters });
+      } else return this.dialog.state.createButtonCaption;
     },
     tabs() {
       if (!this.resolvedBlock) {
@@ -198,6 +213,9 @@ export default defineComponent({
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
+          if (!this.collectionController) {
+            return;
+          }
           if (this.currentAssetId === SCRIPT_ASSET_ID) {
             const base_asset = await this.$getAppManager()
               .get(CreatorAssetManager)
@@ -245,7 +263,13 @@ export default defineComponent({
               await this.createCollectionController(result.ids[0]);
             }
           }
-          const new_variable = await this.collectionController?.createEntity();
+          const new_variable = await this.collectionController.createEntity(
+            this.dialog.state.createEntityInitalVals
+              ? this.dialog.state.createEntityInitalVals({
+                  filters: this.filters,
+                })
+              : {},
+          );
 
           if (!new_variable) return;
           this.collectionController?.addEntity(new_variable);

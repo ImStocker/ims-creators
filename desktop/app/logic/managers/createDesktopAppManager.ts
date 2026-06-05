@@ -22,6 +22,8 @@ import { ProjectDatabaseViaDesktopApi } from '../types/ProjectDatabaseViaDesktop
 import type { IApiTokenStorage } from '~ims-app-base/logic/managers/ApiWorker';
 import { DesktopEditorManager } from './DesktopEditorManager';
 import DesktopExportFormatManager from './DesktopExportFormatManager';
+import FileManager from '~ims-app-base/logic/managers/FileManager';
+import DesktopFileManager from './DesktopFileManager';
 
 import pluginBase from '~ims-plugin-base/index'
 import pluginCreators from '~ims-plugin-creators/index'
@@ -73,6 +75,7 @@ export default function createDesktopAppManager(
   app_manager.register(new GlobalStateManager(app_manager));
   app_manager.register(TaskManager, new DesktopTaskManager(app_manager));
   app_manager.register(ProjectSettingsManager, new DesktopProjectSettingsManager(app_manager));
+  app_manager.register(FileManager, new DesktopFileManager(app_manager));
   
   const project_database = new ProjectDatabaseViaDesktopApi(desktopProjectManager);
 

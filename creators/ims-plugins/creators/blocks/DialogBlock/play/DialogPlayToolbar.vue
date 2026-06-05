@@ -4,14 +4,14 @@
       <button
         class="is-button is-button-icon"
         :title="$t('imsDialogEditor.play.playDemo')"
-        @click="dialogPlayer.play(false)"
+        @click="play(false)"
       >
         <i class="ri-play-fill"></i>
       </button>
       <button
         class="is-button is-button-icon"
         :title="$t('imsDialogEditor.play.playDebug')"
-        @click="dialogPlayer.play(true)"
+        @click="play(true)"
       >
         <i class="ri-bug-fill"></i>
       </button>
@@ -44,7 +44,7 @@
       <button
         :title="$t('imsDialogEditor.play.restart')"
         class="is-button is-button-icon"
-        @click="dialogPlayer.restart()"
+        @click="restart()"
       >
         <i class="ri-restart-line"></i>
       </button>
@@ -87,6 +87,7 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
 import type { DialogPlayer } from './DialogPlayer';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
 
 export default defineComponent({
   name: 'DialogPlayToolbar',
@@ -95,6 +96,22 @@ export default defineComponent({
     dialogPlayer: {
       type: Object as PropType<DialogPlayer>,
       required: true,
+    },
+  },
+  methods: {
+    async play(debug: boolean) {
+      await this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          this.dialogPlayer.play(debug);
+        });
+    },
+    async restart() {
+      await this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          this.dialogPlayer.restart();
+        });
     },
   },
 });

@@ -1,5 +1,8 @@
 <template>
-  <dialog-content class="PlayerDemoDialog tiny-scrollbars">
+  <dialog-content
+    v-if="dialogController"
+    class="PlayerDemoDialog tiny-scrollbars"
+  >
     <div class="PlayerDemoDialog-toolbar">
       <dialog-play-toolbar :dialog-player="dialogPlayer"></dialog-play-toolbar>
     </div>
@@ -11,7 +14,7 @@
           </div>
           <button
             class="PlayerDemoDialog-option-button"
-            @click="dialogPlayer.finishPlay()"
+            @click="dialogPlayer.stop()"
           >
             {{ $t('imsDialogEditor.play.finishExecution') }}
           </button>
@@ -19,19 +22,19 @@
       </template>
       <template v-else-if="currentPlayingNode">
         <dialog-speech-demo-play
-          v-if="currentPlayingNode.type === 'speech'"
+          v-if="currentPlayingNode.node.type === 'speech'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-speech-demo-play>
         <dialog-trigger-demo-play
-          v-else-if="currentPlayingNode.type === 'trigger'"
+          v-else-if="currentPlayingNode.node.type === 'trigger'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-trigger-demo-play>
         <dialog-call-script-demo-play
-          v-else-if="currentPlayingNode.type === 'callScript'"
+          v-else-if="currentPlayingNode.node.type === 'callScript'"
           :dialog-player="dialogPlayer"
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
@@ -39,7 +42,11 @@
         <div v-else class="PlayerDemoDialog-customNode">
           <div class="PlayerDemoDialog-customNode-content">
             {{
-              $t('imsDialogEditor.nodes.' + currentPlayingNode.type + '.title')
+              $t(
+                'imsDialogEditor.nodes.' +
+                  currentPlayingNode.node.type +
+                  '.title',
+              )
             }}
           </div>
           <button
@@ -62,13 +69,11 @@ import type { DialogPlayer } from './DialogPlayer';
 import DialogPlayToolbar from './DialogPlayToolbar.vue';
 import DialogSpeechDemoPlay from './DialogSpeechDemoPlay.vue';
 import DialogTriggerDemoPlay from './DialogTriggerDemoPlay.vue';
-import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptDemoPlay from './DialogCallScriptDemoPlay.vue';
 
 type DialogProps = {
   dialogPlayer: DialogPlayer;
-  dialogController: DialogBlockController;
   projectContext: IProjectContext;
 };
 
@@ -97,7 +102,7 @@ export default defineComponent({
   emits: ['dialog-parameters'],
   computed: {
     dialogController() {
-      return this.dialog.state.dialogController;
+      return this.dialogPlayer.currentPlayingDialogController;
     },
     dialogPlayer() {
       return this.dialog.state.dialogPlayer;

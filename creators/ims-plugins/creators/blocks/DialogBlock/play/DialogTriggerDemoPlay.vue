@@ -42,8 +42,8 @@
             v-else
             :data-type="param_gr.variable.type"
             :model-value="
-              playingNodeData?.values
-                ? playingNodeData?.values[param_gr.variable.name]
+              playingNodeData?.inputs
+                ? playingNodeData?.inputs[param_gr.variable.name]
                 : null
             "
             :title="param_gr.variable.description ?? ''"
@@ -73,7 +73,11 @@ import type {
 import DataFieldInput from '../parts/DataFieldInput.vue';
 import DataFieldDisplay from '../parts/DataFieldDisplay.vue';
 import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
-import { AssetPropType } from '~ims-app-base/logic/types/Props';
+import {
+  AssetPropType,
+  castAssetPropValueToString,
+  type AssetPropValue,
+} from '~ims-app-base/logic/types/Props';
 import { getActionNodeParams } from '../logic/nodeParams';
 
 export default defineComponent({
@@ -100,14 +104,18 @@ export default defineComponent({
       };
     },
     triggerVal() {
-      return this.playingNodeData.subject ?? null;
+      return (
+        castAssetPropValueToString(
+          this.playingNodeData.subject as AssetPropValue,
+        ) ?? null
+      );
     },
     actionNodeParams() {
       return getActionNodeParams(
-        this.playingNodeData?.params ?? { in: [], out: [] },
+        (this.playingNodeData?.node as any).params ?? { in: [], out: [] },
         this.triggerVal,
         this.dialogController.getActions(),
-        this.playingNodeData.values,
+        (this.playingNodeData?.node as any).values,
       );
     },
     inputParameters(): DialogVariable[] {

@@ -2,7 +2,6 @@ import type { GraphNode } from '@vue-flow/core';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { FlowViewportHelper } from '../editor/FlowViewportHelper';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
-import type { ScriptPlayNode, ScriptPlayNodeProps } from './ScriptPlayNode';
 import {
   convertAssetPropsToPlainObject,
   type AssetPropsPlainObjectValue,
@@ -13,18 +12,29 @@ import DialogManager, {
 } from '~ims-app-base/logic/managers/DialogManager';
 import PlayerDialog from './PlayerDemoDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
-import type { ImscScriptPlayerSpeech } from 'imsc-script';
+import type {
+  ImscScriptPlayerEvaluatedNode,
+  ImscScriptPlayerSpeech,
+  ImscScriptPlayerState,
+} from 'imsc-script';
 import { ImscScriptPlayer } from 'imsc-script';
 import type {
   ImscScriptGraphNodeTrigger,
   ImscScriptGraphNodeSpeech,
+  ImscScriptGraph,
 } from 'imsc-script/Graph';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import { reactive } from 'vue';
 import { getActionNodeParams } from '../logic/nodeParams';
+import {
+  type ScriptPlayNode,
+  getScriptPlayNodeFromState,
+} from './ScriptPlayNode';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 
 type DialogPlayingState = {
-  history: ScriptPlayNode[];
+  history: ImscScriptPlayerState[];
   historyPointer: number;
   stop: boolean;
   moveInterrupted: boolean;
@@ -32,39 +42,39 @@ type DialogPlayingState = {
   dialog: DialogHandler<void, any> | null;
 };
 
+type DialogPlayerLoadedScript = {
+  id: string;
+  graph: ImscScriptGraph;
+  controller: DialogBlockController;
+  release: () => void;
+};
+
 export class DialogPlayer {
   private _playingState: DialogPlayingState | null = null;
   private _debugNodeSwitchTime = 1000;
-  private _player!: ImscScriptPlayer;
-  private _waitingForSpeech = false;
-  private _triggerResolve: ((outputs: Record<string, any>) => void) | null =
-    null;
-  private _triggerOutputs: Record<string, AssetPropValue> = {};
-  private _externalPause = false;
+  private _player: ImscScriptPlayer | null = null;
+  private _triggerResolve:
+    | ((res: { outputs: Record<string, any> }) => void)
+    | null = null;
+  private _triggerOutputs: Record<string, AssetPropsPlainObjectValue> = {};
   private _scriptEnded = false;
+  private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
+  private _playEpoch = 0;
+  public displayingFrameIndex = 0;
 
-  private constructor(
+  constructor(
     protected appManager: IAppManager,
     protected dialogController: DialogBlockController,
     protected viewportHelper: FlowViewportHelper,
     protected projectContext: IProjectContext,
   ) {}
 
-  postCreate() {
-    assert(this.dialogController.resolvedBlock?.assetId);
-    const prepared_asset = {
-      id: this.dialogController.resolvedBlock.assetId,
-      blocks: [
-        {
-          ...this.dialogController.resolvedBlock,
-          computed: {
-            ...convertAssetPropsToPlainObject(
-              this.dialogController.resolvedBlock.computed,
-            ),
-          },
-        },
-      ],
-    };
+  private _createPlayer() {
+    const assetId = this.dialogController.resolvedBlock?.assetId;
+    assert(assetId);
+
+    const loadedScript = this._loadedScripts.get(assetId);
+    assert(loadedScript);
 
     const defaultVariableValues = this.dialogController.getVariables().reduce(
       (acc, variable) => {
@@ -74,33 +84,80 @@ export class DialogPlayer {
       {} as Record<string, AssetPropValue>,
     );
 
-    this._player = new ImscScriptPlayer(prepared_asset, {
-      blockName: this.dialogController.resolvedBlock.name ?? undefined,
+    return new ImscScriptPlayer(loadedScript.graph as ImscScriptGraph, {
+      scriptId: assetId,
       initialVariables: defaultVariableValues,
       events: {
-        onSpeech: (speech, node) => this._onSpeech(speech, node),
-        onTrigger: (subject, inputs, node) =>
-          this._onTrigger(subject, inputs, node),
-        onNodeEnter: (nodeId, node) => this._onNodeEnter(nodeId, node),
+        onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
+        onAction: ({ subject, inputs, node, nodeId, type }) => {
+          if (type === 'trigger') {
+            return this._onTrigger(subject, inputs, node, nodeId);
+          }
+        },
+        onNodeEnter: ({ nodeId, node }) => this._onNodeEnter(nodeId, node),
+        onEnd: () => {
+          if (!this._player) {
+            return;
+          }
+          this._pushHistory(this._player.serialize());
+          this._scriptEnded = true;
+        },
+        onError: ({ error }) => {
+          this.appManager.get(UiManager).showError(error);
+        },
+        onLoadScript: async ({ scriptId }) => {
+          const playEpoch = this._playEpoch;
+          let loadedScript = this._loadedScripts.get(scriptId);
+          if (!loadedScript) {
+            const asset = await this.appManager
+              .get(CreatorAssetManager)
+              .getAssetInstance(scriptId);
+            if (!asset) throw new Error('Script asset not found');
+            if (playEpoch !== this._playEpoch) {
+              throw new Error('Play is aborted');
+            }
+            const blocks = await asset.resolveBlocks();
+            const content_block = blocks.mapNames['content'];
+            if (content_block?.type !== 'script') {
+              throw new Error('Script not found in asset');
+            }
+            const context_request = this.appManager
+              .get(EditorManager)
+              .requestEditorContextForAsset(asset.id);
+            const controller = await context_request.promise;
+            if (playEpoch !== this._playEpoch) {
+              context_request.release();
+              throw new Error('Play is aborted');
+            }
+            if (!controller) {
+              throw new Error('Cannot get editor controller');
+            }
+            const block_controller = controller.getBlockController(
+              content_block.id,
+            );
+            if (!block_controller) {
+              throw new Error('Cannot get block controller');
+            }
+            loadedScript = {
+              id: scriptId,
+              graph: convertAssetPropsToPlainObject(content_block.computed),
+              release: () => context_request.release(),
+              controller: block_controller as DialogBlockController,
+            };
+            this._loadedScripts.set(loadedScript.id, loadedScript);
+          }
+          assert(loadedScript);
+
+          return loadedScript.graph;
+        },
+        onSubScriptExit: () => {
+          if (!this._player) return;
+          if (this.displayingFrameIndex >= this._player.frames.length) {
+            this.displayingFrameIndex = this._player.frames.length - 1;
+          }
+        },
       },
     });
-  }
-
-  static CreateInstance(
-    appManager: IAppManager,
-    dialogController: DialogBlockController,
-    viewportHelper: FlowViewportHelper,
-    projectContext: IProjectContext,
-  ): DialogPlayer {
-    const raw = new DialogPlayer(
-      appManager,
-      dialogController,
-      viewportHelper,
-      projectContext,
-    );
-    const res = reactive(raw);
-    res.postCreate();
-    return res as unknown as DialogPlayer;
   }
 
   get isPlaying() {
@@ -108,8 +165,8 @@ export class DialogPlayer {
   }
 
   get isPaused() {
-    if (!this._playingState) return false;
-    return this._externalPause;
+    if (!this._player) return false;
+    return this._player.isPaused;
   }
 
   get isPlayDebug() {
@@ -117,16 +174,15 @@ export class DialogPlayer {
   }
 
   get canResume() {
-    if (!this._playingState) return false;
-    if (this._externalPause) return true;
-    if (this._waitingForSpeech)
-      return this._getFirstAvailableChoice() !== false;
+    if (!this._player) return false;
+    if (this._player.isPaused) return true;
     if (this._triggerResolve) return true;
-    return false;
+    const currentNode = this._player.currentFrame.currentNode;
+    return currentNode && this._getFirstAvailableChoice(currentNode) !== false;
   }
 
   get scriptEnded() {
-    return this._scriptEnded;
+    return this._scriptEnded && this._playingState;
   }
 
   get canHistoryBack() {
@@ -140,18 +196,15 @@ export class DialogPlayer {
     );
   }
 
-  private _getFirstAvailableChoice(): number | null | false {
-    const node = this.currentPlayingNode;
-    if (!node) return false;
-    if (node.type !== 'speech' || !node.options?.length) {
-      return null;
-    }
+  private _getFirstAvailableChoice(
+    speech: ImscScriptPlayerEvaluatedNode,
+  ): number | null | false {
     for (
       let optionIndex = 0;
-      optionIndex < node.options.length;
+      optionIndex < speech.optionsInputs.length;
       optionIndex++
     ) {
-      const optionValues = node.options[optionIndex].values;
+      const optionValues = speech.optionsInputs[optionIndex];
       if (
         !optionValues ||
         optionValues.condition === undefined ||
@@ -171,14 +224,95 @@ export class DialogPlayer {
     ) {
       return null;
     }
-    return this._playingState.history[this._playingState.historyPointer];
+    const record =
+      this._playingState.history[this._playingState.historyPointer];
+    return getScriptPlayNodeFromState(record);
+  }
+
+  get displayingFrameDialogController(): DialogBlockController | null {
+    if (!this._player) return null;
+    const scriptId = this._player.frames[this.displayingFrameIndex]?.scriptId;
+    const loadedScript = this._loadedScripts.get(scriptId ?? '');
+    if (!loadedScript) return null;
+    return loadedScript.controller;
+  }
+
+  get displayingFrameLastHistoryRecord(): {
+    index: number | null;
+    record: ImscScriptPlayerState | null;
+  } {
+    if (
+      !this._playingState ||
+      !this._player ||
+      this._playingState.historyPointer < 0 ||
+      this._playingState.history.length === 0
+    ) {
+      return { index: null, record: null };
+    }
+    let p = this._playingState.historyPointer;
+    while (
+      p >= 0 &&
+      this._playingState.history[p].frames.length !==
+        this._player.frames.length - this.displayingFrameIndex
+    ) {
+      p--;
+    }
+    if (p < 0) return { index: null, record: null };
+    return {
+      index: p,
+      record: this._playingState.history[p],
+    };
+  }
+
+  get displayingFrameCurrentPlayingNodeId(): string | null {
+    const { record } = this.displayingFrameLastHistoryRecord;
+    return record ? (record.frames[0].currentNode?.id ?? null) : null;
+  }
+
+  get currentPlayingDialogController(): DialogBlockController | null {
+    if (!this._player) return null;
+    const loadedScript = this._loadedScripts.get(
+      this._player.currentFrame.scriptId ?? '',
+    );
+    if (!loadedScript) return null;
+    return loadedScript.controller;
+  }
+
+  get currentPlayingNodeId(): string | null {
+    if (
+      !this._playingState ||
+      this._playingState.historyPointer < 0 ||
+      this._playingState.history.length === 0
+    ) {
+      return null;
+    }
+    const record =
+      this._playingState.history[this._playingState.historyPointer];
+    return record.frames[0].currentNode?.id ?? null;
+  }
+
+  get lastVisitedNodeId(): string | null {
+    if (!this._playingState || !this._player) {
+      return null;
+    }
+    for (let p = this._playingState.historyPointer; p >= 0; p--) {
+      const record = this._playingState.history[p];
+      if (
+        record.frames[0].currentNode &&
+        record.frames.length === this._player.frames.length
+      ) {
+        return record.frames[0].currentNode.id;
+      }
+    }
+    return null;
   }
 
   getLastPlayNode(nodeId: string): ScriptPlayNode | null {
     if (!this._playingState) return null;
     for (let p = this._playingState.historyPointer; p >= 0; p--) {
-      if (this._playingState.history[p].id === nodeId) {
-        return this._playingState.history[p];
+      const record = this._playingState.history[p];
+      if (record.frames[0].currentNode?.id === nodeId) {
+        return getScriptPlayNodeFromState(record);
       }
     }
     return null;
@@ -194,11 +328,23 @@ export class DialogPlayer {
       targetH >= 1;
       targetH--
     ) {
-      const sourceH = targetH - 1;
-      const targetContext = this._playingState.history[targetH];
-      if (targetContext.id !== targetId) continue;
-      const sourceContext = this._playingState.history[sourceH];
-      if (sourceContext.id !== sourceId) continue;
+      const targetContext = getScriptPlayNodeFromState(
+        this._playingState.history[targetH],
+      );
+      if (targetContext?.id !== targetId) continue;
+      let sourceH = targetH - 1;
+      while (
+        sourceH >= 0 &&
+        this._playingState.history[sourceH].frames.length >
+          this._playingState.history[targetH].frames.length
+      ) {
+        sourceH--; // Look for sourceH in case of subscript call
+      }
+      if (sourceH < 0) continue;
+      const sourceContext = getScriptPlayNodeFromState(
+        this._playingState.history[sourceH],
+      );
+      if (sourceContext?.id !== sourceId) continue;
       return targetH === this._playingState.historyPointer
         ? 'current'
         : 'visited';
@@ -206,34 +352,57 @@ export class DialogPlayer {
     return null;
   }
 
+  private _loadCurrentStateFromHistory() {
+    if (!this._playingState || !this._player) {
+      return;
+    }
+    const record =
+      this._playingState.history[this._playingState.historyPointer];
+    this._player.load(record);
+    const graph = record.frames[0].graph;
+    this._scriptEnded = !record.frames[0].currentNode;
+    const currentGraphNode = record.frames[0].currentNode
+      ? graph.nodes[record.frames[0].currentNode.id]
+      : null;
+    if (currentGraphNode?.type === 'trigger') {
+      this._player.resume(); // Need call trigger to await user input
+    }
+    const node_id = getScriptPlayNodeFromState(record)?.id ?? null;
+    if (node_id) {
+      this._moveViewportToNode(node_id, this._debugNodeSwitchTime);
+    }
+  }
+
   goHistoryBack() {
-    if (!this._playingState || !this.canHistoryBack) return;
-    this._externalPause = true;
+    if (!this._playingState || !this.canHistoryBack || !this._player) {
+      return;
+    }
     this._playingState.historyPointer--;
-    this._moveViewportToNode(
-      this._playingState.history[this._playingState.historyPointer].id,
-    );
+    this._loadCurrentStateFromHistory();
   }
 
   goHistoryForward() {
-    if (!this._playingState || !this.canHistoryForward) return;
-    this._externalPause = true;
+    if (!this._playingState || !this.canHistoryForward || !this._player) {
+      return;
+    }
     this._playingState.historyPointer++;
-    this._moveViewportToNode(
-      this._playingState.history[this._playingState.historyPointer].id,
-    );
+    this._loadCurrentStateFromHistory();
   }
 
   public pause() {
-    if (!this._playingState) return;
-    this._externalPause = true;
+    if (!this._player) return;
+    this._player.pause();
   }
 
   public resume() {
     if (!this._playingState) return;
-    this._externalPause = false;
-    if (this._waitingForSpeech) {
-      const option = this._getFirstAvailableChoice();
+    if (!this._player) return;
+    this._scriptEnded = false;
+    const currentNode = this._player.currentFrame.currentNode;
+    this.displayingFrameIndex = 0;
+    this._player.resume();
+    if (currentNode) {
+      const option = this._getFirstAvailableChoice(currentNode);
       if (option !== false) {
         this.playChoose(option);
       }
@@ -242,24 +411,24 @@ export class DialogPlayer {
 
   public stop() {
     if (!this._playingState) return;
+    if (!this._player) return;
     this._player.end();
     this._destroyDemoMode();
     this._playingState = null;
-    this._waitingForSpeech = false;
     this._triggerResolve = null;
-    this._externalPause = false;
     this._scriptEnded = false;
-  }
-
-  public finishPlay() {
-    this.stop();
+    this._player = null;
+    for (const loadedScript of this._loadedScripts.values()) {
+      loadedScript.release();
+    }
+    this._loadedScripts = new Map();
   }
 
   public async restart() {
     const wasDebug = !!this._playingState?.debug;
     this.stop();
     await new Promise((resolve) => setTimeout(resolve, 1));
-    await this.play(wasDebug);
+    this.play(wasDebug);
   }
 
   public async playChoose(choice: number | null) {
@@ -268,19 +437,22 @@ export class DialogPlayer {
       this._triggerOutputs = {};
       const resolve = this._triggerResolve;
       this._triggerResolve = null;
-      this._waitingForSpeech = false;
-      resolve(outputs);
-    } else if (this._waitingForSpeech) {
-      this._waitingForSpeech = false;
-      this._player.continue(choice ?? undefined);
+      resolve({
+        outputs,
+      });
+    } else if (this._player) {
+      this._player.continue(choice ?? undefined, true);
     }
   }
 
-  public playGetCurrentNodeParam(param: string): AssetPropValue {
+  public playGetCurrentNodeParam(param: string): AssetPropsPlainObjectValue {
     return this._triggerOutputs[param] ?? null;
   }
 
-  public playSetCurrentNodeParam(param: string, value: AssetPropValue): void {
+  public playSetCurrentNodeParam(
+    param: string,
+    value: AssetPropsPlainObjectValue,
+  ): void {
     this._triggerOutputs[param] = value;
   }
 
@@ -290,7 +462,6 @@ export class DialogPlayer {
       .get(DialogManager)
       .create(PlayerDialog, {
         dialogPlayer: this,
-        dialogController: this.dialogController,
         projectContext: this.projectContext,
       });
     this._playingState.dialog.open();
@@ -313,20 +484,22 @@ export class DialogPlayer {
       const currentNode = this.currentPlayingNode;
       this._playingState.moveInterrupted = false;
       if (currentNode) {
-        this._moveViewportToNode(currentNode.id);
+        this._moveViewportToNode(currentNode.id, this._debugNodeSwitchTime);
       }
     } else {
       this._initDemoMode();
     }
   }
 
-  private async _moveViewportToNode(nodeId: string) {
-    const flowNode = this.dialogController.state.nodes.find(
+  private async _moveViewportToNode(nodeId: string, duration: number) {
+    const currentController = this.currentPlayingDialogController;
+    if (!currentController) return false;
+    const flowNode = currentController.state.nodes.find(
       (n) => n.id === nodeId,
     ) as GraphNode | undefined;
     if (flowNode) {
       return await this.viewportHelper.moveToNodes([flowNode], {
-        duration: this._debugNodeSwitchTime,
+        duration,
         interpolate: 'linear',
         maxZoom: Math.min(
           this.viewportHelper.zoom,
@@ -342,16 +515,12 @@ export class DialogPlayer {
     node: ImscScriptGraphNodeSpeech,
   ) {
     if (!this._playingState) return;
+    if (!this._player) return;
 
     const isDebug = this._playingState.debug;
 
     if (isDebug && (!node.options || node.options.length === 0)) {
-      this._waitingForSpeech = false;
-      setTimeout(() => {
-        this._player.continue();
-      }, this._debugNodeSwitchTime);
-    } else {
-      this._waitingForSpeech = true;
+      this._player.continue();
     }
   }
 
@@ -359,83 +528,113 @@ export class DialogPlayer {
     subject: string,
     inputs: Record<string, AssetPropsPlainObjectValue>,
     node: ImscScriptGraphNodeTrigger,
-  ): void | Record<string, any> | Promise<Record<string, any> | void> {
+    nodeId: string,
+  ):
+    | void
+    | { outputs: Record<string, any> }
+    | Promise<{ outputs: Record<string, any> } | void> {
     if (!this._playingState) return;
+    if (!this._player) return;
 
+    const loadedScript = this._loadedScripts.get(
+      this._player.currentFrame.scriptId ?? '',
+    );
+    assert(loadedScript);
     const isDebug = this._playingState.debug;
     const params = getActionNodeParams(
-      (node.params as any | undefined) ?? { in: [], out: [] },
+      (node as any).params ?? { in: [], out: [] },
       subject,
-      this.dialogController.getActions(),
+      loadedScript.controller.getActions(),
       node.values as any,
     );
     const hasOutputParams = params.outputParameters.length;
     const needWait = !isDebug || hasOutputParams;
 
     if (needWait) {
-      this._triggerOutputs = {};
-      return new Promise<Record<string, any>>((resolve) => {
+      const prev_state =
+        this._playingState.history.length > 1
+          ? this._playingState.history[this._playingState.history.length - 2]
+          : null;
+      this._triggerOutputs = prev_state
+        ? { ...(prev_state.frames[0].nodeOutputs[nodeId] ?? {}) }
+        : {};
+      return new Promise<{
+        outputs: Record<string, any>;
+      }>((resolve) => {
         this._triggerResolve = resolve;
       });
     }
 
-    return {};
+    return { outputs: {} };
   }
 
-  private _onNodeEnter(nodeId: string, node: any) {
+  private async _onNodeEnter(nodeId: string, _node: any) {
+    if (!this._player) return;
     if (!this._playingState) return;
     const playingState = this._playingState;
 
-    const playNode: ScriptPlayNode = {
-      id: nodeId,
-      type: node.type,
-      subject: node.subject,
-      values: node.values as ScriptPlayNodeProps | undefined,
-      next: node.next,
-      options: node.options?.map((o: any) => ({
-        values: o.values as ScriptPlayNodeProps | undefined,
-        next: o.next,
-      })),
-      params: node.params,
-    };
-    this._pushHistory(playNode);
+    this._pushHistory(this._player.serialize());
 
-    if (playingState.debug && playingState.moveInterrupted) {
-      setTimeout(() => {}, this._debugNodeSwitchTime);
-    } else if (playingState.debug) {
-      const flowNode = this.dialogController.state.nodes.find(
-        (n) => n.id === nodeId,
-      ) as GraphNode | undefined;
-      if (flowNode) {
-        playingState.moveInterrupted = !this.viewportHelper.moveToNodes(
-          [flowNode],
-          {
-            duration: this._debugNodeSwitchTime,
-            interpolate: 'linear',
-            maxZoom: Math.min(
-              this.viewportHelper.zoom,
-              this.viewportHelper.maxZoom,
-            ),
-          },
-        );
+    if (playingState.debug) {
+      const currentController = this.currentPlayingDialogController;
+      if (
+        currentController &&
+        this._playingState.history.length >= 2 &&
+        this._playingState.history[this._playingState.history.length - 1].frames
+          .length !==
+          this._playingState.history[this._playingState.history.length - 2]
+            .frames.length
+      ) {
+        // Switched between frames
+        playingState.moveInterrupted = !(await this._moveViewportToNode(
+          nodeId,
+          0,
+        ));
+        await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
+        return;
+      }
+
+      if (playingState.moveInterrupted || !currentController) {
+        await new Promise((r) => setTimeout(r, this._debugNodeSwitchTime));
+      } else {
+        playingState.moveInterrupted = !(await this._moveViewportToNode(
+          nodeId,
+          this._debugNodeSwitchTime,
+        ));
       }
     }
   }
 
-  private _pushHistory(playNode: ScriptPlayNode) {
+  private _pushHistory(record: ImscScriptPlayerState) {
     if (!this._playingState) return;
     const pointer = ++this._playingState.historyPointer;
     this._playingState.history.splice(pointer);
-    this._playingState.history.push(playNode);
+    this._playingState.history.push(record);
   }
 
-  public async play(debug: boolean = false) {
+  public play(debug: boolean = false) {
     if (this._playingState) return;
+    const resolvedBlock = this.dialogController.resolvedBlock;
+    if (!resolvedBlock) return;
 
-    this._waitingForSpeech = false;
+    const start = this.dialogController.hasStart;
+    if (!start) {
+      throw new Error(
+        this.appManager.$t('imsDialogEditor.play.noStartNodeError'),
+      );
+    }
+
+    this._loadedScripts = new Map<string, DialogPlayerLoadedScript>();
+    this._loadedScripts.set(resolvedBlock.assetId, {
+      id: resolvedBlock.assetId,
+      controller: this.dialogController,
+      graph: convertAssetPropsToPlainObject(resolvedBlock.computed),
+      release: () => {},
+    });
     this._triggerResolve = null;
     this._triggerOutputs = {};
-    this._externalPause = false;
+
+    this._player = this._createPlayer();
 
     this._playingState = {
       history: [],
@@ -450,12 +649,24 @@ export class DialogPlayer {
       this._initDemoMode();
     }
 
-    try {
-      await this._player.play();
-    } finally {
-      if (this._playingState && !this._playingState.stop) {
-        this._scriptEnded = true;
-      }
-    }
+    ++this._playEpoch;
+    this._player.play();
+  }
+
+  get playingFramesInfos() {
+    if (!this.isPlaying || !this._player) return [];
+    return this._player.frames.map((frame, ind) => {
+      const asset = frame.scriptId
+        ? this.appManager
+            .get(CreatorAssetManager)
+            .getAssetShortViaCacheSync(frame.scriptId)
+        : null;
+      return {
+        id: (frame.scriptId ?? '') + '_' + ind,
+        title: asset ? asset.title : (frame.scriptId ?? ''),
+        scriptId: frame.scriptId,
+        frameIndex: ind,
+      };
+    });
   }
 }

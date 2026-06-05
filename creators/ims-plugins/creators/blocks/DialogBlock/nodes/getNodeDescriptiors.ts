@@ -17,6 +17,7 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptNode from './DialogCallScriptNode.vue';
+import DialogChanceNode from './DialogChanceNode.vue';
 
 const opOptionsEq = {
   opEqual: {
@@ -249,6 +250,28 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       node: DialogChanceNode,
       color: '#ea95c3',
       type: NodeType.EXEC,
+      initData: () => {
+        return {
+          options: [
+            {
+              next: null,
+              values: {
+                chance: 0.5,
+              },
+            },
+            {
+              next: null,
+              values: {},
+            },
+          ],
+          params: {
+            in: [],
+            out: [],
+          },
+          subject: '',
+          values: {},
+        };
+      },
     },*/
     {
       name: 'setVar',

@@ -22,7 +22,11 @@
         :block-controller="blockController"
         class="AssetEditorDialogBlock-editor"
         @focus="enterEditMode()"
-      ></component>
+      >
+        <template #play-toolbar="{ dialogPlayer }">
+          <slot name="play-toolbar" :dialog-player="dialogPlayer"></slot>
+        </template>
+      </component>
     </template>
 
     <dialog-print v-else :resolved-block="resolvedBlock"></dialog-print>

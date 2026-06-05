@@ -30,11 +30,12 @@ import {
 import type { NodeData, NodeDataController } from './NodeDataController';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import type {
-  ScriptBlockPlainAction,
-  ScriptBlockPlainActionTypes,
-  ScriptBlockPlainNode,
-  ScriptBlockPlainVariable,
+import {
+  ScriptBlockPlainVariableKinds,
+  type ScriptBlockPlainAction,
+  type ScriptBlockPlainActionTypes,
+  type ScriptBlockPlainNode,
+  type ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import {
@@ -121,7 +122,7 @@ export class DialogBlockController extends BlockEditorController {
   }
 
   get hasStart() {
-    return this.state.nodes.find((n) => n.type === 'start');
+    return this.state.nodes.some((n) => n.type === 'start');
   }
 
   cutNodes(selected_node_ids: string[], viewport: ViewportTransform) {
@@ -1085,6 +1086,9 @@ export class DialogBlockController extends BlockEditorController {
       createButtonCaption: this.appManager.$t(
         'imsDialogEditor.var.createVariable',
       ),
+      createEntityInitalVals: ({ filters }) => {
+        return { kind: filters.kind };
+      },
       getCollectionController: (
         dialogController: DialogBlockController,
       ): IDialogCollectionController<DialogVariable> => ({
@@ -1099,7 +1103,7 @@ export class DialogBlockController extends BlockEditorController {
           dialogController.canDeleteVariable(variable_name),
         reorderEntities: (variables: DialogVariable[]) =>
           dialogController.reorderVariables(variables),
-        createEntity: async () =>
+        createEntity: async (initial) =>
           await nodeVariableAdd(
             this.appManager,
             this.getOwnVariables(),
@@ -1110,6 +1114,7 @@ export class DialogBlockController extends BlockEditorController {
             },
             false,
             true,
+            initial,
           ),
       }),
       viewComponent: markRaw(
@@ -1117,6 +1122,9 @@ export class DialogBlockController extends BlockEditorController {
       ),
       viewComponentProps: {
         showKindControl: true,
+      },
+      initialFilters: {
+        kind: ScriptBlockPlainVariableKinds.GLOBAL,
       },
     });
   }
@@ -1129,9 +1137,18 @@ export class DialogBlockController extends BlockEditorController {
       dialogController: this,
       projectContext,
       header: this.appManager.$t('imsDialogEditor.actions.manageActions'),
-      createButtonCaption: this.appManager.$t(
-        'imsDialogEditor.actions.createAction',
-      ),
+      createButtonCaption: ({ filters }) => {
+        if (!filters.type) {
+          return this.appManager.$t('imsDialogEditor.actions.createAction');
+        } else if (filters.type === 'trigger') {
+          return this.appManager.$t('imsDialogEditor.actions.createTrigger');
+        } else {
+          return this.appManager.$t('imsDialogEditor.actions.createFunction');
+        }
+      },
+      createEntityInitalVals: ({ filters }) => {
+        return { type: filters.type };
+      },
       getCollectionController: (
         dialogController: DialogBlockController,
       ): IDialogCollectionController<DialogAction> => ({
@@ -1145,10 +1162,11 @@ export class DialogBlockController extends BlockEditorController {
           dialogController.canDeleteAction(action_name),
         reorderEntities: (actions: DialogAction[]) =>
           dialogController.reorderActions(actions),
-        createEntity: async () => {
+        createEntity: async (initial) => {
           const res = await this.appManager
             .get(DialogManager)
             .show(EnterActionDialog, {
+              initial,
               validate: (action) => {
                 const list = this.getActions().some(
                   (a) => a.name === action.name,
@@ -1169,10 +1187,8 @@ export class DialogBlockController extends BlockEditorController {
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/ActionsList.vue')),
       ),
-      viewComponentProps: {
-        initialFilters: {
-          type: actionType,
-        },
+      initialFilters: {
+        type: actionType,
       },
     });
   }

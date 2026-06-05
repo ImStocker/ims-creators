@@ -27,7 +27,7 @@
       >
         <template #button="{ toggle }">
           <button
-            class="is-button is-button-icon NodeDescriptorsDropdown-item-expand"
+            class="is-button is-button-icon-small NodeDescriptorsDropdown-item-expand"
             @click.stop="toggle"
           >
             <i class="ri-arrow-right-s-line"></i>

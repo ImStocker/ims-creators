@@ -102,7 +102,7 @@ import VariableKindSelector from '../parts/VariableKindSelector.vue';
 import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
 
 type DialogProps = {
-  initial?: DialogVariable;
+  initial?: Partial<DialogVariable>;
   validate: (variable: DialogVariable) => void | Promise<void>;
   showAutoFill?: boolean;
   showKindControl?: boolean;

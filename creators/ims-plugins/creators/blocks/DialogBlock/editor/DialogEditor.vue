@@ -14,9 +14,11 @@
       @drop="onDrop"
     >
       <teleport v-if="toolbarTarget" :to="toolbarTarget">
-        <dialog-play-toolbar
-          :dialog-player="dialogPlayer"
-        ></dialog-play-toolbar>
+        <slot name="play-toolbar" :dialog-player="dialogPlayer">
+          <dialog-play-toolbar
+            :dialog-player="dialogPlayer"
+          ></dialog-play-toolbar>
+        </slot>
       </teleport>
       <VueFlow
         ref="flow"
@@ -27,9 +29,9 @@
         :pan-on-drag="[2]"
         :connection-mode="ConnectionMode.Strict"
         :delete-key-code="['Delete', 'Backspace']"
-        :edges-updatable="!readonly"
-        :nodes-draggable="!readonly"
-        :nodes-connectable="!readonly"
+        :edges-updatable="!readonlyComp"
+        :nodes-draggable="!readonlyComp"
+        :nodes-connectable="!readonlyComp"
         :snap-to-grid="true"
         :snap-grid="[10, 10]"
         :min-zoom="0.1"
@@ -60,15 +62,18 @@
             }"
             :class="{
               'state-selected': params.selected,
+              'state-playing-now':
+                params.id === dialogPlayer.currentPlayingNodeId &&
+                dialogPlayer.displayingFrameIndex === 0,
               'state-playing':
-                params.id === dialogPlayer.currentPlayingNode?.id,
+                params.id === dialogPlayer.displayingFrameCurrentPlayingNodeId,
             }"
             :dialog-controller="blockControllerMut"
             :node-data-controller="
               blockControllerMut.getNodeDataController(params.id)
             "
             :node-descriptor="node_desc"
-            :readonly="readonly"
+            :readonly="readonlyComp"
             :playing-node-data="dialogPlayer.getLastPlayNode(params.id)"
             :dialog-player="dialogPlayer"
             @change-type="changeNodeType(params.id, $event)"
@@ -94,13 +99,18 @@
             </div>
             <button
               class="is-button is-button-primary"
-              @click="dialogPlayer.finishPlay()"
+              @click="dialogPlayer.stop()"
             >
               {{ $t('imsDialogEditor.play.finishExecution') }}
             </button>
           </div>
         </div>
       </VueFlow>
+    </div>
+    <div v-if="!hasStart && !readonly" class="DialogEditor-hint">
+      <div class="DialogEditor-hint-inner">
+        {{ $t('imsDialogEditor.addStartLevelHint') }}
+      </div>
     </div>
     <div
       v-if="createNodeContext && createNodeContext.clickedAt"
@@ -121,6 +131,36 @@
         ></CreateNodeDropdown>
       </dropdown-element>
     </div>
+    <div class="DialogEditor-topButtons">
+      <menu-button
+        v-if="playingFramesInfos.length > 1"
+        class="DialogEdtior-frameSelector"
+      >
+        <template #button="{ toggle }">
+          <button
+            class="is-button is-button-action DialogEdtior-frameSelector-button"
+            @click="toggle"
+          >
+            <i class="ri-arrow-down-s-line"></i>
+            {{ playingFramesInfos[dialogPlayer.displayingFrameIndex]?.title }}
+          </button>
+        </template>
+        <div class="DialogEdtior-frameSelector-options is-dropdown">
+          <div
+            v-for="frame of playingFramesInfos"
+            :key="frame.id"
+            class="DialogEdtior-frameSelector-options-one"
+            @click="dialogPlayer.displayingFrameIndex = frame.frameIndex"
+          >
+            <i
+              v-if="frame.frameIndex === dialogPlayer.displayingFrameIndex"
+              class="ri-arrow-right-s-fill"
+            ></i>
+            {{ frame.title }}
+          </div>
+        </div>
+      </menu-button>
+    </div>
     <div class="DialogEditor-buttons">
       <menu-button class="DialogEditor-variables">
         <template #button="{ toggle }">
@@ -131,7 +171,7 @@
         </template>
         <manage-variables-dropdown
           :dialog-controller="blockControllerMut"
-          :readonly="readonly"
+          :readonly="readonlyComp"
         ></manage-variables-dropdown>
       </menu-button>
       <menu-button class="DialogEditor-actions">
@@ -143,7 +183,7 @@
         </template>
         <manage-actions-dropdown
           :dialog-controller="blockControllerMut"
-          :readonly="readonly"
+          :readonly="readonlyComp"
         ></manage-actions-dropdown>
       </menu-button>
     </div>
@@ -274,7 +314,7 @@ export default defineComponent({
     const projectContext = this.projectContext as IProjectContext | undefined;
     assert(projectContext, 'Project context is not provided');
     const viewportHelper = new FlowViewportHelper();
-    const dialogPlayer = DialogPlayer.CreateInstance(
+    const dialogPlayer = new DialogPlayer(
       this.$getAppManager(),
       this.blockController,
       viewportHelper,
@@ -293,7 +333,13 @@ export default defineComponent({
     ConnectionMode() {
       return ConnectionMode;
     },
+    readonlyComp() {
+      return this.readonly || this.dialogPlayer.isPlaying;
+    },
     blockControllerMut() {
+      const playingBlockController =
+        this.dialogPlayer.displayingFrameDialogController;
+      if (playingBlockController) return playingBlockController;
       return this.blockController;
     },
     nodeDescriptors() {
@@ -327,8 +373,8 @@ export default defineComponent({
       },
     },
     scriptEndedPopupStyle() {
-      if (!this.dialogPlayer.currentPlayingNode) return {};
-      const nodeId = this.dialogPlayer.currentPlayingNode.id;
+      if (!this.dialogPlayer.lastVisitedNodeId) return {};
+      const nodeId = this.dialogPlayer.lastVisitedNodeId;
       const node = this.blockControllerMut.state.nodes.find(
         (n: any) => n.id === nodeId,
       );
@@ -348,6 +394,9 @@ export default defineComponent({
     },
     scriptEndedPopup() {
       return this.dialogPlayer.scriptEnded && this.dialogPlayer.isPlayDebug;
+    },
+    playingFramesInfos() {
+      return this.dialogPlayer.playingFramesInfos;
     },
   },
   watch: {
@@ -449,7 +498,7 @@ export default defineComponent({
       params.template.apply(node_data_controller);
     },
     async createNode(descriptor: NodeDescriptor) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return null;
       }
       if (!this.createNodeContext) {
@@ -593,19 +642,19 @@ export default defineComponent({
       };
     },
     saveProps() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.blockControllerMut.saveProps();
     },
     savePropsDelayed() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.blockControllerMut.savePropsDelayed();
     },
     onMouseDown() {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       this.createNodeContext = null;
@@ -624,7 +673,7 @@ export default defineComponent({
       ev.preventDefault();
     },
     onMouseUp(ev: PointerEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       if (ev.button !== 2) {
@@ -774,7 +823,7 @@ export default defineComponent({
       }
     },
     onDragOver(event: DragEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       const target = event.target as HTMLElement | null;
@@ -801,7 +850,7 @@ export default defineComponent({
       event.preventDefault();
     },
     async onDrop(event: DragEvent) {
-      if (this.readonly) {
+      if (this.readonlyComp) {
         return;
       }
       const target = event.target as HTMLElement | null;
@@ -1106,19 +1155,52 @@ export default defineComponent({
   justify-content: center;
   pointer-events: none;
 }
-.DialogEditor-buttons {
+.DialogEditor-buttons,
+.DialogEditor-topButtons {
   display: flex;
   gap: 5px;
   position: absolute;
+}
+.DialogEditor-buttons {
   bottom: 5px;
   left: 5px;
 }
-.DialogEditor-buttons {
+.DialogEditor-topButtons {
+  top: 5px;
+  left: 5px;
+}
+.DialogEditor-buttons,
+.DialogEditor-topButtons {
   .is-button {
     padding-left: 18px;
     &:not(:hover):not(:focus) {
       --button-bg-color: var(--local-bg-color);
     }
+  }
+}
+.DialogEdtior-frameSelector-button {
+  --button-text-color: var(--imsde-node-playing-color);
+  --button-border-color: var(--imsde-node-playing-color);
+}
+
+.DialogEdtior-frameSelector-options {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  overflow: auto;
+  min-width: 100px;
+}
+.DialogEdtior-frameSelector-options-one {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  padding: 5px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--local-hl-bg-color);
   }
 }
 .DialogEditor-hint-inner {

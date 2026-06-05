@@ -17,6 +17,10 @@
         @dragstart="onDragStart($event, variable)"
       >
         <div class="ManageVariablesDropdown-list-item-name">
+          <i
+            :class="kindIcon(variable.kind)"
+            class="ManageVariablesDropdown-kind-icon"
+          ></i>
           {{ variable.title }}
         </div>
         <div class="ManageVariablesDropdown-list-item-value">
@@ -56,6 +60,7 @@ import type {
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
+import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
 
 export default defineComponent({
   name: 'ManageVariablesDropdown',
@@ -90,6 +95,20 @@ export default defineComponent({
     },
   },
   methods: {
+    kindIcon(kind?: ScriptBlockPlainVariableKinds) {
+      switch (kind) {
+        case ScriptBlockPlainVariableKinds.LOCAL:
+          return 'ri-terminal-line';
+        case ScriptBlockPlainVariableKinds.IN:
+          return 'ri-contract-right-line';
+        case ScriptBlockPlainVariableKinds.OUT:
+          return 'ri-expand-right-line';
+        case ScriptBlockPlainVariableKinds.INOUT:
+          return 'ri-expand-horizontal-line';
+        default:
+          return 'ri-global-line';
+      }
+    },
     onDragStart(e: DragEvent, variable: DialogVariable) {
       e.dataTransfer?.setData('dialog-variable', variable.name);
     },
@@ -143,6 +162,14 @@ export default defineComponent({
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ManageVariablesDropdown-kind-icon {
+  color: var(--local-sub-text-color);
+  font-size: 14px;
+  flex-shrink: 0;
 }
 .ManageVariablesDropdown-list-item-value {
   min-width: 0;

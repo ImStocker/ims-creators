@@ -104,6 +104,19 @@ export default defineComponent({
         canDeleteEntity: (variable_name: string) => variable_name !== 'text',
         reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderMainSpeech(variables),
+        createEntity: async () => {
+          const new_variable = await nodeVariableAdd(
+            this.$getAppManager(),
+            this.mainSpeechList,
+            {
+              alreadyExist: this.$t(
+                'imsDialogEditor.var.variableAlreadyExists',
+              ),
+            },
+            true,
+          );
+          return new_variable ?? null;
+        },
       };
     },
     optionSpeechController(): IDialogVariableController {
@@ -118,6 +131,27 @@ export default defineComponent({
         canDeleteEntity: (variable_name: string) => variable_name !== 'text',
         reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderOptionSpeech(variables),
+        createEntity: async () => {
+          const new_variable = await nodeVariableAdd(
+            this.$getAppManager(),
+            this.optionSpeechList,
+            {
+              alreadyExist: this.$t(
+                'imsDialogEditor.var.variableAlreadyExists',
+              ),
+            },
+          );
+          if (!new_variable) return null;
+          const max_index = Math.max(
+            ...[
+              ...this.optionSpeechList.map((option) =>
+                option.index ? option.index : 0,
+              ),
+              0,
+            ],
+          );
+          return { ...new_variable, index: max_index + 1 };
+        },
       };
     },
     dialogController() {
@@ -132,38 +166,15 @@ export default defineComponent({
   },
   methods: {
     async addSettingSpeechMain() {
-      const new_variable = await nodeVariableAdd(
-        this.$getAppManager(),
-        this.mainSpeechList,
-        {
-          alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
-        },
-        true,
-      );
+      const new_variable = await this.mainSpeechController.createEntity();
       if (!new_variable) return;
       this.mainSpeechController.addEntity(new_variable);
     },
     async addSettingSpeechOption() {
-      const new_variable = await nodeVariableAdd(
-        this.$getAppManager(),
-        this.optionSpeechList,
-        {
-          alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
-        },
-      );
+      debugger;
+      const new_variable = await this.optionSpeechController.createEntity();
       if (!new_variable) return;
-      const max_index = Math.max(
-        ...[
-          ...this.optionSpeechList.map((option) =>
-            option.index ? option.index : 0,
-          ),
-          0,
-        ],
-      );
-      this.optionSpeechController.addEntity({
-        ...new_variable,
-        index: max_index + 1,
-      });
+      this.optionSpeechController.addEntity(new_variable);
     },
     choose(val: boolean | null) {
       this.dialog.close(val);

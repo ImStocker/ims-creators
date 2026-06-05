@@ -5,15 +5,16 @@
         <slot name="prepend-filters"></slot>
         <variable-kind-selector
           v-if="showKindControl"
-          v-model="filters.kind"
+          :model-value="filters?.kind"
           class="VariableList-filters-kind"
+          @update:model-value="changeFilters('kind', $event)"
         ></variable-kind-selector>
       </div>
       <form-search
         v-if="filteredVariables && filteredVariables.length && showSearch"
         class="VariableList-filters-query"
-        :value="filters.query"
-        @change="filters.query = $event"
+        :value="filters?.query ?? ''"
+        @change="changeFilters('query', $event)"
       ></form-search>
     </div>
     <div v-if="filteredVariables.length > 0" class="VariableList-grid">
@@ -52,7 +53,7 @@
       {{
         $t(
           'imsDialogEditor.var.' +
-            (filters.query ? 'noVariablesFound' : 'noVariablesYet'),
+            (filters?.query ? 'noVariablesFound' : 'noVariablesYet'),
         )
       }}
     </div>
@@ -74,6 +75,11 @@ import {
 } from '../logic/nodeStoring';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 import VariableKindSelector from '../parts/VariableKindSelector.vue';
+
+export type VariableListFilters = {
+  query?: string;
+  kind?: ScriptBlockPlainVariableKinds;
+};
 
 export default defineComponent({
   name: 'VariableList',
@@ -100,15 +106,12 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    filters: {
+      type: [Object, null] as PropType<VariableListFilters | null>,
+      default: null,
+    },
   },
-  data() {
-    return {
-      filters: {
-        query: '',
-        kind: ScriptBlockPlainVariableKinds.GLOBAL,
-      },
-    };
-  },
+  emits: ['update:filters'],
   computed: {
     variableList() {
       return this.collectionController.getEntities();
@@ -116,9 +119,11 @@ export default defineComponent({
     filteredVariables() {
       return this.variableList.filter(
         (v) =>
-          v.title.toLowerCase().includes(this.filters.query.toLowerCase()) &&
-          (v.kind === this.filters.kind ||
-            (this.filters.kind === ScriptBlockPlainVariableKinds.GLOBAL &&
+          (!this.filters?.query ||
+            v.title.toLowerCase().includes(this.filters.query.toLowerCase())) &&
+          (!this.filters?.kind ||
+            v.kind === this.filters?.kind ||
+            (this.filters?.kind === ScriptBlockPlainVariableKinds.GLOBAL &&
               v.kind === undefined)),
       );
     },
@@ -127,6 +132,16 @@ export default defineComponent({
     await this.loadVariablesAssetKinds();
   },
   methods: {
+    changeFilters<N extends keyof VariableListFilters>(
+      name: N,
+      val: VariableListFilters[N],
+    ) {
+      const newFilters = {
+        ...this.filters,
+        [name]: val,
+      };
+      this.$emit('update:filters', newFilters);
+    },
     async changeList(reordered_variables: ScriptBlockPlainVariable[]) {
       await this.$getAppManager()
         .get(UiManager)

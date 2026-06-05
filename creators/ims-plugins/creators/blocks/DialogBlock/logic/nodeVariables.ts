@@ -12,6 +12,7 @@ export async function nodeVariableAdd(
   },
   showAutoFill: boolean = false,
   showKindControl: boolean = false,
+  initial?: Partial<DialogVariable>,
 ): Promise<DialogVariable | null> {
   // Refactor: transfer parameters to an object
   const new_param = await appManager
@@ -19,6 +20,7 @@ export async function nodeVariableAdd(
     .show(EnterVariableDialog, {
       showAutoFill,
       showKindControl,
+      initial,
       validate: (variable) => {
         const exists = list.some((v) => v.name === variable.name);
         if (exists) {

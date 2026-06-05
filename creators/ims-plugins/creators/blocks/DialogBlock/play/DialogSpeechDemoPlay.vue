@@ -29,11 +29,14 @@
       </div>
     </div>
     <div
-      v-if="playingNodeData.options && playingNodeData.options.length > 0"
+      v-if="
+        playingNodeData.optionsInputs &&
+        playingNodeData.optionsInputs.length > 0
+      "
       class="DialogSpeechDemoPlay-options"
     >
       <button
-        v-for="(option, option_index) of playingNodeData.options"
+        v-for="(option, option_index) of playingNodeData.optionsInputs"
         :key="option_index"
         class="PlayerDemoDialog-option-button DialogSpeechDemoPlay-options-one"
         :class="{
@@ -103,7 +106,7 @@ export default defineComponent({
   },
   computed: {
     coverValue() {
-      return (this.playingNodeData?.values?.cover ??
+      return (this.playingNodeData?.inputs?.cover ??
         null) as null | AssetPropValueFile;
     },
     mainSpeechList() {
@@ -118,8 +121,8 @@ export default defineComponent({
           return {
             index,
             variable,
-            value: this.playingNodeData.values
-              ? (this.playingNodeData.values[variable.name] ?? variable.default)
+            value: this.playingNodeData.inputs
+              ? (this.playingNodeData.inputs[variable.name] ?? variable.default)
               : variable.default,
           };
         })
@@ -144,16 +147,16 @@ export default defineComponent({
         return true;
       }
       if (
-        !this.playingNodeData.options ||
-        !this.playingNodeData.options[option_index]
+        !this.playingNodeData.optionsInputs ||
+        !this.playingNodeData.optionsInputs[option_index]
       ) {
         return true;
       }
-      const option = this.playingNodeData.options[option_index];
-      if (!option.values) {
+      const optionValues = this.playingNodeData.optionsInputs[option_index];
+      if (!optionValues) {
         return true;
       }
-      return option.values.condition === undefined || option.values.condition;
+      return optionValues.condition === undefined || optionValues.condition;
     },
 
     getOptionVariableCaption(option_index: number, var_index: number) {
@@ -166,18 +169,16 @@ export default defineComponent({
     },
 
     getOptionSpeechInfoList(option_index: number) {
-      const option = this.playingNodeData.options
-        ? this.playingNodeData.options[option_index]
+      const optionValues = this.playingNodeData.optionsInputs
+        ? this.playingNodeData.optionsInputs[option_index]
         : null;
-      if (!option) return [];
+      if (!optionValues) return [];
       return this.optionSpeechList
         .map((variable, index) => {
           return {
             index,
             variable,
-            value: option.values
-              ? (option.values[variable.name] ?? null)
-              : null,
+            value: optionValues ? (optionValues[variable.name] ?? null) : null,
           };
         })
         .filter((info) => {

@@ -95,7 +95,7 @@ export default defineComponent({
       return this.nodeDataController.options;
     },
     conditionPlayVal() {
-      return this.playingNodeData?.values?.condition ?? null;
+      return this.playingNodeData?.inputs?.condition ?? null;
     },
     conditionVal: {
       get() {
