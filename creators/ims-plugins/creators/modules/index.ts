@@ -20,12 +20,6 @@ export default function () {
           cancel_callbacks.push(
             appManager.get(EditorManager).registerAssetLayout({
               name: 'gameobject',
-              pageComponent: defineAsyncComponent(
-                () =>
-                  import(
-                    '~ims-app-base/components/Asset/Layout/AssetDefaultPageLayout.vue'
-                  ),
-              ),
               editorComponent: defineAsyncComponent(
                 () => import('./AssetEditors/AssetBlockGameObjectEditor.vue'),
               ),
@@ -38,12 +32,6 @@ export default function () {
           cancel_callbacks.push(
             appManager.get(EditorManager).registerAssetLayout({
               name: 'markdown',
-              pageComponent: defineAsyncComponent(
-                () =>
-                  import(
-                    '~ims-app-base/components/Asset/Layout/AssetDefaultPageLayout.vue'
-                  ),
-              ),
               editorComponent: defineAsyncComponent(
                 () => import('./AssetEditors/MarkdownEditor.vue'),
               ),
