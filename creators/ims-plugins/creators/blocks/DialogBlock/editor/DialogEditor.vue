@@ -87,7 +87,12 @@
           ></BezierEdge>
         </template>
         <Background :offset="19"></Background>
-        <MiniMap zoomable pannable class="DialogEditor-minimap"></MiniMap>
+        <MiniMap
+          zoomable
+          pannable
+          class="DialogEditor-minimap"
+          @click="onMiniMapClick"
+        ></MiniMap>
         <div
           v-if="scriptEndedPopup"
           class="DialogEditor-scriptEnded is-dropdown"
@@ -996,6 +1001,19 @@ export default defineComponent({
     },
     onNodeClick({ node }: NodeMouseEvent) {
       this.blockControllerMut.revealBlockContentItem('node-' + node.id);
+    },
+    onMiniMapClick({
+      position,
+    }: {
+      event: MouseEvent;
+      position: { x: number; y: number };
+    }) {
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      flow.setCenter(position.x, position.y, {
+        duration: 0,        
+        zoom: this.viewportHelper.zoom
+      });
     },
     async showNode(node_id: string): Promise<boolean> {
       const node = this.blockControllerMut.state.nodes.find(
