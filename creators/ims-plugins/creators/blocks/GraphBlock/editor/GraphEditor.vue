@@ -23,6 +23,7 @@
         :snap-to-grid="true"
         :snap-grid="[10, 10]"
         :min-zoom="0.1"
+        @viewport-change="onViewportChange"
         @connect="onConnect"
         @connect-start="onConnectStart"
         @connect-end="onConnectEnd"
@@ -46,6 +47,10 @@
             :node-descriptor="node_desc"
             :dialog-controller="blockControllerMut"
             :readonly="readonlyComp"
+            :editing-node-id="editingNodeId"
+            :viewport-transform="viewportTransform"
+            @request-edit="onRequestEdit"
+            @request-view="onRequestView"
           ></component>
         </template>
         <template #edge-graph-edge="params">
@@ -64,8 +69,8 @@
               viewBox="0 0 10 10"
               refX="10"
               refY="5"
-              markerWidth="8"
-              markerHeight="8"
+              markerWidth="16"
+              markerHeight="16"
               orient="auto-start-reverse"
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#888" />
@@ -88,7 +93,9 @@
           {{ $t('graphBlock.editor.addCard') }}
         </div>
         <div class="GraphEditor-createNode-dropdown-item" @click="addFileNode">
-          <i class="ri-attachment-2 GraphEditor-createNode-dropdown-item-icon"></i>
+          <i
+            class="ri-attachment-2 GraphEditor-createNode-dropdown-item-icon"
+          ></i>
           {{ $t('graphBlock.editor.addFile') }}
         </div>
         <div class="GraphEditor-createNode-dropdown-item" @click="addAssetNode">
@@ -113,6 +120,7 @@ import {
   type EdgeMouseEvent,
   type NodeMouseEvent,
   type OnConnectStartParams,
+  type ViewportTransform,
 } from '@vue-flow/core';
 import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType, ref } from 'vue';
@@ -160,11 +168,34 @@ export default defineComponent({
   data() {
     return {
       createNodeContext: null as { x: number; y: number } | null,
-      connectStartParams: null as { nodeId: string; handleId: string; handleType: string } | null,
+      connectStartParams: null as {
+        nodeId: string;
+        handleId: string;
+        handleType: string;
+      } | null,
+      editingNodeId: null as string | null,
+      viewportTransform: { x: 0, y: 0, zoom: 1 } as ViewportTransform,
       mouseDownTime: 0,
       lastCreatePosition: { x: 0, y: 0 },
       _keyDownHandler: null as ((e: KeyboardEvent) => void) | null,
     };
+  },
+  computed: {
+    ConnectionMode() {
+      return ConnectionMode;
+    },
+    readonlyComp() {
+      return this.readonly;
+    },
+    blockControllerMut() {
+      return this.blockController;
+    },
+    nodeDescriptors() {
+      return getNodeDescriptors();
+    },
+    arrowMarker() {
+      return 'url(#graph-arrow)';
+    },
   },
   mounted() {
     this._keyDownHandler = (e: KeyboardEvent) => {
@@ -195,10 +226,7 @@ export default defineComponent({
           (n: any) => n.id,
         );
         if (!selectedNodeIds.length) return;
-        this.blockControllerMut.cutNodes(
-          selectedNodeIds,
-          flow.getViewport(),
-        );
+        this.blockControllerMut.cutNodes(selectedNodeIds, flow.getViewport());
       }
     };
     window.addEventListener('keydown', this._keyDownHandler);
@@ -208,23 +236,6 @@ export default defineComponent({
       window.removeEventListener('keydown', this._keyDownHandler);
       this._keyDownHandler = null;
     }
-  },
-  computed: {
-    ConnectionMode() {
-      return ConnectionMode;
-    },
-    readonlyComp() {
-      return this.readonly;
-    },
-    blockControllerMut() {
-      return this.blockController;
-    },
-    nodeDescriptors() {
-      return getNodeDescriptors();
-    },
-    arrowMarker() {
-      return 'url(#graph-arrow)';
-    },
   },
   methods: {
     onContextMenu(ev: PointerEvent) {
@@ -338,14 +349,26 @@ export default defineComponent({
         y: ev.clientY - editorBBox.y,
       };
     },
+    onViewportChange(transform: ViewportTransform) {
+      this.viewportTransform = transform;
+    },
+    onRequestEdit(nodeId: string) {
+      this.editingNodeId = nodeId;
+    },
+    onRequestView() {
+      this.editingNodeId = null;
+    },
     async addCardNode() {
-      await this.blockControllerMut.createNode(
+      const nodeId = await this.blockControllerMut.createNode(
         this.lastCreatePosition,
         this.connectStartParams,
         null,
       );
       this.createNodeContext = null;
       this.connectStartParams = null;
+      if (nodeId) {
+        this.editingNodeId = nodeId;
+      }
     },
     async addFileNode() {
       const appManager = this.$getAppManager();
@@ -405,27 +428,28 @@ export default defineComponent({
       if (!eventDt) return;
       const rawAsset = eventDt.getData('asset');
       if (!rawAsset) return;
-      await this.$getAppManager().get(UiManager).doTask(async () => {
-        const parsed = JSON.parse(rawAsset) as { id: string };
-        if (!parsed.id) return;
-        const assetShort = await this.$getAppManager()
-          .get(CreatorAssetManager)
-          .getAssetShortViaCache(parsed.id);
-        if (!assetShort) {
-          throw new Error(this.$t('asset.assetNotFound'));
-        }
-        const editorBBox = (this.$el as HTMLElement).getBoundingClientRect();
-        const flow = this.$refs['flow'] as VueFlowStore;
-        const flowCoord = flow.screenToFlowCoordinate({
-          x: event.clientX,
-          y: event.clientY,
+      await this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          const parsed = JSON.parse(rawAsset) as { id: string };
+          if (!parsed.id) return;
+          const assetShort = await this.$getAppManager()
+            .get(CreatorAssetManager)
+            .getAssetShortViaCache(parsed.id);
+          if (!assetShort) {
+            throw new Error(this.$t('asset.assetNotFound'));
+          }
+          const flow = this.$refs['flow'] as VueFlowStore;
+          const flowCoord = flow.screenToFlowCoordinate({
+            x: event.clientX,
+            y: event.clientY,
+          });
+          await this.blockControllerMut.createNode(flowCoord, null, {
+            AssetId: assetShort.id,
+            Title: assetShort.title ?? '',
+            Name: assetShort.name,
+          } as AssetPropValueAsset);
         });
-        await this.blockControllerMut.createNode(flowCoord, null, {
-          AssetId: assetShort.id,
-          Title: assetShort.title ?? '',
-          Name: assetShort.name,
-        } as AssetPropValueAsset);
-      });
     },
     onEdgeClick({ event }: EdgeMouseEvent) {
       if (event.ctrlKey || event.metaKey || event.button === 2) {
@@ -466,6 +490,7 @@ export default defineComponent({
 .GraphEditorNode {
   border-radius: 4px;
   border: 1px solid transparent;
+  background: var(--imsde-node-content-bg-color);
   &.state-selected {
     border-color: var(--imsde-node-selected-color);
   }
