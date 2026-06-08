@@ -61,7 +61,12 @@
           ></BezierEdge>
         </template>
         <Background :offset="19" />
-        <MiniMap zoomable pannable class="GraphEditor-minimap" />
+        <MiniMap
+          zoomable
+          pannable
+          class="GraphEditor-minimap"
+          @click="onMiniMapClick"
+        />
         <svg class="GraphEditor-defs">
           <defs>
             <marker
@@ -133,6 +138,8 @@ import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
+import { FlowViewportHelper } from '../../DialogBlock/editor/FlowViewportHelper';
+import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -166,6 +173,7 @@ export default defineComponent({
   },
   emits: ['focus', 'blur'],
   data() {
+    const viewportHelper = new FlowViewportHelper();
     return {
       createNodeContext: null as { x: number; y: number } | null,
       connectStartParams: null as {
@@ -177,6 +185,7 @@ export default defineComponent({
       viewportTransform: { x: 0, y: 0, zoom: 1 } as ViewportTransform,
       mouseDownTime: 0,
       lastCreatePosition: { x: 0, y: 0 },
+      viewportHelper,
       _keyDownHandler: null as ((e: KeyboardEvent) => void) | null,
     };
   },
@@ -198,6 +207,9 @@ export default defineComponent({
     },
   },
   mounted() {
+    const flow = this.$refs['flow'] as VueFlowStore;
+    assert(flow);
+    this.viewportHelper.setFlow(flow);
     this._keyDownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -458,6 +470,19 @@ export default defineComponent({
     },
     onNodeClick({ node }: NodeMouseEvent) {
       this.blockControllerMut.revealBlockContentItem('node-' + node.id);
+    },
+    onMiniMapClick({
+      position,
+    }: {
+      event: MouseEvent;
+      position: { x: number; y: number };
+    }) {
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      flow.setCenter(position.x, position.y, {
+        duration: 0,
+        zoom: this.viewportHelper.zoom,
+      });
     },
   },
 });
