@@ -15,6 +15,8 @@ export class DialogBlockDefinition extends BlockTypeDefinition {
   component = async () => (await import('./DialogBlock.vue')).default;
   icon = 'file-paper-2-fill';
   override resizableBlockHeight = true;
+  override aiSpec =
+    'This block contains the dialogue script. It consists of nodes, each node containing speeches with text and optional response options with button text and links to other nodes.';
 
   override getBlockLocalizableFields(
     asset: AssetFullInstanceR,
