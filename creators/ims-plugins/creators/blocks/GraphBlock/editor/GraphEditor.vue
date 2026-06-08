@@ -74,8 +74,8 @@
               viewBox="0 0 10 10"
               refX="10"
               refY="5"
-              markerWidth="16"
-              markerHeight="16"
+              markerWidth="12"
+              markerHeight="12"
               orient="auto-start-reverse"
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#888" />
@@ -136,6 +136,7 @@ import type { GraphBlockController } from './GraphBlockController';
 import type { AssetPropValueAsset } from '~ims-app-base/logic/types/Props';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { FlowViewportHelper } from '../../DialogBlock/editor/FlowViewportHelper';
@@ -402,11 +403,18 @@ export default defineComponent({
     async addAssetNode() {
       const appManager = this.$getAppManager();
       const dialogManager = appManager.get(DialogManager);
+      const gdd_workspace = appManager
+        .get(ProjectManager)
+        .getWorkspaceByName('gdd');
+      if (!gdd_workspace) return;
       const SelectAssetDialog = (
         await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
       ).default;
       const assetResult = await dialogManager.show(SelectAssetDialog, {
         dialogHeader: this.$t('graphBlock.editor.selectAsset'),
+        where: {
+          workspaceids: gdd_workspace.id,
+        },
       });
       if (!assetResult) return;
       const assetValue: AssetPropValueAsset = {

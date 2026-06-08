@@ -6,7 +6,7 @@
           v-if="editing"
           ref="editorRef"
           v-model="localValue"
-          class="GraphTextNode-editor nodrag nopan"
+          class="GraphTextNode-editor nodrag nopan nowheel"
           :multiline="true"
           toolbar="inline"
           :placeholder="$t('graphBlock.node.placeholder')"
@@ -32,6 +32,12 @@
           :position="Position.Top"
           class="GraphTextNode-handle"
         />
+        <Handle
+          id="target-top"
+          type="target"
+          :position="Position.Top"
+          class="GraphTextNode-targetHandle"
+        />
       </div>
       <div class="GraphTextNode-right">
         <div
@@ -44,6 +50,12 @@
           type="source"
           :position="Position.Right"
           class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-right"
+          type="target"
+          :position="Position.Right"
+          class="GraphTextNode-targetHandle"
         />
       </div>
       <div class="GraphTextNode-bottom">
@@ -58,6 +70,12 @@
           :position="Position.Bottom"
           class="GraphTextNode-handle"
         />
+        <Handle
+          id="target-bottom"
+          type="target"
+          :position="Position.Bottom"
+          class="GraphTextNode-targetHandle"
+        />
       </div>
       <div class="GraphTextNode-left">
         <div
@@ -70,6 +88,12 @@
           type="source"
           :position="Position.Left"
           class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-left"
+          type="target"
+          :position="Position.Left"
+          class="GraphTextNode-targetHandle"
         />
       </div>
       <template v-if="!readonly">
@@ -323,6 +347,10 @@ export default defineComponent({
 .GraphTextNode-body {
   padding: 4px;
 }
+.GraphTextNode-presenter,
+.GraphTextNode-editor {
+  overflow: auto;
+}
 
 .GraphTextNode-body,
 .GraphTextNode-content,
@@ -362,6 +390,11 @@ export default defineComponent({
   border-radius: 50%;
   opacity: 0;
   transition: opacity ease-in-out 0.2s;
+}
+
+.GraphTextNode-targetHandle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .GraphTextNode-top,
