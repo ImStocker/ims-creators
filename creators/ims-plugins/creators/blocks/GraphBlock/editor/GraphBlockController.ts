@@ -1,4 +1,4 @@
-import type { Edge, GraphEdge, GraphNode } from '@vue-flow/core';
+import type { Edge, GraphEdge, GraphNode, ViewportTransform } from '@vue-flow/core';
 import type { GraphBlockState } from './GraphEditor';
 import {
   exportGraphBlockData,
@@ -26,6 +26,11 @@ import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefini
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptors';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import { getNextIndexWithTimestamp } from '~ims-app-base/components/Asset/Editor/blockUtils';
+import {
+  clipboardCopyPlainText,
+  clipboardReadPlainText,
+} from '~ims-app-base/logic/utils/clipboard';
+import type { GraphLink } from '../logic/nodeStoring';
 
 export type GraphBlockContentUserData = {
   type: 'node';
@@ -166,6 +171,135 @@ export class GraphBlockController extends BlockEditorController {
 
     this.savePropsDelayed();
     return id;
+  }
+
+  copyNodesToClipboard(
+    selectedNodeIds: string[],
+    viewport: ViewportTransform,
+  ) {
+    const nodesToCopy: any[] = [];
+    for (const nodeId of selectedNodeIds) {
+      const node = this.state.nodes.find((n) => n.id === nodeId);
+      if (!node) continue;
+      const screenX = node.position.x * viewport.zoom + viewport.x;
+      const screenY = node.position.y * viewport.zoom + viewport.y;
+      const nodeData = node.data as { value?: any; width?: number; height?: number; index?: number } | undefined;
+      const links: GraphLink[] = [];
+      for (const edge of this.state.edges) {
+        if (edge.source !== node.id) continue;
+        if (!selectedNodeIds.includes(edge.target)) continue;
+        const fromSide = edge.sourceHandle
+          ? (parseSourceHandle(edge.sourceHandle) ?? undefined)
+          : undefined;
+        const toSide = edge.targetHandle
+          ? (parseTargetHandle(edge.targetHandle) ?? undefined)
+          : undefined;
+        links.push({
+          to: edge.target,
+          fromSide: fromSide !== 'right' ? fromSide : undefined,
+          toSide: toSide !== 'left' ? toSide : undefined,
+        });
+      }
+      nodesToCopy.push({
+        id: node.id,
+        type: node.type ?? 'graph-node',
+        value: nodeData?.value ?? null,
+        width: nodeData?.width ?? 200,
+        height: nodeData?.height ?? 80,
+        pos: { x: node.position.x, y: node.position.y },
+        index: nodeData?.index ?? 0,
+        links,
+        _screenX: screenX,
+        _screenY: screenY,
+      });
+    }
+    clipboardCopyPlainText(
+      JSON.stringify({ nodes: nodesToCopy, viewport }),
+    );
+  }
+
+  async pasteNodesFromClipboard(viewport: ViewportTransform) {
+    const changer = this.changer;
+    if (!changer) return;
+    if (!this.resolvedBlock) return;
+
+    const pastedData = await clipboardReadPlainText();
+    try {
+      const parsed = JSON.parse(pastedData);
+      const nodes = parsed.nodes;
+      if (!Array.isArray(nodes) || !nodes.length) return;
+
+      const isValidNode = (n: any) =>
+        n && typeof n === 'object' &&
+        typeof n.id === 'string' &&
+        typeof n.type === 'string' &&
+        n.pos && typeof n.pos === 'object' &&
+        typeof n.pos.x === 'number' && typeof n.pos.y === 'number';
+
+      if (!nodes.every(isValidNode)) return;
+
+      const idMap = new Map<string, string>();
+      nodes.forEach((n: any) => idMap.set(n.id, uuidv4()));
+
+      for (const node of nodes) {
+        const newId = idMap.get(node.id);
+        const maxIndex = this.state.nodes.reduce(
+          (acc, n) => Math.max(acc, ((n.data as any)?.index ?? 0)),
+          0,
+        );
+
+        let newX = node.pos.x;
+        let newY = node.pos.y;
+        if (node._screenX !== undefined && node._screenY !== undefined) {
+          newX = (node._screenX - viewport.x) / viewport.zoom;
+          newY = (node._screenY - viewport.y) / viewport.zoom;
+        }
+        newX += 50;
+        newY += 50;
+
+        const remappedLinks: { to: string; fromSide?: string; toSide?: string }[] =
+          (node.links || []).map((link: any) => ({
+            ...link,
+            to: idMap.get(link.to) ?? link.to,
+          }));
+
+        this.state.nodes.push({
+          id: newId,
+          type: node.type ?? 'graph-node',
+          position: { x: newX, y: newY },
+          data: {
+            value: node.value ?? null,
+            width: node.width ?? 200,
+            height: node.height ?? 80,
+            index: getNextIndexWithTimestamp(maxIndex),
+          },
+        });
+
+        for (const link of remappedLinks) {
+          const sourceHandle = `source-${link.fromSide ?? 'right'}`;
+          const targetHandle = `target-${link.toSide ?? 'left'}`;
+          this.state.edges.push({
+            id: `${newId}|${sourceHandle}|${targetHandle}|${link.to}`,
+            source: newId,
+            target: link.to,
+            sourceHandle,
+            targetHandle,
+            type: 'graph-edge',
+          });
+        }
+      }
+
+      this.savePropsDelayed();
+    } catch {
+      // ignore
+    }
+  }
+
+  cutNodes(selectedNodeIds: string[], viewport: ViewportTransform) {
+    this.copyNodesToClipboard(selectedNodeIds, viewport);
+    for (const nodeId of selectedNodeIds) {
+      this.deleteNodeById(nodeId);
+    }
   }
 
   saveProps() {

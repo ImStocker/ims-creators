@@ -163,7 +163,51 @@ export default defineComponent({
       connectStartParams: null as { nodeId: string; handleId: string; handleType: string } | null,
       mouseDownTime: 0,
       lastCreatePosition: { x: 0, y: 0 },
+      _keyDownHandler: null as ((e: KeyboardEvent) => void) | null,
     };
+  },
+  mounted() {
+    this._keyDownHandler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      const flow = this.$refs['flow'] as VueFlowStore | undefined;
+      if (!flow) return;
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') {
+        const selectedNodeIds = (flow.getSelectedNodes as any).map(
+          (n: any) => n.id,
+        );
+        if (!selectedNodeIds.length) return;
+        this.blockControllerMut.copyNodesToClipboard(
+          selectedNodeIds,
+          flow.getViewport(),
+        );
+      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') {
+        this.blockControllerMut.pasteNodesFromClipboard(flow.getViewport());
+      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX') {
+        const selectedNodeIds = (flow.getSelectedNodes as any).map(
+          (n: any) => n.id,
+        );
+        if (!selectedNodeIds.length) return;
+        this.blockControllerMut.cutNodes(
+          selectedNodeIds,
+          flow.getViewport(),
+        );
+      }
+    };
+    window.addEventListener('keydown', this._keyDownHandler);
+  },
+  unmounted() {
+    if (this._keyDownHandler) {
+      window.removeEventListener('keydown', this._keyDownHandler);
+      this._keyDownHandler = null;
+    }
   },
   computed: {
     ConnectionMode() {
