@@ -111,7 +111,10 @@ export class GraphBlockController extends BlockEditorController {
     }
   }
 
-  async createNode(position: { x: number; y: number }) {
+  async createNode(
+    position: { x: number; y: number },
+    connectFrom?: { nodeId: string; handleId: string; handleType: string } | null,
+  ) {
     const id = uuidv4();
     const maxIndex = this.state.nodes.reduce(
       (acc, n) => Math.max(acc, ((n.data as any)?.index ?? 0)),
@@ -129,6 +132,35 @@ export class GraphBlockController extends BlockEditorController {
         index: getNextIndexWithTimestamp(maxIndex),
       },
     });
+
+    if (connectFrom) {
+      const OPPOSITE_SIDE: Record<string, string> = {
+        top: 'bottom',
+        bottom: 'top',
+        left: 'right',
+        right: 'left',
+      };
+
+      if (connectFrom.handleType === 'source') {
+        const fromSide = parseSourceHandle(connectFrom.handleId);
+        const toSide = fromSide ? (OPPOSITE_SIDE[fromSide] ?? 'left') : 'left';
+        this.addEdge(
+          connectFrom.nodeId,
+          id,
+          connectFrom.handleId,
+          `target-${toSide}`,
+        );
+      } else if (connectFrom.handleType === 'target') {
+        const toSide = parseTargetHandle(connectFrom.handleId);
+        const fromSide = toSide ? (OPPOSITE_SIDE[toSide] ?? 'right') : 'right';
+        this.addEdge(
+          id,
+          connectFrom.nodeId,
+          `source-${fromSide}`,
+          connectFrom.handleId,
+        );
+      }
+    }
 
     this.savePropsDelayed();
     return id;

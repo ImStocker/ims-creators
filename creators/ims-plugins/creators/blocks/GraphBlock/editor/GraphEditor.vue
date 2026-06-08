@@ -24,6 +24,8 @@
         :snap-grid="[10, 10]"
         :min-zoom="0.1"
         @connect="onConnect"
+        @connect-start="onConnectStart"
+        @connect-end="onConnectEnd"
         @edges-change="onEdgesChange"
         @nodes-change="onNodesChange"
         @edge-click="onEdgeClick"
@@ -101,6 +103,7 @@ import {
   BezierEdge,
   type EdgeMouseEvent,
   type NodeMouseEvent,
+  type OnConnectStartParams,
 } from '@vue-flow/core';
 import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType, ref } from 'vue';
@@ -143,6 +146,7 @@ export default defineComponent({
   data() {
     return {
       createNodeContext: null as { x: number; y: number } | null,
+      connectStartParams: null as { nodeId: string; handleId: string; handleType: string } | null,
       mouseDownTime: 0,
       lastCreatePosition: { x: 0, y: 0 },
     };
@@ -185,6 +189,7 @@ export default defineComponent({
         ev.targetHandle ?? undefined,
       );
       this.createNodeContext = null;
+      this.connectStartParams = null;
     },
     onEdgesChange(events: EdgeChange[]) {
       let needSave = false;
@@ -217,9 +222,35 @@ export default defineComponent({
         this.blockControllerMut.savePropsDelayed();
       }
     },
+    onConnectStart(ev: OnConnectStartParams) {
+      if (this.readonlyComp) return;
+      if (!ev.nodeId || !ev.handleType || !ev.handleId) return;
+      this.connectStartParams = {
+        nodeId: ev.nodeId,
+        handleId: ev.handleId,
+        handleType: ev.handleType,
+      };
+    },
+    onConnectEnd(ev: any) {
+      if (this.readonlyComp) return;
+      if (!this.connectStartParams) return;
+      if (!this.$el) return;
+      const editorBBox = (this.$el as HTMLElement).getBoundingClientRect();
+      const flow = this.$refs['flow'] as VueFlowStore;
+      const flowCoord = flow.screenToFlowCoordinate({
+        x: ev.clientX,
+        y: ev.clientY,
+      });
+      this.lastCreatePosition = { x: flowCoord.x, y: flowCoord.y };
+      this.createNodeContext = {
+        x: ev.clientX - editorBBox.x,
+        y: ev.clientY - editorBBox.y,
+      };
+    },
     onMouseDown() {
       if (this.readonlyComp) return;
       this.createNodeContext = null;
+      this.connectStartParams = null;
       this.mouseDownTime = Date.now();
     },
     async onMouseUp(ev: PointerEvent) {
@@ -252,8 +283,10 @@ export default defineComponent({
     async addNode() {
       const nodeId = await this.blockControllerMut.createNode(
         this.lastCreatePosition,
+        this.connectStartParams,
       );
       this.createNodeContext = null;
+      this.connectStartParams = null;
     },
     onEdgeClick({ event }: EdgeMouseEvent) {
       if (event.ctrlKey || event.metaKey || event.button === 2) {
