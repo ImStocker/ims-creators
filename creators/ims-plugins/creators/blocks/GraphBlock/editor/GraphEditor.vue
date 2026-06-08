@@ -83,9 +83,18 @@
       }"
     >
       <div class="GraphEditor-createNode-dropdown is-dropdown">
-        <button class="is-button is-button-action" @click="addNode">
-          <i class="ri-node-tree"></i> {{ $t('graphBlock.editor.addNode') }}
-        </button>
+        <div class="GraphEditor-createNode-dropdown-item" @click="addCardNode">
+          <i class="ri-node-tree GraphEditor-createNode-dropdown-item-icon"></i>
+          {{ $t('graphBlock.editor.addCard') }}
+        </div>
+        <div class="GraphEditor-createNode-dropdown-item" @click="addFileNode">
+          <i class="ri-attachment-2 GraphEditor-createNode-dropdown-item-icon"></i>
+          {{ $t('graphBlock.editor.addFile') }}
+        </div>
+        <div class="GraphEditor-createNode-dropdown-item" @click="addAssetNode">
+          <i class="ri-link-m GraphEditor-createNode-dropdown-item-icon"></i>
+          {{ $t('graphBlock.editor.addElement') }}
+        </div>
       </div>
     </div>
   </div>
@@ -111,6 +120,9 @@ import { getNodeDescriptors } from '../nodes/getNodeDescriptors';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { GraphBlockController } from './GraphBlockController';
+import type { AssetPropValueAsset } from '~ims-app-base/logic/types/Props';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -280,10 +292,51 @@ export default defineComponent({
         y: ev.clientY - editorBBox.y,
       };
     },
-    async addNode() {
-      const nodeId = await this.blockControllerMut.createNode(
+    async addCardNode() {
+      await this.blockControllerMut.createNode(
         this.lastCreatePosition,
         this.connectStartParams,
+        null,
+      );
+      this.createNodeContext = null;
+      this.connectStartParams = null;
+    },
+    async addFileNode() {
+      const appManager = this.$getAppManager();
+      const editorManager = appManager.get(EditorManager);
+      const files = await editorManager.pickFiles();
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      const uploadingJob = editorManager.attachFile(file.blob, file.name);
+      const result = await uploadingJob.awaitResult();
+      if (!result) return;
+      await this.blockControllerMut.createNode(
+        this.lastCreatePosition,
+        this.connectStartParams,
+        result,
+      );
+      this.createNodeContext = null;
+      this.connectStartParams = null;
+    },
+    async addAssetNode() {
+      const appManager = this.$getAppManager();
+      const dialogManager = appManager.get(DialogManager);
+      const SelectAssetDialog = (
+        await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
+      ).default;
+      const assetResult = await dialogManager.show(SelectAssetDialog, {
+        dialogHeader: this.$t('graphBlock.editor.selectAsset'),
+      });
+      if (!assetResult) return;
+      const assetValue: AssetPropValueAsset = {
+        AssetId: assetResult.id,
+        Title: assetResult.title ?? '',
+        Name: assetResult.name,
+      };
+      await this.blockControllerMut.createNode(
+        this.lastCreatePosition,
+        this.connectStartParams,
+        assetValue,
       );
       this.createNodeContext = null;
       this.connectStartParams = null;
@@ -375,10 +428,32 @@ export default defineComponent({
 }
 
 .GraphEditor-createNode-dropdown {
-  padding: 4px;
+  background-color: var(--imsde-dropdown-bg-color);
+  border-radius: var(--imsde-dropdown-border-radius);
+  box-shadow: var(--imsde-dropdown-box-shadow);
+  user-select: none;
+}
+.GraphEditor-createNode-dropdown-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--local-text-color);
+  white-space: nowrap;
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--imsde-dropdown-border-color);
+  }
+  &:hover {
+    --local-text-color: var(--imsde-dropdown-text-color);
+    background: var(--imsde-node-color);
+    .GraphEditor-createNode-dropdown-item-icon {
+      color: var(--local-text-color);
+    }
+  }
+}
+.GraphEditor-createNode-dropdown-item-icon {
+  color: var(--imsde-node-color);
 }
 
 .GraphEditor-edge {

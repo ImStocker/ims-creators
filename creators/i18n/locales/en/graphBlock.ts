@@ -6,6 +6,10 @@ export default {
     },
     editor: {
       addNode: 'Add Node',
+      addCard: 'Add Card',
+      addFile: 'Add File',
+      addElement: 'Add Element',
+      selectAsset: 'Select Asset',
     },
     outline: {
       rootTitle: 'Graph',

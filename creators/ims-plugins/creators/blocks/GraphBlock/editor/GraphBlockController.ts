@@ -16,6 +16,7 @@ import {
   castAssetPropValueToString,
   castAssetPropValueToText,
   type AssetProps,
+  type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import { v4 as uuidv4 } from 'uuid';
@@ -114,6 +115,7 @@ export class GraphBlockController extends BlockEditorController {
   async createNode(
     position: { x: number; y: number },
     connectFrom?: { nodeId: string; handleId: string; handleType: string } | null,
+    value?: AssetPropValue | null,
   ) {
     const id = uuidv4();
     const maxIndex = this.state.nodes.reduce(
@@ -126,7 +128,7 @@ export class GraphBlockController extends BlockEditorController {
       type: 'graph-node',
       position,
       data: {
-        value: null,
+        value: value ?? null,
         width: 200,
         height: 80,
         index: getNextIndexWithTimestamp(maxIndex),
