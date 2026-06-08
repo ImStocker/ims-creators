@@ -677,7 +677,7 @@ export default defineComponent({
       }
       ev.preventDefault();
     },
-    onMouseUp(ev: PointerEvent) {
+    async onMouseUp(ev: PointerEvent) {
       if (this.readonlyComp) {
         return;
       }
@@ -701,6 +701,7 @@ export default defineComponent({
 
       const editor_bbox = this.$el.getBoundingClientRect();
       const allowed_types = this._getAvailableNodeTypes(null, null);
+      await new Promise((r) => setTimeout(r, 1));
       this.createNodeContext = {
         clickedAt: {
           x: ev.clientX - editor_bbox.x,
@@ -1011,8 +1012,8 @@ export default defineComponent({
       const flow = this.$refs['flow'] as VueFlowStore;
       if (!flow) return;
       flow.setCenter(position.x, position.y, {
-        duration: 0,        
-        zoom: this.viewportHelper.zoom
+        duration: 0,
+        zoom: this.viewportHelper.zoom,
       });
     },
     async showNode(node_id: string): Promise<boolean> {
