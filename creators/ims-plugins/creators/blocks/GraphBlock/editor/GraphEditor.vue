@@ -5,8 +5,8 @@
       @pointerdown.capture="onMouseDown"
       @pointerup.capture="onMouseUp"
       @contextmenu.capture="onContextMenu"
-      @dragover.prevent
-      @drop.prevent
+      @dragover="onDragOver"
+      @drop="onDrop"
     >
       <VueFlow
         ref="flow"
@@ -123,6 +123,8 @@ import type { GraphBlockController } from './GraphBlockController';
 import type { AssetPropValueAsset } from '~ims-app-base/logic/types/Props';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -340,6 +342,46 @@ export default defineComponent({
       );
       this.createNodeContext = null;
       this.connectStartParams = null;
+    },
+    onDragOver(event: DragEvent) {
+      const eventDt = event.dataTransfer;
+      if (!eventDt) return;
+      if (!eventDt.types.includes('asset')) return;
+      eventDt.dropEffect = 'link';
+      event.preventDefault();
+    },
+    async onDrop(event: DragEvent) {
+      if (this.readonlyComp) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (!target.closest('.vue-flow__pane')) return;
+      if (target.closest('.vue-flow__node')) return;
+      event.preventDefault();
+      const eventDt = event.dataTransfer;
+      if (!eventDt) return;
+      const rawAsset = eventDt.getData('asset');
+      if (!rawAsset) return;
+      await this.$getAppManager().get(UiManager).doTask(async () => {
+        const parsed = JSON.parse(rawAsset) as { id: string };
+        if (!parsed.id) return;
+        const assetShort = await this.$getAppManager()
+          .get(CreatorAssetManager)
+          .getAssetShortViaCache(parsed.id);
+        if (!assetShort) {
+          throw new Error(this.$t('asset.assetNotFound'));
+        }
+        const editorBBox = (this.$el as HTMLElement).getBoundingClientRect();
+        const flow = this.$refs['flow'] as VueFlowStore;
+        const flowCoord = flow.screenToFlowCoordinate({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        await this.blockControllerMut.createNode(flowCoord, null, {
+          AssetId: assetShort.id,
+          Title: assetShort.title ?? '',
+          Name: assetShort.name,
+        } as AssetPropValueAsset);
+      });
     },
     onEdgeClick({ event }: EdgeMouseEvent) {
       if (event.ctrlKey || event.metaKey || event.button === 2) {
