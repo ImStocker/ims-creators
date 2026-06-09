@@ -3,7 +3,7 @@
     class="DialogActionNode DialogEditorNode"
     :menu-list="menuList ?? contextMenu"
   >
-    <slot name="node"></slot>
+    <slot></slot>
   </ContextMenuZone>
 </template>
 
