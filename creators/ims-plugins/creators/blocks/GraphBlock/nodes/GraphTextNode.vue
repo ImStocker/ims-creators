@@ -1,5 +1,9 @@
 <template>
-  <div class="GraphTextNode GraphEditorNode" :style="nodeStyle">
+  <div
+    class="GraphTextNode GraphEditorNode"
+    :class="{ 'is-color-set': !!nodeColor, 'state-selected': selected }"
+    :style="nodeStyle"
+  >
     <div class="GraphTextNode-body GraphEditorNode-body">
       <div class="GraphTextNode-content">
         <imc-editor
@@ -123,6 +127,7 @@ import { defineComponent, type PropType } from 'vue';
 import { Position, Handle, type ViewportTransform } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import type { GraphBlockController } from '../editor/GraphBlockController';
+import { DATA_COLOR_TO_HEX, hexToRgba } from '../editor/GraphEditor';
 import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
 
@@ -150,6 +155,7 @@ export default defineComponent({
         width?: number;
         height?: number;
         index?: number;
+        color?: string;
       }>,
       required: true,
     },
@@ -193,13 +199,22 @@ export default defineComponent({
     editing() {
       return !this.readonly && this.editingNodeId === this.id;
     },
+    nodeColor() {
+      return (this.data as any)?.color ?? '';
+    },
     nodeStyle() {
       const w = (this.data as any)?.width;
       const h = (this.data as any)?.height;
-      return {
-        width: w ? w + 'px' : undefined,
-        height: h ? h + 'px' : undefined,
-      };
+      const storedColor = (this.data as any)?.color;
+      const result: Record<string, string> = {};
+      if (w) result.width = w + 'px';
+      if (h) result.height = h + 'px';
+      if (storedColor) {
+        const hex = DATA_COLOR_TO_HEX[storedColor] || storedColor;
+        result['--node-color'] = hex;
+        result['--node-bg'] = hexToRgba(hex, 0.12);
+      }
+      return result;
     },
   },
   watch: {

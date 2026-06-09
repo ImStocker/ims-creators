@@ -104,6 +104,33 @@
         </div>
       </div>
     </div>
+    <div
+      v-if="selectedNodes.length > 0 && !readonlyComp"
+      class="GraphEditor-colorBar"
+      @mousedown.stop
+    >
+      <button
+        v-for="swatch in colorSwatches"
+        :key="swatch.value || '__none'"
+        class="GraphEditor-colorSwatch"
+        :class="{ active: selectedColor === swatch.value }"
+        :style="{
+          background: swatch.hex || '#fff',
+          borderColor: swatch.hex || '#999',
+        }"
+        @click.stop="setColorForSelected(swatch.value)"
+      >
+        <i v-if="!swatch.value" class="ri-close-line"></i>
+      </button>
+      <input
+        type="color"
+        class="GraphEditor-colorPicker"
+        :value="selectedColor || '#ffffff'"
+        @input.stop="
+          setColorForSelected(($event.target as HTMLInputElement).value)
+        "
+      />
+    </div>
   </div>
 </template>
 
@@ -135,6 +162,7 @@ import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
+import { COLOR_SWATCHES } from './GraphEditor';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default defineComponent({
@@ -200,6 +228,18 @@ export default defineComponent({
     },
     arrowMarker() {
       return 'url(#graph-arrow)';
+    },
+    selectedNodes() {
+      return this.blockControllerMut.state.nodes.filter((n: any) => n.selected);
+    },
+    selectedColor() {
+      const nodes = this.selectedNodes;
+      if (nodes.length === 0) return '';
+      const colors = nodes.map((n: any) => (n.data as any)?.color ?? '');
+      return colors.every((c: string) => c === colors[0]) ? colors[0] : '';
+    },
+    colorSwatches() {
+      return COLOR_SWATCHES;
     },
   },
   mounted() {
@@ -474,6 +514,14 @@ export default defineComponent({
     onNodeClick({ node }: NodeMouseEvent) {
       this.blockControllerMut.revealBlockContentItem('node-' + node.id);
     },
+    setColorForSelected(color: string) {
+      for (const node of this.blockControllerMut.state.nodes) {
+        if ((node as any).selected) {
+          (node.data as any).color = color || undefined;
+        }
+      }
+      this.blockControllerMut.savePropsDelayed();
+    },
   },
 });
 </script>
@@ -507,6 +555,11 @@ export default defineComponent({
   background: var(--imsde-node-content-bg-color);
   &.state-selected {
     border-color: var(--imsde-node-selected-color);
+    border-width: 2px;
+  }
+  &.is-color-set {
+    border-color: var(--node-color);
+    background: var(--node-bg, var(--imsde-node-content-bg-color));
   }
   & > div:first-child {
     border-top-left-radius: 4px;
@@ -524,12 +577,6 @@ export default defineComponent({
 }
 
 .GraphEditorNode-body {
-  background: var(--imsde-node-content-bg-color);
-  color: var(--imsde-node-content-text-color);
-  border: var(--imsde-node-content-border-color) 1px solid;
-  &:not(:first-child) {
-    border-top: none;
-  }
 }
 </style>
 
@@ -591,5 +638,61 @@ export default defineComponent({
   width: 0;
   height: 0;
   overflow: hidden;
+}
+
+.GraphEditor-colorBar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--imsde-node-content-bg-color);
+  border: 1px solid var(--imsde-node-selected-color);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.GraphEditor-colorSwatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.1s;
+  &:hover {
+    transform: scale(1.2);
+  }
+  &.active {
+    border-color: var(--imsde-node-selected-color);
+    transform: scale(1.15);
+  }
+  i {
+    font-size: 12px;
+    color: #666;
+  }
+}
+
+.GraphEditor-colorPicker {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #888;
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
 }
 </style>

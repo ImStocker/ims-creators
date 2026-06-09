@@ -11,12 +11,39 @@ export type GraphNodeData = {
   width: number;
   height: number;
   index: number;
+  color?: string;
 };
 
 export type GraphBlockState = {
   nodes: Node[];
   edges: Edge[];
 };
+
+export const DATA_COLOR_TO_HEX: Record<string, string> = {
+  red: '#dc3545',
+  orange: '#e67e22',
+  yellow: '#f1c40f',
+  green: '#2ecc71',
+  blue: '#3498db',
+  purple: '#9b59b6',
+};
+
+export const COLOR_SWATCHES: { value: string; hex: string }[] = [
+  { value: '', hex: '' },
+  { value: 'red', hex: '#dc3545' },
+  { value: 'orange', hex: '#e67e22' },
+  { value: 'yellow', hex: '#f1c40f' },
+  { value: 'green', hex: '#2ecc71' },
+  { value: 'blue', hex: '#3498db' },
+  { value: 'purple', hex: '#9b59b6' },
+];
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 const SIDE_SOURCE_MAP: Record<string, string> = {
   top: 'source-top',
@@ -54,7 +81,7 @@ export function extractGraphBlockData(props: AssetProps): GraphBlockState {
     for (const [node_id, node_plain] of Object.entries(plain.nodes)) {
       nodes.push({
         id: node_id,
-        type: node_plain.type ?? 'graph-node',
+        type: 'graph-node',
         position: {
           x: node_plain?.pos?.x ?? 0,
           y: node_plain?.pos?.y ?? 0,
@@ -64,6 +91,7 @@ export function extractGraphBlockData(props: AssetProps): GraphBlockState {
           width: node_plain.width ?? 150,
           height: node_plain.height ?? 60,
           index: node_plain.index ?? 0,
+          color: node_plain.color ?? undefined,
         } as GraphNodeData,
       });
 
@@ -112,7 +140,6 @@ export function exportGraphBlockData(state: GraphBlockState): AssetProps {
     }
 
     const plain_node: GraphBlockPlainNode = {
-      type: node.type ?? 'graph-node',
       value: node_data?.value ?? null,
       width: node_data?.width ?? 150,
       height: node_data?.height ?? 60,
@@ -122,6 +149,7 @@ export function exportGraphBlockData(state: GraphBlockState): AssetProps {
       },
       index: node_data?.index ?? 0,
       links,
+      color: node_data?.color ?? undefined,
     };
     res.nodes[node.id] = plain_node;
   }

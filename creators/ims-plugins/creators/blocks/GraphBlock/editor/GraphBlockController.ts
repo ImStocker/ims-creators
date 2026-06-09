@@ -137,6 +137,7 @@ export class GraphBlockController extends BlockEditorController {
         width: 200,
         height: 80,
         index: getNextIndexWithTimestamp(maxIndex),
+        color: undefined,
       },
     });
 
@@ -202,13 +203,13 @@ export class GraphBlockController extends BlockEditorController {
       }
       nodesToCopy.push({
         id: node.id,
-        type: node.type ?? 'graph-node',
         value: nodeData?.value ?? null,
         width: nodeData?.width ?? 200,
         height: nodeData?.height ?? 80,
         pos: { x: node.position.x, y: node.position.y },
         index: nodeData?.index ?? 0,
         links,
+        color: nodeData?.color ?? undefined,
         _screenX: screenX,
         _screenY: screenY,
       });
@@ -232,7 +233,6 @@ export class GraphBlockController extends BlockEditorController {
       const isValidNode = (n: any) =>
         n && typeof n === 'object' &&
         typeof n.id === 'string' &&
-        typeof n.type === 'string' &&
         n.pos && typeof n.pos === 'object' &&
         typeof n.pos.x === 'number' && typeof n.pos.y === 'number';
 
@@ -265,13 +265,14 @@ export class GraphBlockController extends BlockEditorController {
 
         this.state.nodes.push({
           id: newId,
-          type: node.type ?? 'graph-node',
+          type: 'graph-node',
           position: { x: newX, y: newY },
           data: {
             value: node.value ?? null,
             width: node.width ?? 200,
             height: node.height ?? 80,
             index: getNextIndexWithTimestamp(maxIndex),
+            color: node.color ?? undefined,
           },
         });
 

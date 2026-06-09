@@ -9,7 +9,6 @@ export type GraphLink = {
 };
 
 export type GraphBlockPlainNode = {
-  type: string;
   value?: AssetPropValue;
   width: number;
   height: number;
@@ -19,6 +18,7 @@ export type GraphBlockPlainNode = {
   };
   index: number;
   links: GraphLink[];
+  color?: string;
 };
 
 export type GraphBlockPlain = {
