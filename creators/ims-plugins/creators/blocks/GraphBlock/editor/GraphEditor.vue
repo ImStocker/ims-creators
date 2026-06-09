@@ -619,15 +619,8 @@ export default defineComponent({
     border-bottom: 1px solid var(--imsde-dropdown-border-color);
   }
   &:hover {
-    --local-text-color: var(--imsde-dropdown-text-color);
-    background: var(--imsde-node-color);
-    .GraphEditor-createNode-dropdown-item-icon {
-      color: var(--local-text-color);
-    }
+    background: var(--dropdown-hl-bg-color);
   }
-}
-.GraphEditor-createNode-dropdown-item-icon {
-  color: var(--imsde-node-color);
 }
 
 .GraphEditor-edge {

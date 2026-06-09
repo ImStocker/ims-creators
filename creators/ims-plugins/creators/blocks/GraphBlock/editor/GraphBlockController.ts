@@ -12,7 +12,10 @@ import {
   parseTargetHandle,
 } from './GraphEditor';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
-import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
+import {
+  convertTranslatedTitle,
+  type ResolvedAssetBlock,
+} from '~ims-app-base/logic/utils/assets';
 import { debounceForThis } from '~ims-app-base/components/utils/ComponentUtils';
 import {
   diffAssetPropObjects,
@@ -25,6 +28,7 @@ import {
   type AssetProps,
   type AssetPropValue,
   type AssetPropValueFile,
+  type AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import { v4 as uuidv4 } from 'uuid';
@@ -395,19 +399,35 @@ export class GraphBlockController extends BlockEditorController {
     );
 
     for (const node of sortedNodes) {
-      const nodeDesc = node.type ? getNodeDescriptorOfType(node.type) : null;
       const nodeData = node.data as { value?: any } | undefined;
 
+      let icon: string | undefined;
       let title = this.appManager.$t('graphBlock.node.title');
       if (nodeData?.value) {
-        const text = truncateAssetPropValueText(
-          castAssetPropValueToText(nodeData.value),
-          50,
-        );
-        if (text) {
-          title =
-            castAssetPropValueToString(text.result) +
-            (text.truncated ? '...' : '');
+        const valueType = getAssetPropType(nodeData.value);
+        if (valueType === AssetPropType.FILE) {
+          icon = 'ri-attachment-2';
+          title = (nodeData.value as AssetPropValueFile).Title;
+        } else if (valueType === AssetPropType.ASSET) {
+          icon = 'ri-link-m';
+          title = (nodeData.value as AssetPropValueAsset).Title
+            ? convertTranslatedTitle(
+                (nodeData.value as AssetPropValueAsset).Title,
+                (key: any) => this.appManager.$t(key),
+              )
+            : ((nodeData.value as AssetPropValueAsset).Name ??
+              castAssetPropValueToString(nodeData.value));
+        } else {
+          icon = 'ri-node-tree';
+          const text = truncateAssetPropValueText(
+            castAssetPropValueToText(nodeData.value),
+            50,
+          );
+          if (text) {
+            title =
+              castAssetPropValueToString(text.result) +
+              (text.truncated ? '...' : '');
+          }
         }
       }
 
@@ -417,7 +437,7 @@ export class GraphBlockController extends BlockEditorController {
         title,
         anchor: 'node-' + node.id,
         selectable: true,
-        icon: nodeDesc ? nodeDesc.icon : undefined,
+        icon,
         userData: { type: 'node', id: node.id },
       });
     }
