@@ -1,0 +1,514 @@
+<template>
+  <div class="GraphTextNode GraphEditorNode" :style="nodeStyle">
+    <div class="GraphTextNode-body GraphEditorNode-body">
+      <div class="GraphTextNode-content">
+        <imc-editor
+          v-if="editing"
+          ref="editorRef"
+          v-model="localValue"
+          class="GraphTextNode-editor nodrag nopan nowheel"
+          :multiline="true"
+          toolbar="inline"
+          :placeholder="$t('graphBlock.node.placeholder')"
+          @update:model-value="onValueChange"
+          @blur="onEditorBlur"
+        ></imc-editor>
+        <imc-presenter
+          v-else
+          :value="localValue"
+          class="GraphTextNode-presenter"
+          @dblclick="onDblClick"
+        ></imc-presenter>
+      </div>
+      <div class="GraphTextNode-top">
+        <div
+          v-if="!readonly"
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-t"
+          @mousedown.stop="(e) => onResizeStart(e, 't')"
+        ></div>
+        <Handle
+          id="source-top"
+          type="source"
+          :position="Position.Top"
+          class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-top"
+          type="target"
+          :position="Position.Top"
+          class="GraphTextNode-targetHandle"
+        />
+      </div>
+      <div class="GraphTextNode-right">
+        <div
+          v-if="!readonly"
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-r"
+          @mousedown.stop="(e) => onResizeStart(e, 'r')"
+        ></div>
+        <Handle
+          id="source-right"
+          type="source"
+          :position="Position.Right"
+          class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-right"
+          type="target"
+          :position="Position.Right"
+          class="GraphTextNode-targetHandle"
+        />
+      </div>
+      <div class="GraphTextNode-bottom">
+        <div
+          v-if="!readonly"
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-b"
+          @mousedown.stop="(e) => onResizeStart(e, 'b')"
+        ></div>
+        <Handle
+          id="source-bottom"
+          type="source"
+          :position="Position.Bottom"
+          class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-bottom"
+          type="target"
+          :position="Position.Bottom"
+          class="GraphTextNode-targetHandle"
+        />
+      </div>
+      <div class="GraphTextNode-left">
+        <div
+          v-if="!readonly"
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-l"
+          @mousedown.stop="(e) => onResizeStart(e, 'l')"
+        ></div>
+        <Handle
+          id="source-left"
+          type="source"
+          :position="Position.Left"
+          class="GraphTextNode-handle"
+        />
+        <Handle
+          id="target-left"
+          type="target"
+          :position="Position.Left"
+          class="GraphTextNode-targetHandle"
+        />
+      </div>
+      <template v-if="!readonly">
+        <div
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tl"
+          @mousedown.stop="(e) => onResizeStart(e, 'tl')"
+        ></div>
+        <div
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tr"
+          @mousedown.stop="(e) => onResizeStart(e, 'tr')"
+        ></div>
+        <div
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-br"
+          @mousedown.stop="(e) => onResizeStart(e, 'br')"
+        ></div>
+        <div
+          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-bl"
+          @mousedown.stop="(e) => onResizeStart(e, 'bl')"
+        ></div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, type PropType } from 'vue';
+import { Position, Handle, type ViewportTransform } from '@vue-flow/core';
+import type { NodeDescriptor } from './NodeDescriptor';
+import type { GraphBlockController } from '../editor/GraphBlockController';
+import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
+import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
+
+type ResizeDirection = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l';
+
+export default defineComponent({
+  name: 'GraphTextNode',
+  components: { Handle, ImcEditor, ImcPresenter },
+  props: {
+    nodeDescriptor: {
+      type: Object as PropType<NodeDescriptor>,
+      required: true,
+    },
+    selected: {
+      type: Boolean,
+      required: true,
+    },
+    id: {
+      type: String,
+      required: true,
+    },
+    data: {
+      type: Object as PropType<{
+        value?: any;
+        width?: number;
+        height?: number;
+        index?: number;
+      }>,
+      required: true,
+    },
+    readonly: {
+      type: Boolean,
+      default: false,
+    },
+    dialogController: {
+      type: Object as PropType<GraphBlockController>,
+      required: true,
+    },
+    editingNodeId: {
+      type: [String, null] as PropType<string | null>,
+      default: null,
+    },
+    viewportTransform: {
+      type: Object as PropType<ViewportTransform>,
+      default: () => ({ x: 0, y: 0, zoom: 1 }),
+    },
+  },
+  emits: ['change-type', 'request-edit', 'request-view'],
+  data() {
+    return {
+      localValue: (this as any).data?.value ?? null,
+      resizing: null as {
+        startX: number;
+        startY: number;
+        startWidth: number;
+        startHeight: number;
+        startPosX: number;
+        startPosY: number;
+        direction: ResizeDirection;
+        zoom: number;
+      } | null,
+    };
+  },
+  computed: {
+    Position() {
+      return Position;
+    },
+    editing() {
+      return !this.readonly && this.editingNodeId === this.id;
+    },
+    nodeStyle() {
+      const w = (this.data as any)?.width;
+      const h = (this.data as any)?.height;
+      return {
+        width: w ? w + 'px' : undefined,
+        height: h ? h + 'px' : undefined,
+      };
+    },
+  },
+  watch: {
+    'data.value'(val: any) {
+      this.localValue = val ?? null;
+    },
+    editingNodeId(newVal: string | null, oldVal: string | null) {
+      if (newVal === this.id && newVal !== oldVal) {
+        this.$nextTick(() => {
+          (this.$refs['editorRef'] as any)?.focus?.();
+        });
+      }
+    },
+  },
+  methods: {
+    onValueChange(val: any) {
+      this.localValue = val;
+      const node = this.dialogController.state.nodes.find(
+        (n) => n.id === this.id,
+      );
+      if (node) {
+        (node.data as any).value = val;
+        this.dialogController.savePropsDelayed();
+      }
+    },
+    onDblClick(e: MouseEvent) {
+      if (this.readonly) return;
+      this.$emit('request-edit', this.id);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    onEditorBlur() {
+      this.$emit('request-view');
+    },
+    onResizeStart(ev: MouseEvent, direction: ResizeDirection) {
+      if (this.readonly) return;
+      const node = this.dialogController.state.nodes.find(
+        (n) => n.id === this.id,
+      );
+      if (!node) return;
+      const w = (this.data as any)?.width ?? 200;
+      const h = (this.data as any)?.height ?? 80;
+      this.resizing = {
+        startX: ev.clientX,
+        startY: ev.clientY,
+        startWidth: w,
+        startHeight: h,
+        startPosX: node.position.x,
+        startPosY: node.position.y,
+        direction,
+        zoom: this.viewportTransform.zoom || 1,
+      };
+      window.addEventListener('mousemove', this.onResizeMove);
+      window.addEventListener('mouseup', this.onResizeEnd);
+    },
+    onResizeMove(ev: MouseEvent) {
+      if (!this.resizing) return;
+      const d = this.resizing;
+      const dx = (ev.clientX - d.startX) / d.zoom;
+      const dy = (ev.clientY - d.startY) / d.zoom;
+      let newW = d.startWidth;
+      let newH = d.startHeight;
+      let newPosX = d.startPosX;
+      let newPosY = d.startPosY;
+
+      switch (d.direction) {
+        case 'tl':
+          newW = Math.max(180, d.startWidth - dx);
+          newH = Math.max(60, d.startHeight - dy);
+          newPosX = d.startPosX + (d.startWidth - newW);
+          newPosY = d.startPosY + (d.startHeight - newH);
+          break;
+        case 't':
+          newH = Math.max(60, d.startHeight - dy);
+          newPosY = d.startPosY + (d.startHeight - newH);
+          break;
+        case 'tr':
+          newW = Math.max(180, d.startWidth + dx);
+          newH = Math.max(60, d.startHeight - dy);
+          newPosY = d.startPosY + (d.startHeight - newH);
+          break;
+        case 'r':
+          newW = Math.max(180, d.startWidth + dx);
+          break;
+        case 'br':
+          newW = Math.max(180, d.startWidth + dx);
+          newH = Math.max(60, d.startHeight + dy);
+          break;
+        case 'b':
+          newH = Math.max(60, d.startHeight + dy);
+          break;
+        case 'bl':
+          newW = Math.max(180, d.startWidth - dx);
+          newH = Math.max(60, d.startHeight + dy);
+          newPosX = d.startPosX + (d.startWidth - newW);
+          break;
+        case 'l':
+          newW = Math.max(180, d.startWidth - dx);
+          newPosX = d.startPosX + (d.startWidth - newW);
+          break;
+      }
+
+      const node = this.dialogController.state.nodes.find(
+        (n) => n.id === this.id,
+      );
+      if (node) {
+        (node.data as any).width = newW;
+        (node.data as any).height = newH;
+        node.position.x = newPosX;
+        node.position.y = newPosY;
+      }
+    },
+    onResizeEnd() {
+      window.removeEventListener('mousemove', this.onResizeMove);
+      window.removeEventListener('mouseup', this.onResizeEnd);
+      if (this.resizing) {
+        this.dialogController.savePropsDelayed();
+        this.resizing = null;
+      }
+    },
+  },
+});
+</script>
+
+<style lang="scss" scoped>
+.GraphTextNode {
+  position: relative;
+  min-width: 180px;
+}
+
+.GraphTextNode-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  position: relative;
+}
+
+.GraphTextNode-header-title {
+  flex: 1;
+}
+
+.GraphTextNode-body {
+  padding: 4px;
+}
+.GraphTextNode-presenter,
+.GraphTextNode-editor {
+  overflow: auto;
+}
+
+.GraphTextNode-body,
+.GraphTextNode-content,
+.GraphTextNode-presenter,
+.GraphTextNode-editor {
+  height: 100%;
+  width: 100%;
+}
+
+.GraphTextNode-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 10px;
+  position: relative;
+}
+
+.GraphTextNode-editor {
+  min-height: 36px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.GraphTextNode-presenter {
+  padding: 4px 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 36px;
+  cursor: grab;
+}
+
+.GraphTextNode-handle {
+  z-index: 20;
+  width: 12px;
+  height: 12px;
+  background: #888;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity ease-in-out 0.2s;
+}
+
+.GraphTextNode-targetHandle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.GraphTextNode-top,
+.GraphTextNode-bottom,
+.GraphTextNode-left,
+.GraphTextNode-right {
+  position: absolute;
+  &:hover .GraphTextNode-handle {
+    opacity: 1;
+  }
+  &:hover .GraphTextNode-resizeHandle {
+    opacity: 1;
+  }
+}
+.GraphTextNode-top,
+.GraphTextNode-bottom {
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+.GraphTextNode-left,
+.GraphTextNode-right {
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+.GraphTextNode-top {
+  top: 0;
+}
+.GraphTextNode-bottom {
+  bottom: 0;
+}
+.GraphTextNode-left {
+  left: 0;
+}
+.GraphTextNode-right {
+  right: 0;
+}
+
+.GraphTextNode-resizeHandle {
+  position: absolute;
+  z-index: 10;
+}
+
+.GraphTextNode-resizeHandle-tl,
+.GraphTextNode-resizeHandle-tr,
+.GraphTextNode-resizeHandle-bl,
+.GraphTextNode-resizeHandle-br {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.GraphTextNode-resizeHandle-tl {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.GraphTextNode-resizeHandle-tr {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.GraphTextNode-resizeHandle-bl {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.GraphTextNode-resizeHandle-br {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}
+
+.GraphTextNode-resizeHandle-t {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 2px;
+}
+
+.GraphTextNode-resizeHandle-b {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 2px;
+}
+
+.GraphTextNode-resizeHandle-l {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  border-radius: 2px;
+}
+
+.GraphTextNode-resizeHandle-r {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  border-radius: 2px;
+}
+</style>
