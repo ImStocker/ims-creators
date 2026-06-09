@@ -87,12 +87,7 @@
           ></BezierEdge>
         </template>
         <Background :offset="19"></Background>
-        <MiniMap
-          zoomable
-          pannable
-          class="DialogEditor-minimap"
-          @click="onMiniMapClick"
-        ></MiniMap>
+        <GraphMiniMap :viewport-helper="viewportHelper" />
         <div
           v-if="scriptEndedPopup"
           class="DialogEditor-scriptEnded is-dropdown"
@@ -212,8 +207,8 @@ import {
   type NodeMouseEvent,
   type ViewportTransform,
 } from '@vue-flow/core';
-import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType } from 'vue';
+import GraphMiniMap from '../../flow-common/GraphMiniMap.vue';
 import DialogSpeechNode from '../nodes/DialogSpeechNode.vue';
 import DialogStartNode from '../nodes/DialogStartNode.vue';
 import DialogTriggerNode from '../nodes/DialogTriggerNode.vue';
@@ -241,7 +236,7 @@ import type {
 } from '~ims-app-base/logic/types/Props';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
-import { FlowViewportHelper } from './FlowViewportHelper';
+import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import { DialogPlayer } from '../play/DialogPlayer';
 import DialogPlayToolbar from '../play/DialogPlayToolbar.vue';
@@ -281,7 +276,7 @@ export default defineComponent({
     DialogTimerNode,
     DialogChanceNode,
     DialogBranchNode,
-    MiniMap,
+    GraphMiniMap,
     Background,
     CreateNodeDropdown,
     BezierEdge,
@@ -1003,19 +998,6 @@ export default defineComponent({
     onNodeClick({ node }: NodeMouseEvent) {
       this.blockControllerMut.revealBlockContentItem('node-' + node.id);
     },
-    onMiniMapClick({
-      position,
-    }: {
-      event: MouseEvent;
-      position: { x: number; y: number };
-    }) {
-      const flow = this.$refs['flow'] as VueFlowStore;
-      if (!flow) return;
-      flow.setCenter(position.x, position.y, {
-        duration: 0,
-        zoom: this.viewportHelper.zoom,
-      });
-    },
     async showNode(node_id: string): Promise<boolean> {
       const node = this.blockControllerMut.state.nodes.find(
         (n) => n.id === node_id,
@@ -1040,7 +1022,6 @@ export default defineComponent({
 <style lang="scss">
 @import '@vue-flow/core/dist/style.css';
 @import '@vue-flow/core/dist/theme-default.css';
-@import '@vue-flow/minimap/dist/style.css';
 
 .DialogEditor {
   --imsde-text-color: #333;
@@ -1147,20 +1128,6 @@ export default defineComponent({
   width: 100%;
   height: 100%;
 }
-.DialogEditor-minimap {
-  background-color: transparent;
-
-  :deep(svg) {
-    background-color: var(--imsde-minimap-bg-color);
-  }
-  :deep(.vue-flow__minimap-node) {
-    fill: var(--imsde-minimap-node-color);
-  }
-  :deep(.vue-flow__minimap-mask) {
-    fill: var(--imsde-minimap-mask-color);
-  }
-}
-
 :deep(.DialogNode-header) {
   color: var(--imsde-node-header-text-color);
 }

@@ -61,12 +61,7 @@
           ></BezierEdge>
         </template>
         <Background :offset="19" />
-        <MiniMap
-          zoomable
-          pannable
-          class="GraphEditor-minimap"
-          @click="onMiniMapClick"
-        />
+        <GraphMiniMap :viewport-helper="viewportHelper" />
         <svg class="GraphEditor-defs">
           <defs>
             <marker
@@ -127,8 +122,8 @@ import {
   type OnConnectStartParams,
   type ViewportTransform,
 } from '@vue-flow/core';
-import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType, ref } from 'vue';
+import GraphMiniMap from '../../flow-common/GraphMiniMap.vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptors';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
@@ -139,14 +134,14 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
-import { FlowViewportHelper } from '../../DialogBlock/editor/FlowViewportHelper';
+import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default defineComponent({
   name: 'GraphEditor',
   components: {
     VueFlow,
-    MiniMap,
+    GraphMiniMap,
     Background,
     BezierEdge,
   },
@@ -479,19 +474,6 @@ export default defineComponent({
     onNodeClick({ node }: NodeMouseEvent) {
       this.blockControllerMut.revealBlockContentItem('node-' + node.id);
     },
-    onMiniMapClick({
-      position,
-    }: {
-      event: MouseEvent;
-      position: { x: number; y: number };
-    }) {
-      const flow = this.$refs['flow'] as VueFlowStore;
-      if (!flow) return;
-      flow.setCenter(position.x, position.y, {
-        duration: 0,
-        zoom: this.viewportHelper.zoom,
-      });
-    },
   },
 });
 </script>
@@ -499,7 +481,6 @@ export default defineComponent({
 <style lang="scss">
 @import '@vue-flow/core/dist/style.css';
 @import '@vue-flow/core/dist/theme-default.css';
-@import '@vue-flow/minimap/dist/style.css';
 
 .GraphEditor {
   --imsde-node-color: #6c8cff;
@@ -610,19 +591,5 @@ export default defineComponent({
   width: 0;
   height: 0;
   overflow: hidden;
-}
-
-.GraphEditor-minimap {
-  background-color: transparent;
-
-  :deep(svg) {
-    background-color: var(--imsde-minimap-bg-color);
-  }
-  :deep(.vue-flow__minimap-node) {
-    fill: var(--imsde-minimap-node-color);
-  }
-  :deep(.vue-flow__minimap-mask) {
-    fill: var(--imsde-minimap-mask-color);
-  }
 }
 </style>

@@ -1,6 +1,6 @@
 import type { GraphNode } from '@vue-flow/core';
 import type { DialogBlockController } from '../editor/DialogBlockController';
-import type { FlowViewportHelper } from '../editor/FlowViewportHelper';
+import type { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import {
   convertAssetPropsToPlainObject,
