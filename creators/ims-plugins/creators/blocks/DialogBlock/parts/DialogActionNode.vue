@@ -181,8 +181,21 @@ export default defineComponent({
     },
     contextMenu() {
       if (this.readonly) return [];
+      const menu = [
+        {
+          title: this.$t('imsDialogEditor.run'),
+          action: async () => await this.startRunWithNode(false),
+          icon: 'ri-play-fill',
+        },
+        {
+          title: this.$t('imsDialogEditor.debug'),
+          action: async () => await this.startRunWithNode(true),
+          icon: 'ri-bug-fill',
+        },
+      ];
       if (!this.action)
         return [
+          ...menu,
           {
             title: this.$t(
               `imsDialogEditor.nodes.${this.nodeDescriptor.name}.manageCaption`,
@@ -196,16 +209,7 @@ export default defineComponent({
           },
         ];
       return [
-        {
-          title: this.$t('imsDialogEditor.run'),
-          action: async () => await this.startRunWithNode(false),
-          icon: 'ri-play-fill',
-        },
-        {
-          title: this.$t('imsDialogEditor.debug'),
-          action: async () => await this.startRunWithNode(true),
-          icon: 'ri-bug-fill',
-        },
+        ...menu,
         {
           title: this.$t('imsDialogEditor.trigger.addInputParameter'),
           action: () => this.addParameter(false),
