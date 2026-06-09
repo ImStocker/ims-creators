@@ -17,7 +17,6 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptNode from './DialogCallScriptNode.vue';
-import DialogChanceNode from './DialogChanceNode.vue';
 
 const opOptionsEq = {
   opEqual: {

@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogConstNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogConstNode DialogEditorNode"
+  >
     <div
       class="DialogConstNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -28,7 +32,7 @@
         :node-data-controller="nodeDataController"
       />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -45,14 +49,25 @@ import {
 import DataFieldInput from '../parts/DataFieldInput.vue';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { ScriptBlockPlainPropValueBind } from '../logic/nodeStoring';
+import DialogBaseNode from './DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogConstNode',
   components: {
     DataField,
     DataFieldInput,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
       required: true,

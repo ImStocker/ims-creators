@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogGetVarNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogGetVarNode DialogEditorNode"
+  >
     <div
       class="DialogGetVarNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -22,7 +26,7 @@
         :node-data-controller="nodeDataController"
       />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -42,14 +46,25 @@ import {
   type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptBlockPlainPropValueBind } from '../logic/nodeStoring';
+import DialogBaseNode from './DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogGetVarNode',
   components: {
     DataField,
     VariableSelector,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
       required: true,

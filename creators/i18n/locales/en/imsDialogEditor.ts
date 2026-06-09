@@ -280,5 +280,7 @@ export default {
       varGet: 'Get',
       varSet: 'Set',
     },
+    run: 'Run from this node',
+    debug: 'Debug from this node',
   },
 };

@@ -1,40 +1,42 @@
 <template>
-  <div class="DialogCallScriptNode DialogEditorNode">
-    <div
-      class="DialogCallScriptNode-header DialogNode-header DialogEditorNode-header"
-      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-    >
-      <i :class="nodeDescriptor.icon"></i>
-      {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-    </div>
-    <div class="DialogCallScriptNode-body DialogEditorNode-body">
-      <div v-if="loading" class="DialogCallScriptNode-loading">
-        <div class="loaderSpinner"></div>
+  <DialogBaseNode :node-id="id" :dialog-player="dialogPlayer">
+    <div class="DialogCallScriptNode DialogEditorNode">
+      <div
+        class="DialogCallScriptNode-header DialogNode-header DialogEditorNode-header"
+        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+      >
+        <i :class="nodeDescriptor.icon"></i>
+        {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
       </div>
-      <div class="DialogCallScriptNode-body-main">
-        <ExecHandle id="in" type="target" :position="Position.Left" />
-        <div class="DialogCallScriptNode-content">
-          <select-asset-combo-box
-            class="VariableTypeSelector-selectAsset"
-            :model-value="callScriptForSelection"
-            :where="selectAssetWhere"
-            @update:model-value="selectExternalAsset"
-          >
-          </select-asset-combo-box>
+      <div class="DialogCallScriptNode-body DialogEditorNode-body">
+        <div v-if="loading" class="DialogCallScriptNode-loading">
+          <div class="loaderSpinner"></div>
         </div>
-        <ExecHandle id="out" type="source" :position="Position.Right" />
+        <div class="DialogCallScriptNode-body-main">
+          <ExecHandle id="in" type="target" :position="Position.Left" />
+          <div class="DialogCallScriptNode-content">
+            <select-asset-combo-box
+              class="VariableTypeSelector-selectAsset"
+              :model-value="callScriptForSelection"
+              :where="selectAssetWhere"
+              @update:model-value="selectExternalAsset"
+            >
+            </select-asset-combo-box>
+          </div>
+          <ExecHandle id="out" type="source" :position="Position.Right" />
+        </div>
+        <node-parameters-grid
+          :dialog-player="dialogPlayer"
+          :node-data-controller="nodeDataController"
+          :readonly="readonly"
+          :play-wait-user="false"
+          :output-params="outputParameters"
+          :input-params="inputParameters"
+          :playing-node-data="playingNodeData"
+        ></node-parameters-grid>
       </div>
-      <node-parameters-grid
-        :dialog-player="dialogPlayer"
-        :node-data-controller="nodeDataController"
-        :readonly="readonly"
-        :play-wait-user="false"
-        :output-params="outputParameters"
-        :input-params="inputParameters"
-        :playing-node-data="playingNodeData"
-      ></node-parameters-grid>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
@@ -65,6 +67,7 @@ import { loadCallScriptController } from '../logic/callScriptLoader';
 import { getCallScriptNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
+import DialogBaseNode from './DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogCallScriptNode',
@@ -72,6 +75,7 @@ export default defineComponent({
     ExecHandle,
     SelectAssetComboBox,
     NodeParametersGrid,
+    DialogBaseNode,
   },
   props: {
     id: {

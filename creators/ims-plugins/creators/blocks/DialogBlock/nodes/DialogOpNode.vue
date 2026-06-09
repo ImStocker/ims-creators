@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogOpNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogOpNode DialogEditorNode"
+  >
     <div
       v-if="!sign"
       class="DialogOpNode-header DialogNode-header DialogEditorNode-header"
@@ -51,7 +55,7 @@
         :node-data-controller="nodeDataController"
       />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -69,14 +73,25 @@ import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import { opOptions } from './getNodeDescriptiors';
 import OpNodeTypeSelector from '../parts/OpNodeTypeSelector.vue';
+import DialogBaseNode from './DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogOpNode',
   components: {
     DataField,
     OpNodeTypeSelector,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     readonly: {
       type: Boolean,
       default: false,
