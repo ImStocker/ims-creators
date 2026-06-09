@@ -533,7 +533,7 @@ export default defineComponent({
 .GraphEditor {
   --imsde-node-color: #6c8cff;
   --imsde-text-color: #333;
-  --imsde-node-content-border-color: transparent;
+  --imsde-node-content-border-color: #999;
   --imsde-node-content-inner-border-color: #555;
   --imsde-node-content-bg-color: #444444f6;
   --imsde-node-content-text-color: #eaeaea;
@@ -551,15 +551,16 @@ export default defineComponent({
 
 .GraphEditorNode {
   border-radius: 4px;
-  border: 1px solid transparent;
-  background: var(--imsde-node-content-bg-color);
+  border: 1px solid
+    var(--imsgr-node-color, var(--imsde-node-content-border-color));
+  background: var(--imsgr-node-bg, var(--imsde-node-content-bg-color));
   &.state-selected {
-    border-color: var(--imsde-node-selected-color);
-    border-width: 2px;
-  }
-  &.is-color-set {
-    border-color: var(--node-color);
-    background: var(--node-bg, var(--imsde-node-content-bg-color));
+    .GraphEditorNode-body {
+      border-color: var(
+        --imsgr-node-color,
+        var(--imsde-node-content-border-color)
+      );
+    }
   }
   & > div:first-child {
     border-top-left-radius: 4px;
@@ -577,6 +578,7 @@ export default defineComponent({
 }
 
 .GraphEditorNode-body {
+  border: 1px solid transparent;
 }
 </style>
 

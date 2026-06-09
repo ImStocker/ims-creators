@@ -1,4 +1,9 @@
-import type { Edge, GraphEdge, GraphNode, ViewportTransform } from '@vue-flow/core';
+import type {
+  Edge,
+  GraphEdge,
+  GraphNode,
+  ViewportTransform,
+} from '@vue-flow/core';
 import type { GraphBlockState } from './GraphEditor';
 import {
   exportGraphBlockData,
@@ -15,8 +20,11 @@ import {
   truncateAssetPropValueText,
   castAssetPropValueToString,
   castAssetPropValueToText,
+  getAssetPropType,
+  AssetPropType,
   type AssetProps,
   type AssetPropValue,
+  type AssetPropValueFile,
 } from '~ims-app-base/logic/types/Props';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +39,7 @@ import {
   clipboardReadPlainText,
 } from '~ims-app-base/logic/utils/clipboard';
 import type { GraphLink } from '../logic/nodeStoring';
+import { useFilePresenterParams } from '~ims-app-base/components/File/FilePresenter';
 
 export type GraphBlockContentUserData = {
   type: 'node';
@@ -77,9 +86,11 @@ export class GraphBlockController extends BlockEditorController {
     targetHandle?: string,
   ) {
     const existing = this.state.edges.find(
-      (e) => e.source === source && e.target === target
-        && e.sourceHandle === sourceHandle
-        && e.targetHandle === targetHandle,
+      (e) =>
+        e.source === source &&
+        e.target === target &&
+        e.sourceHandle === sourceHandle &&
+        e.targetHandle === targetHandle,
     );
     if (existing) return;
 
@@ -119,14 +130,26 @@ export class GraphBlockController extends BlockEditorController {
 
   async createNode(
     position: { x: number; y: number },
-    connectFrom?: { nodeId: string; handleId: string; handleType: string } | null,
+    connectFrom?: {
+      nodeId: string;
+      handleId: string;
+      handleType: string;
+    } | null,
     value?: AssetPropValue | null,
   ) {
     const id = uuidv4();
     const maxIndex = this.state.nodes.reduce(
-      (acc, n) => Math.max(acc, ((n.data as any)?.index ?? 0)),
+      (acc, n) => Math.max(acc, (n.data as any)?.index ?? 0),
       0,
     );
+
+    const valueType = value ? getAssetPropType(value) : null;
+    let isInlineFile = false;
+    if (valueType === AssetPropType.FILE) {
+      const fileInfo = useFilePresenterParams(value as AssetPropValueFile);
+      isInlineFile = !!fileInfo?.inlineType;
+    }
+    const isAssetType = valueType === AssetPropType.ASSET;
 
     this.state.nodes.push({
       id,
@@ -134,8 +157,8 @@ export class GraphBlockController extends BlockEditorController {
       position,
       data: {
         value: value ?? null,
-        width: 200,
-        height: 80,
+        width: isInlineFile ? 600 : 200,
+        height: isInlineFile ? 400 : isAssetType ? 60 : 80,
         index: getNextIndexWithTimestamp(maxIndex),
         color: undefined,
       },
@@ -174,17 +197,16 @@ export class GraphBlockController extends BlockEditorController {
     return id;
   }
 
-  copyNodesToClipboard(
-    selectedNodeIds: string[],
-    viewport: ViewportTransform,
-  ) {
+  copyNodesToClipboard(selectedNodeIds: string[], viewport: ViewportTransform) {
     const nodesToCopy: any[] = [];
     for (const nodeId of selectedNodeIds) {
       const node = this.state.nodes.find((n) => n.id === nodeId);
       if (!node) continue;
       const screenX = node.position.x * viewport.zoom + viewport.x;
       const screenY = node.position.y * viewport.zoom + viewport.y;
-      const nodeData = node.data as { value?: any; width?: number; height?: number; index?: number } | undefined;
+      const nodeData = node.data as
+        | { value?: any; width?: number; height?: number; index?: number }
+        | undefined;
       const links: GraphLink[] = [];
       for (const edge of this.state.edges) {
         if (edge.source !== node.id) continue;
@@ -214,9 +236,7 @@ export class GraphBlockController extends BlockEditorController {
         _screenY: screenY,
       });
     }
-    clipboardCopyPlainText(
-      JSON.stringify({ nodes: nodesToCopy, viewport }),
-    );
+    clipboardCopyPlainText(JSON.stringify({ nodes: nodesToCopy, viewport }));
   }
 
   async pasteNodesFromClipboard(viewport: ViewportTransform) {
@@ -231,10 +251,13 @@ export class GraphBlockController extends BlockEditorController {
       if (!Array.isArray(nodes) || !nodes.length) return;
 
       const isValidNode = (n: any) =>
-        n && typeof n === 'object' &&
+        n &&
+        typeof n === 'object' &&
         typeof n.id === 'string' &&
-        n.pos && typeof n.pos === 'object' &&
-        typeof n.pos.x === 'number' && typeof n.pos.y === 'number';
+        n.pos &&
+        typeof n.pos === 'object' &&
+        typeof n.pos.x === 'number' &&
+        typeof n.pos.y === 'number';
 
       if (!nodes.every(isValidNode)) return;
 
@@ -244,7 +267,7 @@ export class GraphBlockController extends BlockEditorController {
       for (const node of nodes) {
         const newId = idMap.get(node.id);
         const maxIndex = this.state.nodes.reduce(
-          (acc, n) => Math.max(acc, ((n.data as any)?.index ?? 0)),
+          (acc, n) => Math.max(acc, (n.data as any)?.index ?? 0),
           0,
         );
 
@@ -257,11 +280,14 @@ export class GraphBlockController extends BlockEditorController {
         newX += 50;
         newY += 50;
 
-        const remappedLinks: { to: string; fromSide?: string; toSide?: string }[] =
-          (node.links || []).map((link: any) => ({
-            ...link,
-            to: idMap.get(link.to) ?? link.to,
-          }));
+        const remappedLinks: {
+          to: string;
+          fromSide?: string;
+          toSide?: string;
+        }[] = (node.links || []).map((link: any) => ({
+          ...link,
+          to: idMap.get(link.to) ?? link.to,
+        }));
 
         this.state.nodes.push({
           id: newId,
@@ -357,7 +383,9 @@ export class GraphBlockController extends BlockEditorController {
     const root: BlockContentItem<GraphBlockContentUserData> = {
       blockId: this.resolvedBlock.id,
       itemId: 'root',
-      title: this.resolvedBlock.title ?? this.appManager.$t('graphBlock.outline.rootTitle'),
+      title:
+        this.resolvedBlock.title ??
+        this.appManager.$t('graphBlock.outline.rootTitle'),
       children: [],
     };
 

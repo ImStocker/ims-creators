@@ -1,29 +1,64 @@
 <template>
   <div
     class="GraphTextNode GraphEditorNode"
-    :class="{ 'is-color-set': !!nodeColor, 'state-selected': selected }"
+    :class="{ 'state-selected': selected }"
     :style="nodeStyle"
   >
-    <div class="GraphTextNode-body GraphEditorNode-body">
-      <div class="GraphTextNode-content">
-        <imc-editor
-          v-if="editing"
-          ref="editorRef"
-          v-model="localValue"
-          class="GraphTextNode-editor nodrag nopan nowheel"
-          :multiline="true"
-          toolbar="inline"
-          :placeholder="$t('graphBlock.node.placeholder')"
-          @update:model-value="onValueChange"
-          @blur="onEditorBlur"
-        ></imc-editor>
-        <imc-presenter
-          v-else
+    <div v-if="projectInfo" class="GraphTextNode-body GraphEditorNode-body">
+      <context-menu-zone class="GraphTextNode-content" :menu-list="menuList">
+        <file-presenter
+          v-if="isFileValue"
           :value="localValue"
-          class="GraphTextNode-presenter"
-          @dblclick="onDblClick"
-        ></imc-presenter>
-      </div>
+          :inline="true"
+          :width="nodeWidth"
+          :height="nodeHeight"
+          is-static
+          class="GraphTextNode-filePresenter"
+        />
+        <div
+          v-else-if="isAssetValue && assetLink"
+          class="GraphTextNode-asset"
+          :class="{
+            'type-has-image': assetHasImage,
+          }"
+          @dblclick="onDblClickAsset"
+        >
+          <asset-icon-image
+            v-if="assetHasImage"
+            :asset="assetLink"
+            :width="96"
+            :height="96"
+            class="GraphTextNode-assetIcon"
+          />
+          <asset-link
+            class="GraphTextNode-assetTitle"
+            :project="projectInfo"
+            :asset="assetLink"
+            :show-icon="!assetHasImage"
+            :draggable="false"
+            @click.prevent
+          ></asset-link>
+        </div>
+        <template v-else>
+          <imc-editor
+            v-if="editing"
+            ref="editorRef"
+            v-model="localValue"
+            class="GraphTextNode-editor nodrag nopan nowheel"
+            :multiline="true"
+            toolbar="inline"
+            :placeholder="$t('graphBlock.node.placeholder')"
+            @update:model-value="onValueChange"
+            @blur="onEditorBlur"
+          ></imc-editor>
+          <imc-presenter
+            v-else
+            :value="localValue"
+            class="GraphTextNode-presenter"
+            @dblclick="onDblClickText"
+          ></imc-presenter>
+        </template>
+      </context-menu-zone>
       <div class="GraphTextNode-top">
         <div
           v-if="!readonly"
@@ -123,19 +158,44 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import { defineAsyncComponent, defineComponent, type PropType } from 'vue';
 import { Position, Handle, type ViewportTransform } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import type { GraphBlockController } from '../editor/GraphBlockController';
 import { DATA_COLOR_TO_HEX, hexToRgba } from '../editor/GraphEditor';
 import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
+import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+import type {
+  AssetPropValueFile,
+  AssetPropValueAsset,
+} from '~ims-app-base/logic/types/Props';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import AssetLink from '~ims-app-base/components/Asset/AssetLink.vue';
+import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
+import { getAssetImageFromPreview } from '~ims-app-base/components/Asset/AssetIconImage.vue';
 
 type ResizeDirection = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l';
 
 export default defineComponent({
   name: 'GraphTextNode',
-  components: { Handle, ImcEditor, ImcPresenter },
+  components: {
+    Handle,
+    ImcEditor,
+    ImcPresenter,
+    ContextMenuZone,
+    FilePresenter: defineAsyncComponent(
+      () => import('~ims-app-base/components/File/FilePresenter.vue'),
+    ),
+    AssetIconImage: defineAsyncComponent(
+      () => import('~ims-app-base/components/Asset/AssetIconImage.vue'),
+    ),
+    AssetLink,
+  },
   props: {
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
@@ -202,19 +262,95 @@ export default defineComponent({
     nodeColor() {
       return (this.data as any)?.color ?? '';
     },
+    nodeWidth(): number | null {
+      return (this.data as any)?.width ?? null;
+    },
+    nodeHeight(): number | null {
+      return (this.data as any)?.height ?? null;
+    },
     nodeStyle() {
-      const w = (this.data as any)?.width;
-      const h = (this.data as any)?.height;
+      const w = this.nodeWidth;
+      const h = this.nodeHeight;
       const storedColor = (this.data as any)?.color;
       const result: Record<string, string> = {};
       if (w) result.width = w + 'px';
       if (h) result.height = h + 'px';
       if (storedColor) {
         const hex = DATA_COLOR_TO_HEX[storedColor] || storedColor;
-        result['--node-color'] = hex;
-        result['--node-bg'] = hexToRgba(hex, 0.12);
+        result['--imsgr-node-color'] = hex;
+        result['--imsgr-node-bg'] = hexToRgba(hex, 0.12);
       }
       return result;
+    },
+    isFileValue(): boolean {
+      return !!(this.localValue as AssetPropValueFile)?.FileId;
+    },
+    isAssetValue(): boolean {
+      return !!(this.localValue as AssetPropValueAsset)?.AssetId;
+    },
+    assetLink(): {
+      id: string;
+      title: string | null;
+      name: string | null;
+    } | null {
+      if (!this.isAssetValue) return null;
+      const v = this.localValue as AssetPropValueAsset;
+      return { id: v.AssetId, title: v.Title ?? null, name: v.Name ?? null };
+    },
+    assetHasImage(): boolean {
+      if (!this.assetLink) return '';
+      const cached_preview = this.$getAppManager()
+        .get(CreatorAssetManager)
+        .getAssetPreviewViaCacheSync(this.assetLink.id);
+      if (cached_preview === undefined) {
+        this.$getAppManager()
+          .get(CreatorAssetManager)
+          .requestAssetPreviewInCache(this.assetLink.id);
+      }
+      if (!cached_preview) return false;
+      return !!getAssetImageFromPreview(cached_preview);
+    },
+    menuList(): MenuListItem[] {
+      if (this.readonly) return [];
+      if (this.editing) return [];
+      if (this.isFileValue) {
+        return [
+          {
+            title: (this as any).$t('graphBlock.editor.replaceFile'),
+            icon: 'ri-attachment-2',
+            action: () => this.replaceFile(),
+          },
+          {
+            title: (this as any).$t('graphBlock.editor.deleteNode'),
+            danger: true,
+            action: () => this.deleteNode(),
+          },
+        ];
+      }
+      if (this.isAssetValue) {
+        return [
+          {
+            title: (this as any).$t('graphBlock.editor.replaceAsset'),
+            icon: 'ri-link-m',
+            action: () => this.replaceAsset(),
+          },
+          {
+            title: (this as any).$t('graphBlock.editor.deleteNode'),
+            danger: true,
+            action: () => this.deleteNode(),
+          },
+        ];
+      }
+      return [
+        {
+          title: (this as any).$t('graphBlock.editor.deleteNode'),
+          danger: true,
+          action: () => this.deleteNode(),
+        },
+      ];
+    },
+    projectInfo() {
+      return this.$getAppManager().get(ProjectManager).getProjectInfo();
     },
   },
   watch: {
@@ -230,7 +366,7 @@ export default defineComponent({
     },
   },
   methods: {
-    onValueChange(val: any) {
+    setValue(val: any) {
       this.localValue = val;
       const node = this.dialogController.state.nodes.find(
         (n) => n.id === this.id,
@@ -240,14 +376,65 @@ export default defineComponent({
         this.dialogController.savePropsDelayed();
       }
     },
-    onDblClick(e: MouseEvent) {
+    onValueChange(val: any) {
+      this.setValue(val);
+    },
+    onDblClickText(e: MouseEvent) {
       if (this.readonly) return;
       this.$emit('request-edit', this.id);
       e.preventDefault();
       e.stopPropagation();
     },
+    onDblClickAsset(e: MouseEvent) {
+      e.preventDefault();
+      e.stopPropagation();
+      const open_blank = e.ctrlKey || e.metaKey;
+      this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          if (!this.assetLink) return;
+          this.$getAppManager()
+            .get(EditorManager)
+            .openAsset(this.assetLink.id, open_blank ? 'new-tab' : 'popup');
+        });
+    },
     onEditorBlur() {
       this.$emit('request-view');
+    },
+    async replaceFile() {
+      const appManager = (this as any).$getAppManager();
+      const editorManager = appManager.get(EditorManager);
+      const files = await editorManager.pickFiles();
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      const uploadingJob = editorManager.attachFile(file.blob, file.name);
+      const result = await uploadingJob.awaitResult();
+      if (!result) return;
+      this.setValue(result);
+    },
+    async replaceAsset() {
+      const appManager = (this as any).$getAppManager();
+      const dialogManager = appManager.get(DialogManager);
+      const projectManager = appManager.get(ProjectManager);
+      const gdd_workspace = projectManager.getWorkspaceByName('gdd');
+      if (!gdd_workspace) return;
+      const SelectAssetDialog = (
+        await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
+      ).default;
+      const assetResult = await dialogManager.show(SelectAssetDialog, {
+        dialogHeader: (this as any).$t('graphBlock.editor.selectAsset'),
+        where: { workspaceids: gdd_workspace.id },
+      });
+      if (!assetResult) return;
+      const assetValue: AssetPropValueAsset = {
+        AssetId: assetResult.id,
+        Title: assetResult.title ?? '',
+        Name: assetResult.name,
+      };
+      this.setValue(assetValue);
+    },
+    deleteNode() {
+      this.dialogController.deleteNodeById(this.id);
     },
     onResizeStart(ev: MouseEvent, direction: ResizeDirection) {
       if (this.readonly) return;
@@ -255,8 +442,8 @@ export default defineComponent({
         (n) => n.id === this.id,
       );
       if (!node) return;
-      const w = (this.data as any)?.width ?? 200;
-      const h = (this.data as any)?.height ?? 80;
+      const w = this.nodeWidth ?? 200;
+      const h = this.nodeHeight ?? 80;
       this.resizing = {
         startX: ev.clientX,
         startY: ev.clientY,
@@ -388,10 +575,13 @@ export default defineComponent({
   line-height: 1.4;
 }
 
-.GraphTextNode-presenter {
+.GraphTextNode-presenter,
+.GraphTextNode-editor {
   padding: 4px 6px;
   font-size: 13px;
   line-height: 1.4;
+}
+.GraphTextNode-presenter {
   min-height: 36px;
   cursor: grab;
 }
@@ -525,5 +715,41 @@ export default defineComponent({
   height: 100%;
   cursor: ew-resize;
   border-radius: 2px;
+}
+
+.GraphTextNode-filePresenter,
+.GraphTextNode-filePresenter :deep(.FilePresenter),
+.GraphTextNode-filePresenter :deep(img),
+.GraphTextNode-filePresenter :deep(video),
+.GraphTextNode-filePresenter :deep(iframe) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.GraphTextNode-asset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  &:not(.type-has-image) {
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+.GraphTextNode-assetIcon {
+  flex-shrink: 0;
+  max-height: 100%;
+  width: auto;
+  border-radius: 4px;
+}
+
+.GraphTextNode-assetTitle {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--local-text-color);
+  text-decoration: none;
 }
 </style>

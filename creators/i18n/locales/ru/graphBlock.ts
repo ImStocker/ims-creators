@@ -10,6 +10,9 @@ export default {
       addFile: 'Добавить файл',
       addElement: 'Добавить элемент',
       selectAsset: 'Выбрать элемент',
+      replaceFile: 'Заменить файл',
+      replaceAsset: 'Заменить элемент',
+      deleteNode: 'Удалить узел',
     },
     outline: {
       rootTitle: 'Граф',
