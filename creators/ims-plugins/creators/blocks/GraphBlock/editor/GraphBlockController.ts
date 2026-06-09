@@ -25,7 +25,6 @@ import {
   castAssetPropValueToText,
   getAssetPropType,
   AssetPropType,
-  type AssetProps,
   type AssetPropValue,
   type AssetPropValueFile,
   type AssetPropValueAsset,
@@ -35,7 +34,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { BlockEditorController } from '~ims-app-base/logic/types/BlockEditorController';
 import { watch } from 'vue';
 import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefinition';
-import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptors';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import { getNextIndexWithTimestamp } from '~ims-app-base/components/Asset/Editor/blockUtils';
 import {

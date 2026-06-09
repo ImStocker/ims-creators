@@ -4,7 +4,11 @@ import {
   convertAssetPropsToPlainObject,
   type AssetProps,
 } from '~ims-app-base/logic/types/Props';
-import type { GraphBlockPlain, GraphBlockPlainNode, GraphLink } from '../logic/nodeStoring';
+import type {
+  GraphBlockPlain,
+  GraphBlockPlainNode,
+  GraphLink,
+} from '../logic/nodeStoring';
 
 export type GraphNodeData = {
   value: any;
@@ -97,8 +101,10 @@ export function extractGraphBlockData(props: AssetProps): GraphBlockState {
 
       if (node_plain.links) {
         for (const link of node_plain.links) {
-          const sourceHandle = SIDE_SOURCE_MAP[link.fromSide ?? 'right'] ?? 'source-right';
-          const targetHandle = SIDE_TARGET_MAP[link.toSide ?? 'left'] ?? 'target-left';
+          const sourceHandle =
+            SIDE_SOURCE_MAP[link.fromSide ?? 'right'] ?? 'source-right';
+          const targetHandle =
+            SIDE_TARGET_MAP[link.toSide ?? 'left'] ?? 'target-left';
           edges.push({
             id: `${node_id}|${sourceHandle}|${targetHandle}|${link.to}`,
             source: node_id,

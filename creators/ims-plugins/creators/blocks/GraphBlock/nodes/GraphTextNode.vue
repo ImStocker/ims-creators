@@ -17,7 +17,7 @@
         />
         <div
           v-else-if="isAssetValue && assetLink"
-          class="GraphTextNode-asset"
+          class="GraphTextNode-asset tiny-scrollbars"
           :class="{
             'type-has-image': assetHasImage,
           }"
@@ -44,7 +44,7 @@
             v-if="editing"
             ref="editorRef"
             v-model="localValue"
-            class="GraphTextNode-editor nodrag nopan nowheel"
+            class="GraphTextNode-editor nodrag nopan nowheel tiny-scrollbars"
             :multiline="true"
             toolbar="inline"
             :placeholder="$t('graphBlock.node.placeholder')"
@@ -54,7 +54,7 @@
           <imc-presenter
             v-else
             :value="localValue"
-            class="GraphTextNode-presenter"
+            class="GraphTextNode-presenter tiny-scrollbars"
             @dblclick="onDblClickText"
           ></imc-presenter>
         </template>
@@ -180,6 +180,8 @@ import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManage
 import { getAssetImageFromPreview } from '~ims-app-base/components/Asset/AssetIconImage.vue';
 
 type ResizeDirection = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l';
+const MIN_NODE_WIDTH = 60;
+const MIN_NODE_HEIGHT = 60;
 
 export default defineComponent({
   name: 'GraphTextNode',
@@ -469,37 +471,37 @@ export default defineComponent({
 
       switch (d.direction) {
         case 'tl':
-          newW = Math.max(180, d.startWidth - dx);
-          newH = Math.max(60, d.startHeight - dy);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth - dx);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight - dy);
           newPosX = d.startPosX + (d.startWidth - newW);
           newPosY = d.startPosY + (d.startHeight - newH);
           break;
         case 't':
-          newH = Math.max(60, d.startHeight - dy);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight - dy);
           newPosY = d.startPosY + (d.startHeight - newH);
           break;
         case 'tr':
-          newW = Math.max(180, d.startWidth + dx);
-          newH = Math.max(60, d.startHeight - dy);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth + dx);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight - dy);
           newPosY = d.startPosY + (d.startHeight - newH);
           break;
         case 'r':
-          newW = Math.max(180, d.startWidth + dx);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth + dx);
           break;
         case 'br':
-          newW = Math.max(180, d.startWidth + dx);
-          newH = Math.max(60, d.startHeight + dy);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth + dx);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight + dy);
           break;
         case 'b':
-          newH = Math.max(60, d.startHeight + dy);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight + dy);
           break;
         case 'bl':
-          newW = Math.max(180, d.startWidth - dx);
-          newH = Math.max(60, d.startHeight + dy);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth - dx);
+          newH = Math.max(MIN_NODE_HEIGHT, d.startHeight + dy);
           newPosX = d.startPosX + (d.startWidth - newW);
           break;
         case 'l':
-          newW = Math.max(180, d.startWidth - dx);
+          newW = Math.max(MIN_NODE_WIDTH, d.startWidth - dx);
           newPosX = d.startPosX + (d.startWidth - newW);
           break;
       }
@@ -529,7 +531,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .GraphTextNode {
   position: relative;
-  min-width: 180px;
+  min-width: 60px;
 }
 
 .GraphTextNode-header {
@@ -733,6 +735,7 @@ export default defineComponent({
   align-items: center;
   gap: 6px;
   height: 100%;
+  overflow: auto;
   &:not(.type-has-image) {
     text-align: center;
     justify-content: center;

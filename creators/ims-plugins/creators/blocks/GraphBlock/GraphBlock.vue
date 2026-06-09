@@ -158,9 +158,12 @@ export default defineComponent({
     },
     async revealBlockAnchor(blockAnchor: string): Promise<boolean> {
       if (!blockAnchor.startsWith('node-')) return false;
+      const node_id = blockAnchor.slice('node-'.length);
       const mounted = await this.mountPromise;
       if (!mounted) return false;
-      return true;
+      const editor = this.$refs['editor'] as InstanceType<typeof GraphEditor> | null;
+      if (!editor) return false;
+      return await editor.showNode(node_id);
     },
   },
 });

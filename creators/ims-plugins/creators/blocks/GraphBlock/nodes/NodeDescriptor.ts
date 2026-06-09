@@ -6,4 +6,5 @@ export type NodeDescriptor = {
   node: Component;
   color: string;
   initData?: () => { text?: string };
+  params?: any;
 };

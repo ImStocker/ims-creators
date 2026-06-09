@@ -24,6 +24,7 @@
         :snap-grid="[10, 10]"
         :min-zoom="0.1"
         @viewport-change="onViewportChange"
+        @viewport-change-end="onViewportChangeEnd"
         @connect="onConnect"
         @connect-start="onConnectStart"
         @connect-end="onConnectEnd"
@@ -92,15 +93,15 @@
           <i class="ri-node-tree GraphEditor-createNode-dropdown-item-icon"></i>
           {{ $t('graphBlock.editor.addCard') }}
         </div>
+        <div class="GraphEditor-createNode-dropdown-item" @click="addAssetNode">
+          <i class="ri-link-m GraphEditor-createNode-dropdown-item-icon"></i>
+          {{ $t('graphBlock.editor.addElement') }}
+        </div>
         <div class="GraphEditor-createNode-dropdown-item" @click="addFileNode">
           <i
             class="ri-attachment-2 GraphEditor-createNode-dropdown-item-icon"
           ></i>
           {{ $t('graphBlock.editor.addFile') }}
-        </div>
-        <div class="GraphEditor-createNode-dropdown-item" @click="addAssetNode">
-          <i class="ri-link-m GraphEditor-createNode-dropdown-item-icon"></i>
-          {{ $t('graphBlock.editor.addElement') }}
         </div>
       </div>
     </div>
@@ -148,8 +149,9 @@ import {
   type NodeMouseEvent,
   type OnConnectStartParams,
   type ViewportTransform,
+  type GraphNode,
 } from '@vue-flow/core';
-import { defineComponent, type PropType, ref } from 'vue';
+import { defineComponent, type PropType } from 'vue';
 import GraphMiniMap from '../../flow-common/GraphMiniMap.vue';
 import { getNodeDescriptors } from '../nodes/getNodeDescriptors';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
@@ -164,6 +166,8 @@ import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManage
 import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { COLOR_SWATCHES } from './GraphEditor';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { getPreferenceKeyForBlock } from '~ims-app-base/logic/utils/assets';
+import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -241,11 +245,34 @@ export default defineComponent({
     colorSwatches() {
       return COLOR_SWATCHES;
     },
+    flowViewportTransformPreferenceKey() {
+      const preference_id = this.resolvedBlock
+        ? getPreferenceKeyForBlock(this.resolvedBlock)
+        : '';
+      return `GraphBlock.viewportTransform.` + preference_id;
+    },
+    flowViewportTransform: {
+      get(): ViewportTransform | null {
+        return (this as any)
+          .$getAppManager()
+          .get(UiPreferenceManager)
+          .getPreference(this.flowViewportTransformPreferenceKey, null);
+      },
+      set(value: ViewportTransform) {
+        (this as any)
+          .$getAppManager()
+          .get(UiPreferenceManager)
+          .setPreference(this.flowViewportTransformPreferenceKey, value);
+      },
+    },
   },
   mounted() {
     const flow = this.$refs['flow'] as VueFlowStore;
     assert(flow);
     this.viewportHelper.setFlow(flow);
+    if (this.flowViewportTransform) {
+      flow.setViewport(this.flowViewportTransform);
+    }
     this._keyDownHandler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -286,7 +313,7 @@ export default defineComponent({
     }
   },
   methods: {
-    onContextMenu(ev: PointerEvent) {
+    onContextMenu(ev: MouseEvent) {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) {
@@ -400,6 +427,9 @@ export default defineComponent({
     onViewportChange(transform: ViewportTransform) {
       this.viewportTransform = transform;
     },
+    onViewportChangeEnd(transform: ViewportTransform) {
+      this.flowViewportTransform = transform;
+    },
     onRequestEdit(nodeId: string) {
       this.editingNodeId = nodeId;
     },
@@ -422,6 +452,7 @@ export default defineComponent({
       const appManager = this.$getAppManager();
       const editorManager = appManager.get(EditorManager);
       const files = await editorManager.pickFiles();
+      this.createNodeContext = null;
       if (!files || files.length === 0) return;
       const file = files[0];
       const uploadingJob = editorManager.attachFile(file.blob, file.name);
@@ -432,7 +463,6 @@ export default defineComponent({
         this.connectStartParams,
         result,
       );
-      this.createNodeContext = null;
       this.connectStartParams = null;
     },
     async addAssetNode() {
@@ -451,6 +481,7 @@ export default defineComponent({
           workspaceids: gdd_workspace.id,
         },
       });
+      this.createNodeContext = null;
       if (!assetResult) return;
       const assetValue: AssetPropValueAsset = {
         AssetId: assetResult.id,
@@ -462,7 +493,6 @@ export default defineComponent({
         this.connectStartParams,
         assetValue,
       );
-      this.createNodeContext = null;
       this.connectStartParams = null;
     },
     onDragOver(event: DragEvent) {
@@ -521,6 +551,24 @@ export default defineComponent({
         }
       }
       this.blockControllerMut.savePropsDelayed();
+    },
+    async showNode(node_id: string): Promise<boolean> {
+      const node = this.blockControllerMut.state.nodes.find(
+        (n: any) => n.id === node_id,
+      ) as GraphNode | undefined;
+      if (!node) return false;
+
+      const is_visible = this.viewportHelper.checkNodesAreVisible([node]);
+      if (is_visible) return true;
+
+      return await this.viewportHelper.moveToNodes([node], {
+        duration: 1000,
+        interpolate: 'linear' as any,
+        maxZoom: Math.min(
+          this.viewportHelper.zoom,
+          this.viewportHelper.maxZoom,
+        ),
+      });
     },
   },
 });

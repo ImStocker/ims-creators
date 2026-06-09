@@ -662,7 +662,7 @@ export default defineComponent({
       this.isFocused = true;
       this.mouseDownTime = Date.now();
     },
-    onContextMenu(ev: PointerEvent) {
+    onContextMenu(ev: MouseEvent) {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) {
