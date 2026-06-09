@@ -1,50 +1,52 @@
 <template>
-  <div class="DialogGetPropsNode DialogEditorNode">
-    <div
-      class="DialogGetPropsNode-header DialogNode-header DialogEditorNode-header"
-      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-    >
-      <i :class="nodeDescriptor.icon"></i>
-      {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-    </div>
-    <div class="DialogGetPropsNode-body DialogEditorNode-body">
-      <div class="DialogGetPropsNode-body-main">
-        <select-asset-prop-fields
-          v-model="fields"
-          :asset-id="assetType?.Kind"
-          :show-filter="!assetType?.Kind"
-        ></select-asset-prop-fields>
+  <DialogBaseNode :node-id="id" :dialog-player="dialogPlayer">
+    <div class="DialogGetPropsNode DialogEditorNode">
+      <div
+        class="DialogGetPropsNode-header DialogNode-header DialogEditorNode-header"
+        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+      >
+        <i :class="nodeDescriptor.icon"></i>
+        {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
       </div>
-      <div class="DialogGetPropsNode-params">
-        <DataField
-          v-model="valueVal"
-          class="DialogGetPropsNode-parameter type-input"
-          :in-id="valuePinId"
-          :play-value="valuePlayVal"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-        ></DataField>
-        <DataField
-          v-for="out_param of outputParameters"
-          :key="'out-' + out_param.name"
-          class="DialogGetPropsNode-parameter type-output"
-          :out-id="generateDataPinId(true, out_param.name)"
-          :play-value="dialogPlayer.playGetCurrentNodeParam(out_param.name)"
-          :caption="out_param.name"
-          :title="
-            convertTranslatedTitle(out_param.title ?? '', (key: string) =>
-              $t(key),
-            )
-          "
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          @update:play-value="
-            dialogPlayer.playSetCurrentNodeParam(out_param.name, $event)
-          "
-        ></DataField>
+      <div class="DialogGetPropsNode-body DialogEditorNode-body">
+        <div class="DialogGetPropsNode-body-main">
+          <select-asset-prop-fields
+            v-model="fields"
+            :asset-id="assetType?.Kind"
+            :show-filter="!assetType?.Kind"
+          ></select-asset-prop-fields>
+        </div>
+        <div class="DialogGetPropsNode-params">
+          <DataField
+            v-model="valueVal"
+            class="DialogGetPropsNode-parameter type-input"
+            :in-id="valuePinId"
+            :play-value="valuePlayVal"
+            :node-data-controller="nodeDataController"
+            :readonly="readonly"
+          ></DataField>
+          <DataField
+            v-for="out_param of outputParameters"
+            :key="'out-' + out_param.name"
+            class="DialogGetPropsNode-parameter type-output"
+            :out-id="generateDataPinId(true, out_param.name)"
+            :play-value="dialogPlayer.playGetCurrentNodeParam(out_param.name)"
+            :caption="out_param.name"
+            :title="
+              convertTranslatedTitle(out_param.title ?? '', (key: string) =>
+                $t(key),
+              )
+            "
+            :node-data-controller="nodeDataController"
+            :readonly="readonly"
+            @update:play-value="
+              dialogPlayer.playSetCurrentNodeParam(out_param.name, $event)
+            "
+          ></DataField>
+        </div>
       </div>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
@@ -66,12 +68,14 @@ import {
 import SelectAssetPropFields from '~ims-app-base/components/Asset/SelectAssetPropFields.vue';
 import type { AssetPropField } from '~ims-app-base/components/Asset/SelectAssetPropFields';
 import { convertTranslatedTitle } from '../../../../../../ims-app-base/app/logic/utils/assets';
+import DialogBaseNode from './DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogGetPropsNode',
   components: {
     DataField,
     SelectAssetPropFields,
+    DialogBaseNode,
   },
   props: {
     id: {

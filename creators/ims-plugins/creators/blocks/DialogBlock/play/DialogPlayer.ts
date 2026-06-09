@@ -612,16 +612,18 @@ export class DialogPlayer {
     this._playingState.history.push(record);
   }
 
-  public play(debug: boolean = false) {
+  public play(debug: boolean = false, node_id?: string) {
     if (this._playingState) return;
     const resolvedBlock = this.dialogController.resolvedBlock;
     if (!resolvedBlock) return;
 
-    const start = this.dialogController.hasStart;
-    if (!start) {
-      throw new Error(
-        this.appManager.$t('imsDialogEditor.play.noStartNodeError'),
-      );
+    if (!node_id) {
+      const start = this.dialogController.hasStart;
+      if (!start) {
+        throw new Error(
+          this.appManager.$t('imsDialogEditor.play.noStartNodeError'),
+        );
+      }
     }
 
     this._loadedScripts = new Map<string, DialogPlayerLoadedScript>();
@@ -650,7 +652,7 @@ export class DialogPlayer {
     }
 
     ++this._playEpoch;
-    this._player.play();
+    this._player.play(node_id);
   }
 
   get playingFramesInfos() {
@@ -668,5 +670,9 @@ export class DialogPlayer {
         frameIndex: ind,
       };
     });
+  }
+
+  public startRunWithNode(debug: boolean = false, node_id: string){
+    this.play(debug, node_id);
   }
 }

@@ -1,238 +1,244 @@
 <template>
-  <div class="DialogSpeechNode DialogEditorNode">
-    <div
-      class="DialogSpeechNode-header DialogNode-header DialogEditorNode-header"
-      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-    >
-      <div>
-        <ExecHandle
-          id="in"
-          type="target"
-          :position="Position.Left"
-        ></ExecHandle>
-        <i :class="nodeDescriptor.icon"></i>
-        {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-      </div>
-      <div v-if="!readonly" class="DialogSpeechNode-header-settings">
-        <dialog-speech-node-attach-cover
-          v-if="!coverValue"
-          v-model="coverValue"
-        ></dialog-speech-node-attach-cover>
-        <button
-          class="is-button is-button-icon"
-          :title="$t('gddPage.settings')"
-          @click="openSpeechParametersDialog()"
-        >
-          <i class="ri-settings-3-fill" />
-        </button>
-      </div>
-    </div>
-    <div class="DialogSpeechNode-body DialogEditorNode-body">
-      <div v-if="coverValue" class="DialogSpeechNode-cover">
-        <file-presenter
-          :value="coverValue"
-          :inline="true"
-          class="DialogSpeechNode-cover-image"
-        ></file-presenter>
-        <menu-button
-          v-if="!readonly"
-          v-model:shown="coverMenuShown"
-          class="DialogSpeechNode-cover-menu"
-          :class="{ 'state-active': coverMenuShown }"
-        >
-          <menu-list :menu-list="coverMenu"></menu-list>
-        </menu-button>
-      </div>
-      <div class="DialogSpeechNode-content">
-        <div
-          v-for="(variable, var_index) of mainSpeechList"
-          :key="variable.name"
-          class="DialogSpeechNode-prop-line"
-        >
-          <DataField
-            :ref="'main-' + variable.name"
-            class="DialogSpeechNode-prop-dataField"
-            :model-value="
-              nodeDataController.values[variable.name] === undefined
-                ? variable.default
-                : nodeDataController.values[variable.name]
-            "
-            :play-value="
-              playingNodeData?.inputs
-                ? playingNodeData.inputs[variable.name]
-                : null
-            "
-            :in-id="generateDataPinId(false, variable.name)"
-            :node-data-controller="nodeDataController"
-            :readonly="readonly"
-            :title="variable.description ?? ''"
-            :placeholder="
-              variable.name === 'text'
-                ? $t('imsDialogEditor.speech.enterSpeech')
-                : ''
-            "
-            :caption="getMainVariableCaption(var_index)"
-            @update:model-value="
-              nodeDataController.setValue(variable.name, $event)
-            "
-          ></DataField>
+  <DialogBaseNode :node-id="id" :dialog-player="dialogPlayer">
+    <div class="DialogSpeechNode DialogEditorNode">
+      <div
+        class="DialogSpeechNode-header DialogNode-header DialogEditorNode-header"
+        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+      >
+        <div>
+          <ExecHandle
+            id="in"
+            type="target"
+            :position="Position.Left"
+          ></ExecHandle>
+          <i :class="nodeDescriptor.icon"></i>
+          {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+        </div>
+        <div v-if="!readonly" class="DialogSpeechNode-header-settings">
+          <dialog-speech-node-attach-cover
+            v-if="!coverValue"
+            v-model="coverValue"
+          ></dialog-speech-node-attach-cover>
           <button
-            v-if="shouldShowRestoreVariableButton(variable)"
-            class="is-button is-button-icon DialogSpeechNode-prop-restore"
-            :title="$t('imsDialogEditor.speech.restoreValues')"
-            @click="nodeDataController.deleteValue(variable.name)"
+            class="is-button is-button-icon"
+            :title="$t('gddPage.settings')"
+            @click="openSpeechParametersDialog()"
           >
-            <i class="ri-arrow-go-back-line"></i>
+            <i class="ri-settings-3-fill" />
           </button>
         </div>
-        <div v-if="options.length > 0" class="DialogSpeechNode-options">
-          <ContextMenuZone
-            v-for="(option, option_index) of options"
-            :key="option_index"
-            class="DialogSpeechNode-options-one"
-            :class="{
-              'state-unavailable':
-                isPlaying && !playOptionConditionPass(option_index),
-            }"
-            :menu-list="getOptionContextMenu(option, option_index)"
-            ignoring-css-selector=".DataField-input"
+      </div>
+      <div class="DialogSpeechNode-body DialogEditorNode-body">
+        <div v-if="coverValue" class="DialogSpeechNode-cover">
+          <file-presenter
+            :value="coverValue"
+            :inline="true"
+            class="DialogSpeechNode-cover-image"
+          ></file-presenter>
+          <menu-button
+            v-if="!readonly"
+            v-model:shown="coverMenuShown"
+            class="DialogSpeechNode-cover-menu"
+            :class="{ 'state-active': coverMenuShown }"
           >
-            <div class="DialogSpeechNode-options-one-common">
-              <div
-                v-if="isOptionConditionDisplaying(option)"
-                class="DialogSpeechNode-options-one-param type-first"
-              >
-                <DataField
-                  class="DialogSpeechNode-options-one-param-input"
-                  :in-id="generateDataPinId(false, 'condition', option_index)"
-                  :option="option"
-                  :option-index="option_index"
-                  :placeholder="$t('imsDialogEditor.speech.enterText')"
-                  :node-data-controller="nodeDataController"
-                  caption="[[t:Condition]]"
-                  :readonly="readonly"
-                  :model-value="option.values['condition'] ?? null"
-                  :play-value="
-                    playingNodeData?.optionsInputs &&
-                    playingNodeData.optionsInputs[option_index] &&
-                    playingNodeData.optionsInputs[option_index]
-                      ? playingNodeData.optionsInputs[option_index]['condition']
-                      : null
-                  "
-                  @update:model-value="
-                    nodeDataController.setOptionValue(
-                      option_index,
-                      'condition',
-                      $event,
-                    )
-                  "
-                ></DataField>
+            <menu-list :menu-list="coverMenu"></menu-list>
+          </menu-button>
+        </div>
+        <div class="DialogSpeechNode-content">
+          <div
+            v-for="(variable, var_index) of mainSpeechList"
+            :key="variable.name"
+            class="DialogSpeechNode-prop-line"
+          >
+            <DataField
+              :ref="'main-' + variable.name"
+              class="DialogSpeechNode-prop-dataField"
+              :model-value="
+                nodeDataController.values[variable.name] === undefined
+                  ? variable.default
+                  : nodeDataController.values[variable.name]
+              "
+              :play-value="
+                playingNodeData?.inputs
+                  ? playingNodeData.inputs[variable.name]
+                  : null
+              "
+              :in-id="generateDataPinId(false, variable.name)"
+              :node-data-controller="nodeDataController"
+              :readonly="readonly"
+              :title="variable.description ?? ''"
+              :placeholder="
+                variable.name === 'text'
+                  ? $t('imsDialogEditor.speech.enterSpeech')
+                  : ''
+              "
+              :caption="getMainVariableCaption(var_index)"
+              @update:model-value="
+                nodeDataController.setValue(variable.name, $event)
+              "
+            ></DataField>
+            <button
+              v-if="shouldShowRestoreVariableButton(variable)"
+              class="is-button is-button-icon DialogSpeechNode-prop-restore"
+              :title="$t('imsDialogEditor.speech.restoreValues')"
+              @click="nodeDataController.deleteValue(variable.name)"
+            >
+              <i class="ri-arrow-go-back-line"></i>
+            </button>
+          </div>
+          <div v-if="options.length > 0" class="DialogSpeechNode-options">
+            <ContextMenuZone
+              v-for="(option, option_index) of options"
+              :key="option_index"
+              class="DialogSpeechNode-options-one"
+              :class="{
+                'state-unavailable':
+                  isPlaying && !playOptionConditionPass(option_index),
+              }"
+              :menu-list="getOptionContextMenu(option, option_index)"
+              ignoring-css-selector=".DataField-input"
+            >
+              <div class="DialogSpeechNode-options-one-common">
+                <div
+                  v-if="isOptionConditionDisplaying(option)"
+                  class="DialogSpeechNode-options-one-param type-first"
+                >
+                  <DataField
+                    class="DialogSpeechNode-options-one-param-input"
+                    :in-id="generateDataPinId(false, 'condition', option_index)"
+                    :option="option"
+                    :option-index="option_index"
+                    :placeholder="$t('imsDialogEditor.speech.enterText')"
+                    :node-data-controller="nodeDataController"
+                    caption="[[t:Condition]]"
+                    :readonly="readonly"
+                    :model-value="option.values['condition'] ?? null"
+                    :play-value="
+                      playingNodeData?.optionsInputs &&
+                      playingNodeData.optionsInputs[option_index] &&
+                      playingNodeData.optionsInputs[option_index]
+                        ? playingNodeData.optionsInputs[option_index][
+                            'condition'
+                          ]
+                        : null
+                    "
+                    @update:model-value="
+                      nodeDataController.setOptionValue(
+                        option_index,
+                        'condition',
+                        $event,
+                      )
+                    "
+                  ></DataField>
+                </div>
+                <div
+                  v-for="(variable, var_index) of optionSpeechList"
+                  :key="variable.name"
+                  class="DialogSpeechNode-options-one-param"
+                  :class="{
+                    ' type-first':
+                      var_index === 0 && !isOptionConditionDisplaying(option),
+                  }"
+                >
+                  <DataField
+                    class="DialogSpeechNode-options-one-param-input"
+                    :model-value="
+                      nodeDataController.getOptionValue(
+                        option_index,
+                        variable.name,
+                      ) === undefined
+                        ? variable.default
+                        : nodeDataController.getOptionValue(
+                            option_index,
+                            variable.name,
+                          )
+                    "
+                    :play-value="
+                      playingNodeData?.optionsInputs &&
+                      playingNodeData.optionsInputs[option_index] &&
+                      playingNodeData.optionsInputs[option_index]
+                        ? playingNodeData.optionsInputs[option_index][
+                            variable.name
+                          ]
+                        : null
+                    "
+                    :in-id="
+                      generateDataPinId(false, variable.name, option_index)
+                    "
+                    :caption="getOptionVariableCaption(option_index, var_index)"
+                    :node-data-controller="nodeDataController"
+                    :readonly="readonly"
+                    :title="variable.description ?? ''"
+                    :placeholder="
+                      variable.name === 'text'
+                        ? $t('imsDialogEditor.speech.enterText')
+                        : ''
+                    "
+                    @update:model-value="
+                      nodeDataController.setOptionValue(
+                        option_index,
+                        variable.name,
+                        $event,
+                      )
+                    "
+                  ></DataField>
+                  <button
+                    v-if="shouldShowRestoreOptionButton(variable, option_index)"
+                    class="is-button is-button-icon DialogSpeechNode-prop-restore"
+                    :title="$t('imsDialogEditor.speech.restoreValues')"
+                    @click="
+                      nodeDataController.deleteOptionValue(
+                        option_index,
+                        variable.name,
+                      )
+                    "
+                  >
+                    <i class="ri-arrow-go-back-line"></i>
+                  </button>
+                </div>
               </div>
               <div
-                v-for="(variable, var_index) of optionSpeechList"
-                :key="variable.name"
-                class="DialogSpeechNode-options-one-param"
-                :class="{
-                  ' type-first':
-                    var_index === 0 && !isOptionConditionDisplaying(option),
-                }"
+                v-if="isPlaying && playOptionConditionPass(option_index)"
+                class="DialogSpeechNode-options-one-select"
               >
-                <DataField
-                  class="DialogSpeechNode-options-one-param-input"
-                  :model-value="
-                    nodeDataController.getOptionValue(
-                      option_index,
-                      variable.name,
-                    ) === undefined
-                      ? variable.default
-                      : nodeDataController.getOptionValue(
-                          option_index,
-                          variable.name,
-                        )
-                  "
-                  :play-value="
-                    playingNodeData?.optionsInputs &&
-                    playingNodeData.optionsInputs[option_index] &&
-                    playingNodeData.optionsInputs[option_index]
-                      ? playingNodeData.optionsInputs[option_index][
-                          variable.name
-                        ]
-                      : null
-                  "
-                  :in-id="generateDataPinId(false, variable.name, option_index)"
-                  :caption="getOptionVariableCaption(option_index, var_index)"
-                  :node-data-controller="nodeDataController"
-                  :readonly="readonly"
-                  :title="variable.description ?? ''"
-                  :placeholder="
-                    variable.name === 'text'
-                      ? $t('imsDialogEditor.speech.enterText')
-                      : ''
-                  "
-                  @update:model-value="
-                    nodeDataController.setOptionValue(
-                      option_index,
-                      variable.name,
-                      $event,
-                    )
-                  "
-                ></DataField>
                 <button
-                  v-if="shouldShowRestoreOptionButton(variable, option_index)"
-                  class="is-button is-button-icon DialogSpeechNode-prop-restore"
-                  :title="$t('imsDialogEditor.speech.restoreValues')"
-                  @click="
-                    nodeDataController.deleteOptionValue(
-                      option_index,
-                      variable.name,
-                    )
-                  "
+                  class="is-button"
+                  @click="dialogPlayer.playChoose(option_index)"
                 >
-                  <i class="ri-arrow-go-back-line"></i>
+                  {{ $t('imsDialogEditor.play.select') }}
                 </button>
               </div>
-            </div>
-            <div
-              v-if="isPlaying && playOptionConditionPass(option_index)"
-              class="DialogSpeechNode-options-one-select"
-            >
-              <button
-                class="is-button"
-                @click="dialogPlayer.playChoose(option_index)"
-              >
-                {{ $t('imsDialogEditor.play.select') }}
-              </button>
-            </div>
-            <div class="DialogSpeechNode-options-one-handle">
-              <ExecHandle
-                :id="`out-${option_index + 1}`"
-                type="source"
-                :position="Position.Right"
-              ></ExecHandle>
-            </div>
-            <menu-button class="DialogSpeechNode-options-one-menu">
-              <menu-list
-                :menu-list="getOptionContextMenu(option, option_index)"
-              />
-            </menu-button>
-          </ContextMenuZone>
+              <div class="DialogSpeechNode-options-one-handle">
+                <ExecHandle
+                  :id="`out-${option_index + 1}`"
+                  type="source"
+                  :position="Position.Right"
+                ></ExecHandle>
+              </div>
+              <menu-button class="DialogSpeechNode-options-one-menu">
+                <menu-list
+                  :menu-list="getOptionContextMenu(option, option_index)"
+                />
+              </menu-button>
+            </ContextMenuZone>
+          </div>
+          <div
+            v-if="!readonly"
+            class="DialogSpeechNode-addOption"
+            @click="addOption"
+          >
+            + {{ $t('imsDialogEditor.speech.addOption') }}
+          </div>
         </div>
-        <div
-          v-if="!readonly"
-          class="DialogSpeechNode-addOption"
-          @click="addOption"
-        >
-          + {{ $t('imsDialogEditor.speech.addOption') }}
-        </div>
+        <ExecHandle
+          v-if="options.length === 0"
+          id="out"
+          type="source"
+          :position="Position.Right"
+        ></ExecHandle>
       </div>
-      <ExecHandle
-        v-if="options.length === 0"
-        id="out"
-        type="source"
-        :position="Position.Right"
-      ></ExecHandle>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -268,6 +274,7 @@ import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import DialogSpeechNodeAttachCover from './DialogSpeechNodeAttachCover.vue';
 import FilePresenter from '~ims-app-base/components/File/FilePresenter.vue';
+import DialogBaseNode from './DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSpeechNode',
@@ -279,6 +286,7 @@ export default defineComponent({
     MenuList,
     DialogSpeechNodeAttachCover,
     FilePresenter,
+    DialogBaseNode,
   },
   inject: ['projectContext'],
   props: {

@@ -82,6 +82,7 @@ import ActionSelector from '../parts/ActionSelector.vue';
 import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
 import { getActionNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from './NodeParametersGrid.vue';
+import UiManager from '~ims-app-base/logic/managers/UiManager.js';
 
 export default defineComponent({
   name: 'DialogActionNode',
@@ -196,6 +197,16 @@ export default defineComponent({
         ];
       return [
         {
+          title: this.$t('imsDialogEditor.run'),
+          action: async () => await this.startRunWithNode(false),
+          icon: 'ri-play-fill',
+        },
+        {
+          title: this.$t('imsDialogEditor.debug'),
+          action: async () => await this.startRunWithNode(true),
+          icon: 'ri-bug-fill',
+        },
+        {
           title: this.$t('imsDialogEditor.trigger.addInputParameter'),
           action: () => this.addParameter(false),
           icon: 'ri-arrow-right-circle-fill',
@@ -215,6 +226,13 @@ export default defineComponent({
   },
 
   methods: {
+    async startRunWithNode(debug: boolean) {
+      await this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          this.dialogPlayer.startRunWithNode(debug, this.id);
+        });
+    },
     generateDataPinId,
     async addParameter(is_out: boolean) {
       const new_variable = await nodeVariableAdd(
