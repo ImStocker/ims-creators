@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogSetVarNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogSetVarNode DialogEditorNode"
+  >
     <div
       class="DialogSetVarNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -29,7 +33,7 @@
       </div>
       <ExecHandle id="out" type="source" :position="Position.Right" />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -54,6 +58,8 @@ import {
   type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
+import type { DialogPlayer } from '../play/DialogPlayer';
+import DialogBaseNode from './DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSetVarNode',
@@ -61,8 +67,17 @@ export default defineComponent({
     ExecHandle,
     VariableSelector,
     DataField,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     readonly: {
       type: Boolean,
       default: false,

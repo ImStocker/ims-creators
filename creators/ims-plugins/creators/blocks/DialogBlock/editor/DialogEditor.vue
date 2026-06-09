@@ -56,6 +56,7 @@
               ...(node_desc.params ? node_desc.params : {}),
             }"
             :is="node_desc.node"
+            :id="params.id"
             :ref="'node-' + params.id"
             :style="{
               '--imsde-node-color': node_desc.color,

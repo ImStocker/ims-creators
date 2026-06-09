@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogChanceNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogChanceNode DialogEditorNode"
+  >
     <div
       class="DialogChanceNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -75,7 +79,7 @@ class="DialogChanceNode-else-pct"
         </div>
       </div>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -89,6 +93,8 @@ import type { NodeDataController } from '../editor/NodeDataController';
 import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
+import DialogBaseNode from './DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogChanceNode',
@@ -96,8 +102,17 @@ export default defineComponent({
     ExecHandle,
     DataField,
     DataFieldInput,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
       required: true,
