@@ -1,4 +1,6 @@
 import type { Component } from 'vue';
+import type { GraphBlockController } from '../editor/GraphBlockController';
+import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 
 export type NodeDescriptor = {
   name: string;
@@ -7,4 +9,9 @@ export type NodeDescriptor = {
   color: string;
   initData?: () => { text?: string };
   params?: any;
+  getContextMenuItems?: (
+    controller: GraphBlockController,
+    nodeId: string,
+    t: (key: string) => string,
+  ) => MenuListItem[];
 };

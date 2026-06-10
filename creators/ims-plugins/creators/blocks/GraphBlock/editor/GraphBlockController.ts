@@ -43,6 +43,10 @@ import {
 import type { GraphLink } from '../logic/nodeStoring';
 import { useFilePresenterParams } from '~ims-app-base/components/File/FilePresenter';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptors';
 
 export const GRAPH_BLOCK_CLIPBOARD_TYPE = 'graph-block';
 
@@ -499,6 +503,7 @@ export class GraphBlockController extends BlockEditorController {
           this.appManager.$t('common.dialogs.delete') +
           (items.length > 1 ? ` (${items.length})` : ''),
         danger: true,
+        icon: 'ri-delete-bin-line',
         action: async () => {
           for (const item of items) {
             if (item.userData && item.userData.type === 'node') {
@@ -508,6 +513,88 @@ export class GraphBlockController extends BlockEditorController {
         },
       },
     ];
+  }
+
+  async pickAndAttachFile(): Promise<AssetPropValue | null> {
+    const editorManager = this.appManager.get(EditorManager);
+    const files = await editorManager.pickFiles();
+    if (!files || files.length === 0) return null;
+    const file = files[0];
+    const uploadingJob = editorManager.attachFile(file.blob, file.name);
+    return await uploadingJob.awaitResult();
+  }
+
+  async pickAsset(): Promise<AssetPropValueAsset | null> {
+    const dialogManager = this.appManager.get(DialogManager);
+    const gdd_workspace = this.appManager
+      .get(ProjectManager)
+      .getWorkspaceByName('gdd');
+    if (!gdd_workspace) return null;
+    const SelectAssetDialog = (
+      await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
+    ).default;
+    const assetResult = await dialogManager.show(SelectAssetDialog, {
+      dialogHeader: this.appManager.$t('graphBlock.editor.selectAsset'),
+      where: { workspaceids: gdd_workspace.id },
+    });
+    if (!assetResult) return null;
+    return {
+      AssetId: assetResult.id,
+      Title: assetResult.title ?? '',
+      Name: assetResult.name,
+    };
+  }
+
+  getNodeContextMenu(
+    nodeIds: string[],
+    viewport: ViewportTransform,
+  ): MenuListItem[] {
+    if (!nodeIds.length) return [];
+    const count = nodeIds.length;
+    const suffix = count > 1 ? ` (${count})` : '';
+    const items: MenuListItem[] = [
+      {
+        name: 'copy',
+        title: this.appManager.$t('common.dialogs.copy') + suffix,
+        icon: 'ri-file-copy-line',
+        action: () => this.copyNodesToClipboard(nodeIds, viewport),
+      },
+      {
+        name: 'cut',
+        title: this.appManager.$t('graphBlock.editor.cutNode') + suffix,
+        icon: 'ri-scissors-cut-line',
+        action: () => this.cutNodes(nodeIds, viewport),
+      },
+      {
+        name: 'delete',
+        title: this.appManager.$t('common.dialogs.delete') + suffix,
+        icon: 'ri-delete-bin-line',
+        danger: true,
+        action: async () => {
+          for (const id of nodeIds) {
+            await this.deleteNodeById(id);
+          }
+        },
+      },
+    ];
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node) {
+        const descriptor = getNodeDescriptorOfType(node.type ?? '');
+        if (descriptor?.getContextMenuItems) {
+          const nodeItems = descriptor.getContextMenuItems(
+            this,
+            nodeIds[0],
+            (key: string) => this.appManager.$t(key),
+          );
+          if (nodeItems.length > 0) {
+            items.unshift({ type: 'separator', name: 'sep-value' });
+            items.unshift(...nodeItems);
+          }
+        }
+      }
+    }
+    return items;
   }
 
   revealBlockContentItem(itemId: string) {

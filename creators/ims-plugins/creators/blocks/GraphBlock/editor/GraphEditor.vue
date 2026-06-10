@@ -1,5 +1,10 @@
 <template>
-  <div class="GraphEditor">
+  <div
+    class="GraphEditor"
+    :style="{
+      '--imsde-node-selected-outline-width': selectedOutlineWidth + 'px',
+    }"
+  >
     <div
       class="GraphEditor-wrapper"
       @pointerdown.capture="onMouseDown"
@@ -153,9 +158,6 @@ import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { GraphBlockController } from './GraphBlockController';
 import type { AssetPropValueAsset } from '~ims-app-base/logic/types/Props';
-import EditorManager from '~ims-app-base/logic/managers/EditorManager';
-import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
@@ -242,29 +244,11 @@ export default defineComponent({
       return colors.every((c: string) => c === colors[0]) ? colors[0] : '';
     },
     selectionMenuList(): MenuListItem[] {
-      const count = this.selectedNodes.length;
-      const suffix = count > 1 ? ` (${count})` : '';
-      return [
-        {
-          name: 'copy',
-          title: this.$t('common.dialogs.copy') + suffix,
-          icon: 'ri-file-copy-line',
-          action: () => this.copySelectedNodes(),
-        },
-        {
-          name: 'cut',
-          title: this.$t('graphBlock.editor.cutNode') + suffix,
-          icon: 'ri-scissors-cut-line',
-          action: () => this.cutSelectedNodes(),
-        },
-        {
-          name: 'delete',
-          title: this.$t('common.dialogs.delete') + suffix,
-          icon: 'ri-delete-bin-line',
-          danger: true,
-          action: () => this.deleteSelectedNodes(),
-        },
-      ];
+      const ids = this.selectedNodes.map((n: any) => n.id);
+      return this.blockControllerMut.getNodeContextMenu(
+        ids,
+        this.viewportTransform,
+      );
     },
     createNodeMenuList(): MenuListItem[] {
       return [
@@ -297,6 +281,12 @@ export default defineComponent({
     },
     colorSwatches() {
       return COLOR_SWATCHES;
+    },
+    selectedOutlineWidth() {
+      return Math.max(
+        Math.round(-1.5 * Math.log2(this.viewportHelper.zoom)),
+        0,
+      );
     },
     flowViewportTransformPreferenceKey() {
       const preference_id = this.resolvedBlock
@@ -514,14 +504,8 @@ export default defineComponent({
       }
     },
     async addFileNode() {
-      const appManager = this.$getAppManager();
-      const editorManager = appManager.get(EditorManager);
-      const files = await editorManager.pickFiles();
+      const result = await this.blockControllerMut.pickAndAttachFile();
       this.createNodeContext = null;
-      if (!files || files.length === 0) return;
-      const file = files[0];
-      const uploadingJob = editorManager.attachFile(file.blob, file.name);
-      const result = await uploadingJob.awaitResult();
       if (!result) return;
       await this.blockControllerMut.createNode(
         this.lastCreatePosition,
@@ -531,28 +515,9 @@ export default defineComponent({
       this.connectStartParams = null;
     },
     async addAssetNode() {
-      const appManager = this.$getAppManager();
-      const dialogManager = appManager.get(DialogManager);
-      const gdd_workspace = appManager
-        .get(ProjectManager)
-        .getWorkspaceByName('gdd');
-      if (!gdd_workspace) return;
-      const SelectAssetDialog = (
-        await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
-      ).default;
-      const assetResult = await dialogManager.show(SelectAssetDialog, {
-        dialogHeader: this.$t('graphBlock.editor.selectAsset'),
-        where: {
-          workspaceids: gdd_workspace.id,
-        },
-      });
+      const assetValue = await this.blockControllerMut.pickAsset();
       this.createNodeContext = null;
-      if (!assetResult) return;
-      const assetValue: AssetPropValueAsset = {
-        AssetId: assetResult.id,
-        Title: assetResult.title ?? '',
-        Name: assetResult.name,
-      };
+      if (!assetValue) return;
       await this.blockControllerMut.createNode(
         this.lastCreatePosition,
         this.connectStartParams,
@@ -618,32 +583,6 @@ export default defineComponent({
       }
       this.blockControllerMut.savePropsDelayed();
     },
-    copySelectedNodes() {
-      this.selectionContextMenu = null;
-      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
-      if (!selectedNodeIds.length) return;
-      const flow = this.$refs['flow'] as VueFlowStore;
-      if (!flow) return;
-      this.blockControllerMut.copyNodesToClipboard(
-        selectedNodeIds,
-        flow.getViewport(),
-      );
-    },
-    cutSelectedNodes() {
-      this.selectionContextMenu = null;
-      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
-      if (!selectedNodeIds.length) return;
-      const flow = this.$refs['flow'] as VueFlowStore;
-      if (!flow) return;
-      this.blockControllerMut.cutNodes(selectedNodeIds, flow.getViewport());
-    },
-    deleteSelectedNodes() {
-      this.selectionContextMenu = null;
-      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
-      for (const id of selectedNodeIds) {
-        this.blockControllerMut.deleteNodeById(id);
-      }
-    },
     pasteFromClipboard() {
       this.createNodeContext = null;
       const flow = this.$refs['flow'] as VueFlowStore;
@@ -687,6 +626,7 @@ export default defineComponent({
   --imsde-node-content-bg-color: #444444f6;
   --imsde-node-content-text-color: #eaeaea;
   --imsde-node-selected-color: #999;
+  --imsde-node-selected-outline-width: 0;
 }
 
 [data-theme='ims-light'] {
@@ -704,12 +644,8 @@ export default defineComponent({
     var(--imsgr-node-color, var(--imsde-node-content-border-color));
   background: var(--imsgr-node-bg, var(--imsde-node-content-bg-color));
   &.state-selected {
-    .GraphEditorNode-body {
-      border-color: var(
-        --imsgr-node-color,
-        var(--imsde-node-content-border-color)
-      );
-    }
+    outline: calc(1px + var(--imsde-node-selected-outline-width)) solid
+      var(--imsgr-node-color, var(--imsde-node-content-border-color));
   }
   & > div:first-child {
     border-top-left-radius: 4px;
@@ -727,7 +663,6 @@ export default defineComponent({
 }
 
 .GraphEditorNode-body {
-  border: 1px solid transparent;
 }
 </style>
 

@@ -172,7 +172,6 @@ import type {
   AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
-import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import AssetLink from '~ims-app-base/components/Asset/AssetLink.vue';
@@ -300,7 +299,7 @@ export default defineComponent({
       return { id: v.AssetId, title: v.Title ?? null, name: v.Name ?? null };
     },
     assetHasImage(): boolean {
-      if (!this.assetLink) return '';
+      if (!this.assetLink) return false;
       const cached_preview = this.$getAppManager()
         .get(CreatorAssetManager)
         .getAssetPreviewViaCacheSync(this.assetLink.id);
@@ -317,52 +316,16 @@ export default defineComponent({
         .filter((n: any) => n.selected)
         .map((n: any) => n.id);
     },
-    selectedCount(): number {
-      return this.selectedNodeIds.length;
-    },
     menuList(): MenuListItem[] {
       if (this.readonly) return [];
       if (this.editing) return [];
-      const count = this.selectedCount;
-      const suffix = count > 1 ? ` (${count})` : '';
-      const items: MenuListItem[] = [
-        {
-          title: (this as any).$t('common.dialogs.copy') + suffix,
-          icon: 'ri-file-copy-line',
-          action: () => this.copyNodes(),
-        },
-        {
-          title: (this as any).$t('graphBlock.editor.cutNode') + suffix,
-          icon: 'ri-scissors-cut-line',
-          action: () => this.cutNodes(),
-        },
-        {
-          title: (this as any).$t('common.dialogs.delete') + suffix,
-          icon: 'ri-delete-bin-line',
-          danger: true,
-          action: () => this.deleteSelectedNodes(),
-        },
-      ];
-      if (this.isFileValue) {
-        items.unshift({
-          type: 'separator',
-        });
-        items.unshift({
-          title: (this as any).$t('graphBlock.editor.replaceFile'),
-          icon: 'ri-attachment-2',
-          action: () => this.replaceFile(),
-        });
-      } else if (this.isAssetValue) {
-        items.unshift({
-          type: 'separator',
-        });
-        items.unshift({
-          title: (this as any).$t('graphBlock.editor.replaceAsset'),
-          icon: 'ri-link-m',
-          action: () => this.replaceAsset(),
-        });
-      }
-      return items;
+      const ids = this.selectedNodeIds.length
+        ? this.selectedNodeIds
+        : [this.id];
+      return this.dialogController.getNodeContextMenu(
+        ids,
+        this.viewportTransform,
+      );
     },
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
@@ -415,58 +378,6 @@ export default defineComponent({
     },
     onEditorBlur() {
       this.$emit('request-view');
-    },
-    async replaceFile() {
-      const appManager = (this as any).$getAppManager();
-      const editorManager = appManager.get(EditorManager);
-      const files = await editorManager.pickFiles();
-      if (!files || files.length === 0) return;
-      const file = files[0];
-      const uploadingJob = editorManager.attachFile(file.blob, file.name);
-      const result = await uploadingJob.awaitResult();
-      if (!result) return;
-      this.setValue(result);
-    },
-    async replaceAsset() {
-      const appManager = (this as any).$getAppManager();
-      const dialogManager = appManager.get(DialogManager);
-      const projectManager = appManager.get(ProjectManager);
-      const gdd_workspace = projectManager.getWorkspaceByName('gdd');
-      if (!gdd_workspace) return;
-      const SelectAssetDialog = (
-        await import('~ims-app-base/components/Asset/SelectAssetDialog.vue')
-      ).default;
-      const assetResult = await dialogManager.show(SelectAssetDialog, {
-        dialogHeader: (this as any).$t('graphBlock.editor.selectAsset'),
-        where: { workspaceids: gdd_workspace.id },
-      });
-      if (!assetResult) return;
-      const assetValue: AssetPropValueAsset = {
-        AssetId: assetResult.id,
-        Title: assetResult.title ?? '',
-        Name: assetResult.name,
-      };
-      this.setValue(assetValue);
-    },
-    deleteSelectedNodes() {
-      const ids = this.selectedNodeIds.length
-        ? this.selectedNodeIds
-        : [this.id];
-      for (const id of ids) {
-        this.dialogController.deleteNodeById(id);
-      }
-    },
-    copyNodes() {
-      const ids = this.selectedNodeIds.length
-        ? this.selectedNodeIds
-        : [this.id];
-      this.dialogController.copyNodesToClipboard(ids, this.viewportTransform);
-    },
-    cutNodes() {
-      const ids = this.selectedNodeIds.length
-        ? this.selectedNodeIds
-        : [this.id];
-      this.dialogController.cutNodes(ids, this.viewportTransform);
     },
     onResizeStart(ev: MouseEvent, direction: ResizeDirection) {
       if (this.readonly) return;
