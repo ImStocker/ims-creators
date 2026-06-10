@@ -84,6 +84,11 @@
           </defs>
         </svg>
       </VueFlow>
+      <div v-if="hasHint" class="GraphEditor-hint">
+        <div class="GraphEditor-hint-inner">
+          {{ $t('graphBlock.editor.emptyHint') }}
+        </div>
+      </div>
     </div>
     <div
       v-if="createNodeContext"
@@ -236,6 +241,9 @@ export default defineComponent({
     },
     selectedNodes() {
       return this.blockControllerMut.state.nodes.filter((n: any) => n.selected);
+    },
+    hasHint() {
+      return !this.readonlyComp && this.blockControllerMut.state.nodes.length === 0;
     },
     selectedColor() {
       const nodes = this.selectedNodes;
@@ -690,6 +698,22 @@ export default defineComponent({
   left: 0;
   top: 0;
   z-index: 100;
+}
+
+.GraphEditor-hint {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.GraphEditor-hint-inner {
+  padding: 10px 20px;
+  border-radius: 4px;
+  background: var(--dropdown-bg-color);
+  pointer-events: all;
 }
 
 .GraphEditor-edge {

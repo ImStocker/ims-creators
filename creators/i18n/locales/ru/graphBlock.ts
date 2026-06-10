@@ -16,6 +16,7 @@ export default {
       cutNode: 'Вырезать',
       pasteNode: 'Вставить из буфера',
       noGraphInClipboard: 'В буфере нет данных графа',
+      emptyHint: 'Кликните правой кнопкой на поле, чтобы создать узел.',
     },
     outline: {
       rootTitle: 'Граф',

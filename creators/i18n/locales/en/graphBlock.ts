@@ -16,6 +16,7 @@ export default {
       cutNode: 'Cut',
       pasteNode: 'Paste from clipboard',
       noGraphInClipboard: 'No graph data in clipboard',
+      emptyHint: 'Right-click on the field to create a node.',
     },
     outline: {
       rootTitle: 'Graph',
