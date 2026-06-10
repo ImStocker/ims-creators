@@ -88,22 +88,17 @@
         top: `${createNodeContext.y}px`,
       }"
     >
-      <div class="GraphEditor-createNode-dropdown is-dropdown">
-        <div class="GraphEditor-createNode-dropdown-item" @click="addCardNode">
-          <i class="ri-node-tree GraphEditor-createNode-dropdown-item-icon"></i>
-          {{ $t('graphBlock.editor.addCard') }}
-        </div>
-        <div class="GraphEditor-createNode-dropdown-item" @click="addAssetNode">
-          <i class="ri-link-m GraphEditor-createNode-dropdown-item-icon"></i>
-          {{ $t('graphBlock.editor.addElement') }}
-        </div>
-        <div class="GraphEditor-createNode-dropdown-item" @click="addFileNode">
-          <i
-            class="ri-attachment-2 GraphEditor-createNode-dropdown-item-icon"
-          ></i>
-          {{ $t('graphBlock.editor.addFile') }}
-        </div>
-      </div>
+      <menu-list :menu-list="createNodeMenuList" />
+    </div>
+    <div
+      v-if="selectionContextMenu"
+      class="GraphEditor-selectionContext"
+      :style="{
+        left: `${selectionContextMenu.x}px`,
+        top: `${selectionContextMenu.y}px`,
+      }"
+    >
+      <menu-list :menu-list="selectionMenuList" />
     </div>
     <div
       v-if="selectedNodes.length > 0 && !readonlyComp"
@@ -168,6 +163,8 @@ import { COLOR_SWATCHES } from './GraphEditor';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import { getPreferenceKeyForBlock } from '~ims-app-base/logic/utils/assets';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
+import MenuList from '~ims-app-base/components/Common/MenuList.vue';
+import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -176,6 +173,7 @@ export default defineComponent({
     GraphMiniMap,
     Background,
     BezierEdge,
+    MenuList,
   },
   props: {
     readonly: {
@@ -204,6 +202,7 @@ export default defineComponent({
     const viewportHelper = new FlowViewportHelper();
     return {
       createNodeContext: null as { x: number; y: number } | null,
+      selectionContextMenu: null as { x: number; y: number } | null,
       connectStartParams: null as {
         nodeId: string;
         handleId: string;
@@ -241,6 +240,60 @@ export default defineComponent({
       if (nodes.length === 0) return '';
       const colors = nodes.map((n: any) => (n.data as any)?.color ?? '');
       return colors.every((c: string) => c === colors[0]) ? colors[0] : '';
+    },
+    selectionMenuList(): MenuListItem[] {
+      const count = this.selectedNodes.length;
+      const suffix = count > 1 ? ` (${count})` : '';
+      return [
+        {
+          name: 'copy',
+          title: this.$t('common.dialogs.copy') + suffix,
+          icon: 'ri-file-copy-line',
+          action: () => this.copySelectedNodes(),
+        },
+        {
+          name: 'cut',
+          title: this.$t('graphBlock.editor.cutNode') + suffix,
+          icon: 'ri-scissors-cut-line',
+          action: () => this.cutSelectedNodes(),
+        },
+        {
+          name: 'delete',
+          title: this.$t('common.dialogs.delete') + suffix,
+          icon: 'ri-delete-bin-line',
+          danger: true,
+          action: () => this.deleteSelectedNodes(),
+        },
+      ];
+    },
+    createNodeMenuList(): MenuListItem[] {
+      return [
+        {
+          name: 'addCard',
+          title: this.$t('graphBlock.editor.addCard'),
+          icon: 'ri-info-card-line',
+          action: () => this.addCardNode(),
+        },
+        {
+          name: 'addAsset',
+          title: this.$t('graphBlock.editor.addElement'),
+          icon: 'ri-link-m',
+          action: () => this.addAssetNode(),
+        },
+        {
+          name: 'addFile',
+          title: this.$t('graphBlock.editor.addFile'),
+          icon: 'ri-attachment-2',
+          action: () => this.addFileNode(),
+        },
+        { type: 'separator', name: 'sep1' },
+        {
+          name: 'paste',
+          title: this.$t('graphBlock.editor.pasteNode'),
+          icon: 'ri-clipboard-line',
+          action: () => this.pasteFromClipboard(),
+        },
+      ];
     },
     colorSwatches() {
       return COLOR_SWATCHES;
@@ -322,6 +375,16 @@ export default defineComponent({
       if (target.closest('.vue-flow__node')) {
         return; // Clicked inside the node
       }
+      if (target.closest('.vue-flow__nodesselection-rect')) {
+        if (this.selectedNodes.length === 0) return;
+        this.selectionContextMenu = {
+          x:
+            ev.clientX - (this.$el as HTMLElement).getBoundingClientRect().left,
+          y: ev.clientY - (this.$el as HTMLElement).getBoundingClientRect().top,
+        };
+        ev.preventDefault();
+        return;
+      }
       ev.preventDefault();
     },
     onConnect(ev: Connection) {
@@ -394,6 +457,7 @@ export default defineComponent({
     onMouseDown() {
       if (this.readonlyComp) return;
       this.createNodeContext = null;
+      this.selectionContextMenu = null;
       this.connectStartParams = null;
       this.mouseDownTime = Date.now();
     },
@@ -405,6 +469,7 @@ export default defineComponent({
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) return;
       if (target.closest('.vue-flow__node')) return;
+      if (target.closest('.vue-flow__nodesselection-rect')) return;
 
       ev.preventDefault();
       const elapsed = Date.now() - this.mouseDownTime;
@@ -508,6 +573,7 @@ export default defineComponent({
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) return;
       if (target.closest('.vue-flow__node')) return;
+      if (target.closest('.vue-flow__nodesselection-rect')) return;
       event.preventDefault();
       const eventDt = event.dataTransfer;
       if (!eventDt) return;
@@ -551,6 +617,41 @@ export default defineComponent({
         }
       }
       this.blockControllerMut.savePropsDelayed();
+    },
+    copySelectedNodes() {
+      this.selectionContextMenu = null;
+      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
+      if (!selectedNodeIds.length) return;
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      this.blockControllerMut.copyNodesToClipboard(
+        selectedNodeIds,
+        flow.getViewport(),
+      );
+    },
+    cutSelectedNodes() {
+      this.selectionContextMenu = null;
+      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
+      if (!selectedNodeIds.length) return;
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      this.blockControllerMut.cutNodes(selectedNodeIds, flow.getViewport());
+    },
+    deleteSelectedNodes() {
+      this.selectionContextMenu = null;
+      const selectedNodeIds = this.selectedNodes.map((n: any) => n.id);
+      for (const id of selectedNodeIds) {
+        this.blockControllerMut.deleteNodeById(id);
+      }
+    },
+    pasteFromClipboard() {
+      this.createNodeContext = null;
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      this.blockControllerMut.pasteNodesFromClipboard(
+        flow.getViewport(),
+        this.lastCreatePosition,
+      );
     },
     async showNode(node_id: string): Promise<boolean> {
       const node = this.blockControllerMut.state.nodes.find(
@@ -649,26 +750,11 @@ export default defineComponent({
   z-index: 100;
 }
 
-.GraphEditor-createNode-dropdown {
-  background-color: var(--imsde-dropdown-bg-color);
-  border-radius: var(--imsde-dropdown-border-radius);
-  box-shadow: var(--imsde-dropdown-box-shadow);
-  user-select: none;
-}
-.GraphEditor-createNode-dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
-  color: var(--local-text-color);
-  white-space: nowrap;
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--imsde-dropdown-border-color);
-  }
-  &:hover {
-    background: var(--dropdown-hl-bg-color);
-  }
+.GraphEditor-selectionContext {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 100;
 }
 
 .GraphEditor-edge {

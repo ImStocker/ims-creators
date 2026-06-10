@@ -42,6 +42,9 @@ import {
 } from '~ims-app-base/logic/utils/clipboard';
 import type { GraphLink } from '../logic/nodeStoring';
 import { useFilePresenterParams } from '~ims-app-base/components/File/FilePresenter';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+
+export const GRAPH_BLOCK_CLIPBOARD_TYPE = 'graph-block';
 
 export type GraphBlockContentUserData = {
   type: 'node';
@@ -238,17 +241,38 @@ export class GraphBlockController extends BlockEditorController {
         _screenY: screenY,
       });
     }
-    clipboardCopyPlainText(JSON.stringify({ nodes: nodesToCopy, viewport }));
+    clipboardCopyPlainText(
+      JSON.stringify({
+        type: GRAPH_BLOCK_CLIPBOARD_TYPE,
+        nodes: nodesToCopy,
+        viewport,
+      }),
+    );
   }
 
-  async pasteNodesFromClipboard(viewport: ViewportTransform) {
+  async pasteNodesFromClipboard(
+    viewport: ViewportTransform,
+    targetFlowPos?: { x: number; y: number },
+  ) {
     const changer = this.changer;
     if (!changer) return;
     if (!this.resolvedBlock) return;
 
     const pastedData = await clipboardReadPlainText();
     try {
-      const parsed = JSON.parse(pastedData);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(pastedData);
+      } catch {
+        throw new Error(
+          this.appManager.$t('graphBlock.editor.noGraphInClipboard'),
+        );
+      }
+      if (parsed.type !== GRAPH_BLOCK_CLIPBOARD_TYPE) {
+        throw new Error(
+          this.appManager.$t('graphBlock.editor.noGraphInClipboard'),
+        );
+      }
       const nodes = parsed.nodes;
       if (!Array.isArray(nodes) || !nodes.length) return;
 
@@ -266,6 +290,16 @@ export class GraphBlockController extends BlockEditorController {
       const idMap = new Map<string, string>();
       nodes.forEach((n: any) => idMap.set(n.id, uuidv4()));
 
+      // Calculate center of copied nodes for offset-based positioning
+      let centerX = 0;
+      let centerY = 0;
+      for (const node of nodes) {
+        centerX += node.pos.x;
+        centerY += node.pos.y;
+      }
+      centerX /= nodes.length;
+      centerY /= nodes.length;
+
       for (const node of nodes) {
         const newId = idMap.get(node.id);
         const maxIndex = this.state.nodes.reduce(
@@ -273,14 +307,20 @@ export class GraphBlockController extends BlockEditorController {
           0,
         );
 
-        let newX = node.pos.x;
-        let newY = node.pos.y;
-        if (node._screenX !== undefined && node._screenY !== undefined) {
+        let newX: number;
+        let newY: number;
+        if (targetFlowPos) {
+          newX = targetFlowPos.x + (node.pos.x - centerX);
+          newY = targetFlowPos.y + (node.pos.y - centerY);
+        } else if (node._screenX !== undefined && node._screenY !== undefined) {
           newX = (node._screenX - viewport.x) / viewport.zoom;
           newY = (node._screenY - viewport.y) / viewport.zoom;
+          newX += 50;
+          newY += 50;
+        } else {
+          newX = node.pos.x + 50;
+          newY = node.pos.y + 50;
         }
-        newX += 50;
-        newY += 50;
 
         const remappedLinks: {
           to: string;
@@ -319,8 +359,8 @@ export class GraphBlockController extends BlockEditorController {
       }
 
       this.savePropsDelayed();
-    } catch {
-      // ignore
+    } catch (err: any) {
+      this.appManager.get(UiManager).showError(err.message);
     }
   }
 
@@ -416,7 +456,7 @@ export class GraphBlockController extends BlockEditorController {
             : ((nodeData.value as AssetPropValueAsset).Name ??
               castAssetPropValueToString(nodeData.value));
         } else {
-          icon = 'ri-node-tree';
+          icon = 'ri-info-card-line';
           const text = truncateAssetPropValueText(
             castAssetPropValueToText(nodeData.value),
             50,

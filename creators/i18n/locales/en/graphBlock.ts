@@ -13,6 +13,9 @@ export default {
       replaceFile: 'Replace File',
       replaceAsset: 'Replace Asset',
       deleteNode: 'Delete Node',
+      cutNode: 'Cut',
+      pasteNode: 'Paste from clipboard',
+      noGraphInClipboard: 'No graph data in clipboard',
     },
     outline: {
       rootTitle: 'Graph',

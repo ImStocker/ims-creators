@@ -312,44 +312,57 @@ export default defineComponent({
       if (!cached_preview) return false;
       return !!getAssetImageFromPreview(cached_preview);
     },
+    selectedNodeIds(): string[] {
+      return this.dialogController.state.nodes
+        .filter((n: any) => n.selected)
+        .map((n: any) => n.id);
+    },
+    selectedCount(): number {
+      return this.selectedNodeIds.length;
+    },
     menuList(): MenuListItem[] {
       if (this.readonly) return [];
       if (this.editing) return [];
-      if (this.isFileValue) {
-        return [
-          {
-            title: (this as any).$t('graphBlock.editor.replaceFile'),
-            icon: 'ri-attachment-2',
-            action: () => this.replaceFile(),
-          },
-          {
-            title: (this as any).$t('graphBlock.editor.deleteNode'),
-            danger: true,
-            action: () => this.deleteNode(),
-          },
-        ];
-      }
-      if (this.isAssetValue) {
-        return [
-          {
-            title: (this as any).$t('graphBlock.editor.replaceAsset'),
-            icon: 'ri-link-m',
-            action: () => this.replaceAsset(),
-          },
-          {
-            title: (this as any).$t('graphBlock.editor.deleteNode'),
-            danger: true,
-            action: () => this.deleteNode(),
-          },
-        ];
-      }
-      return [
+      const count = this.selectedCount;
+      const suffix = count > 1 ? ` (${count})` : '';
+      const items: MenuListItem[] = [
         {
-          title: (this as any).$t('graphBlock.editor.deleteNode'),
+          title: (this as any).$t('common.dialogs.copy') + suffix,
+          icon: 'ri-file-copy-line',
+          action: () => this.copyNodes(),
+        },
+        {
+          title: (this as any).$t('graphBlock.editor.cutNode') + suffix,
+          icon: 'ri-scissors-cut-line',
+          action: () => this.cutNodes(),
+        },
+        {
+          title: (this as any).$t('common.dialogs.delete') + suffix,
+          icon: 'ri-delete-bin-line',
           danger: true,
-          action: () => this.deleteNode(),
+          action: () => this.deleteSelectedNodes(),
         },
       ];
+      if (this.isFileValue) {
+        items.unshift({
+          type: 'separator',
+        });
+        items.unshift({
+          title: (this as any).$t('graphBlock.editor.replaceFile'),
+          icon: 'ri-attachment-2',
+          action: () => this.replaceFile(),
+        });
+      } else if (this.isAssetValue) {
+        items.unshift({
+          type: 'separator',
+        });
+        items.unshift({
+          title: (this as any).$t('graphBlock.editor.replaceAsset'),
+          icon: 'ri-link-m',
+          action: () => this.replaceAsset(),
+        });
+      }
+      return items;
     },
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
@@ -435,8 +448,25 @@ export default defineComponent({
       };
       this.setValue(assetValue);
     },
-    deleteNode() {
-      this.dialogController.deleteNodeById(this.id);
+    deleteSelectedNodes() {
+      const ids = this.selectedNodeIds.length
+        ? this.selectedNodeIds
+        : [this.id];
+      for (const id of ids) {
+        this.dialogController.deleteNodeById(id);
+      }
+    },
+    copyNodes() {
+      const ids = this.selectedNodeIds.length
+        ? this.selectedNodeIds
+        : [this.id];
+      this.dialogController.copyNodesToClipboard(ids, this.viewportTransform);
+    },
+    cutNodes() {
+      const ids = this.selectedNodeIds.length
+        ? this.selectedNodeIds
+        : [this.id];
+      this.dialogController.cutNodes(ids, this.viewportTransform);
     },
     onResizeStart(ev: MouseEvent, direction: ResizeDirection) {
       if (this.readonly) return;

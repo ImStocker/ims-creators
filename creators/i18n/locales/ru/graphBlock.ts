@@ -13,6 +13,9 @@ export default {
       replaceFile: 'Заменить файл',
       replaceAsset: 'Заменить элемент',
       deleteNode: 'Удалить узел',
+      cutNode: 'Вырезать',
+      pasteNode: 'Вставить из буфера',
+      noGraphInClipboard: 'В буфере нет данных графа',
     },
     outline: {
       rootTitle: 'Граф',
