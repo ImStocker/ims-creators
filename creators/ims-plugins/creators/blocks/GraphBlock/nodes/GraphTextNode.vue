@@ -336,10 +336,15 @@ export default defineComponent({
     'data.value'(val: any) {
       this.localValue = val ?? null;
     },
-    editingNodeId(newVal: string | null, oldVal: string | null) {
-      if (newVal === this.id && newVal !== oldVal) {
+    editing() {
+      if (this.editing) {
         this.$nextTick(() => {
-          (this.$refs['editorRef'] as any)?.focus?.();
+          const editor = this.$refs['editorRef'] as InstanceType<
+            typeof ImcEditor
+          > | null;
+          if (editor) {
+            editor.focus();
+          }
         });
       }
     },
