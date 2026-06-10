@@ -46,7 +46,7 @@ import {
   type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptBlockPlainPropValueBind } from '../logic/nodeStoring';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({

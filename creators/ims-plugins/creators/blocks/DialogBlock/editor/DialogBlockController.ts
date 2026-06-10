@@ -50,10 +50,13 @@ import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefini
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptiors';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import type { DialogPlayer } from '../play/DialogPlayer';
 import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
 import type { IDialogCollectionController } from './DialogVariableController';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import { nodeVariableAdd } from '../logic/nodeVariables';
+
+export const SCRIPT_BLOCK_CLIPBOARD_TYPE = 'script-block';
 
 export type DialogVariable = ScriptBlockPlainVariable;
 export type DialogAction = ScriptBlockPlainAction;
@@ -181,6 +184,7 @@ export class DialogBlockController extends BlockEditorController {
     }
     clipboardCopyPlainText(
       JSON.stringify({
+        type: SCRIPT_BLOCK_CLIPBOARD_TYPE,
         nodes: Object.values(nodes_to_copy),
         viewport,
       }),
@@ -198,7 +202,19 @@ export class DialogBlockController extends BlockEditorController {
     const pasted_data = await clipboardReadPlainText();
 
     try {
-      const parsed = JSON.parse(pasted_data);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(pasted_data);
+      } catch {
+        throw new Error(
+          this.appManager.$t('imsDialogEditor.noScriptInClipboard'),
+        );
+      }
+      if (parsed.type !== SCRIPT_BLOCK_CLIPBOARD_TYPE) {
+        throw new Error(
+          this.appManager.$t('imsDialogEditor.noScriptInClipboard'),
+        );
+      }
       const nodes = parsed.nodes;
 
       if (!Array.isArray(nodes)) return;
@@ -284,8 +300,8 @@ export class DialogBlockController extends BlockEditorController {
           this.appManager.get(UiManager).showError(err);
         }
       }
-    } catch {
-      // do nothing
+    } catch (err: any) {
+      this.appManager.get(UiManager).showError(err.message);
     }
   }
 
@@ -1409,6 +1425,85 @@ export class DialogBlockController extends BlockEditorController {
     }
 
     return [root_anchor];
+  }
+
+  getNodeContextMenu(
+    nodeIds: string[],
+    viewport: ViewportTransform,
+    dialogPlayer?: DialogPlayer,
+  ): MenuListItem[] {
+    if (!nodeIds.length) return [];
+    const count = nodeIds.length;
+    const suffix = count > 1 ? ` (${count})` : '';
+    const items: MenuListItem[] = [
+      {
+        name: 'copy',
+        title: this.appManager.$t('common.dialogs.copy') + suffix,
+        icon: 'ri-file-copy-line',
+        action: () => this.copyNodesToClipboard(nodeIds, viewport),
+      },
+      {
+        name: 'cut',
+        title: this.appManager.$t('imsDialogEditor.cutNode') + suffix,
+        icon: 'ri-scissors-cut-line',
+        action: () => this.cutNodes(nodeIds, viewport),
+      },
+      {
+        name: 'delete',
+        title: this.appManager.$t('common.dialogs.delete') + suffix,
+        icon: 'ri-delete-bin-line',
+        danger: true,
+        action: async () => {
+          for (const id of nodeIds) {
+            await this.deleteNodeById(id);
+          }
+        },
+      },
+    ];
+    if (count === 1 && dialogPlayer) {
+      const runDebugItems: MenuListItem[] = [
+        {
+          name: 'run',
+          title: this.appManager.$t('imsDialogEditor.runFromNode'),
+          icon: 'ri-play-fill',
+          action: async () => {
+            await this.appManager.get(UiManager).doTask(async () => {
+              dialogPlayer.startRunWithNode(false, nodeIds[0]);
+            });
+          },
+        },
+        {
+          name: 'debug',
+          title: this.appManager.$t('imsDialogEditor.debugFromNode'),
+          icon: 'ri-bug-fill',
+          action: async () => {
+            await this.appManager.get(UiManager).doTask(async () => {
+              dialogPlayer.startRunWithNode(true, nodeIds[0]);
+            });
+          },
+        },
+      ];
+      items.unshift({ type: 'separator', name: 'sep-run' });
+      items.unshift(...runDebugItems);
+    }
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node) {
+        const descriptor = getNodeDescriptorOfType(node.type ?? '');
+        if (descriptor?.getContextMenuItems) {
+          const nodeItems = descriptor.getContextMenuItems(
+            this,
+            nodeIds[0],
+            (key: string) => this.appManager.$t(key),
+          );
+          if (nodeItems.length > 0) {
+            items.unshift({ type: 'separator', name: 'sep-value' });
+            items.unshift(...nodeItems);
+          }
+        }
+      }
+    }
+    return items;
   }
 
   override getContentItemsMenu(

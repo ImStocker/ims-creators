@@ -40,7 +40,7 @@ import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { NodeDataController } from '../editor/NodeDataController';
 import DataField from '../parts/DataField.vue';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({

@@ -93,7 +93,7 @@ import type { NodeDataController } from '../editor/NodeDataController';
 import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({

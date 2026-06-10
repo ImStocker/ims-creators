@@ -67,7 +67,7 @@ import { loadCallScriptController } from '../logic/callScriptLoader';
 import { getCallScriptNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogCallScriptNode',

@@ -73,7 +73,7 @@ import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import { opOptions } from './getNodeDescriptiors';
 import OpNodeTypeSelector from '../parts/OpNodeTypeSelector.vue';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({

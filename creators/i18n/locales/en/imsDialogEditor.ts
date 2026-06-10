@@ -174,6 +174,9 @@ export default {
     },
     addStartLevelHint:
       'There is no start node in the script. Right-click on the field to create a node.',
+    cutNode: 'Cut',
+    pasteNode: 'Paste from clipboard',
+    noScriptInClipboard: 'No script data in clipboard',
     trigger: {
       addInputParameter: 'Add input parameter',
       addOutputParameter: 'Add output parameter',
@@ -282,5 +285,7 @@ export default {
     },
     run: 'Run from this node',
     debug: 'Debug from this node',
+    runFromNode: 'Run from this node',
+    debugFromNode: 'Debug from this node',
   },
 };

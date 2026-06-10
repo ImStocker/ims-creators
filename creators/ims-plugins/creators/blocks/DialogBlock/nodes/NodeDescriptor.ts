@@ -6,6 +6,7 @@ import type {
 } from '../editor/NodeDataController';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 
 export enum NodeType {
   EXEC_START = 'exec-start',
@@ -39,4 +40,9 @@ export type NodeDescriptor = {
   getTemplateController?: (
     dialogController: DialogBlockController,
   ) => NodeDescriptorTemplateController;
+  getContextMenuItems?: (
+    controller: DialogBlockController,
+    nodeId: string,
+    $t: (key: string) => string,
+  ) => MenuListItem[];
 };
