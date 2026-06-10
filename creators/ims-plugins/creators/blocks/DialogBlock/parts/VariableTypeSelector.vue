@@ -34,6 +34,7 @@
         class="VariableTypeSelector-selectAsset"
         :model-value="kindAsset"
         :where="selectAssetWhere"
+        :select-base-asset="true"
         @update:model-value="setKind"
       >
       </select-asset-combo-box>

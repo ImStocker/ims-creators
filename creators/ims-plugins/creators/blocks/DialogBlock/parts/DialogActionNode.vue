@@ -195,18 +195,7 @@ export default defineComponent({
             },
           },
         ];
-      return [
-        {
-          title: this.$t('imsDialogEditor.trigger.addInputParameter'),
-          action: () => this.addParameter(false),
-          icon: 'ri-arrow-right-circle-fill',
-        },
-        {
-          title: this.$t('imsDialogEditor.trigger.addOutputParameter'),
-          action: () => this.addParameter(true),
-          icon: 'ri-arrow-left-circle-line',
-        },
-      ];
+      return [];
     },
     action() {
       return this.dialogController

@@ -5,6 +5,7 @@ import {
   SCRIPT_ASSET_ID,
   GAME_OBJECT_ASSET_ID,
   MARKDOWN_ASSET_ID,
+  GRAPH_ASSET_ID,
 } from '~ims-app-base/logic/constants';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
@@ -57,6 +58,12 @@ export default function () {
             appManager
               .get(EditorManager)
               .registerAssetLayoutBind(SCRIPT_ASSET_ID, 'full'),
+          );
+
+          cancel_callbacks.push(
+            appManager
+              .get(EditorManager)
+              .registerAssetLayoutBind(GRAPH_ASSET_ID, 'full'),
           );
 
           cancel_callbacks.push(
