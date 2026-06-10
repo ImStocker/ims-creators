@@ -1,11 +1,12 @@
 <template>
-  <div
+  <context-menu-zone
     class="GraphTextNode GraphEditorNode"
     :class="{ 'state-selected': selected }"
     :style="nodeStyle"
+    :menu-list="menuList"
   >
     <div v-if="projectInfo" class="GraphTextNode-body GraphEditorNode-body">
-      <context-menu-zone class="GraphTextNode-content" :menu-list="menuList">
+      <div class="GraphTextNode-content">
         <file-presenter
           v-if="isFileValue"
           :value="localValue"
@@ -58,7 +59,7 @@
             @dblclick="onDblClickText"
           ></imc-presenter>
         </template>
-      </context-menu-zone>
+      </div>
       <div class="GraphTextNode-top">
         <div
           v-if="!readonly"
@@ -154,7 +155,7 @@
         ></div>
       </template>
     </div>
-  </div>
+  </context-menu-zone>
 </template>
 
 <script lang="ts">
@@ -531,8 +532,8 @@ export default defineComponent({
 
 .GraphTextNode-handle {
   z-index: 20;
-  width: 12px;
-  height: 12px;
+  width: calc(12px + var(--imsde-node-selected-outline-width) * 4);
+  height: calc(12px + var(--imsde-node-selected-outline-width) * 4);
   background: #888;
   border: 2px solid #fff;
   border-radius: 50%;
