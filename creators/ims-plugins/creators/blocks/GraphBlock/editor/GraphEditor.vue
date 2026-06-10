@@ -120,15 +120,30 @@
         :key="swatch.value || '__none'"
         class="GraphEditor-colorSwatch"
         :class="{ active: selectedColor === swatch.value }"
-        :style="{
-          background: swatch.hex || '#fff',
-          borderColor: swatch.hex || '#999',
-        }"
         @click.stop="setColorForSelected(swatch.value)"
       >
-        <i v-if="!swatch.value" class="ri-close-line"></i>
+        <span
+          v-if="swatch.hex"
+          class="GraphEditor-colorSwatch-inner"
+          :style="{ background: swatch.hex }"
+        ></span>
+        <i v-else class="ri-close-line"></i>
+      </button>
+      <div class="GraphEditor-colorBar-sep"></div>
+      <button
+        class="GraphEditor-colorSwatch GraphEditor-customColorBtn"
+        :class="{ active: selectedColorIsCustom }"
+        @click.stop="openColorPicker"
+      >
+        <span
+          v-if="selectedColorIsCustom"
+          class="GraphEditor-colorSwatch-inner"
+          :style="{ background: selectedColor }"
+        ></span>
+        <i v-else class="ri-palette-line"></i>
       </button>
       <input
+        ref="colorPickerInput"
         type="color"
         class="GraphEditor-colorPicker"
         :value="selectedColor || '#ffffff'"
@@ -243,13 +258,21 @@ export default defineComponent({
       return this.blockControllerMut.state.nodes.filter((n: any) => n.selected);
     },
     hasHint() {
-      return !this.readonlyComp && this.blockControllerMut.state.nodes.length === 0;
+      return (
+        !this.readonlyComp && this.blockControllerMut.state.nodes.length === 0
+      );
     },
     selectedColor() {
       const nodes = this.selectedNodes;
       if (nodes.length === 0) return '';
       const colors = nodes.map((n: any) => (n.data as any)?.color ?? '');
       return colors.every((c: string) => c === colors[0]) ? colors[0] : '';
+    },
+    selectedColorIsCustom() {
+      return (
+        this.selectedColor &&
+        this.colorSwatches.every((c) => c.value !== this.selectedColor)
+      );
     },
     selectionMenuList(): MenuListItem[] {
       const ids = this.selectedNodes.map((n: any) => n.id);
@@ -591,6 +614,9 @@ export default defineComponent({
       }
       this.blockControllerMut.savePropsDelayed();
     },
+    openColorPicker() {
+      (this.$refs['colorPickerInput'] as HTMLInputElement)?.click();
+    },
     pasteFromClipboard() {
       this.createNodeContext = null;
       const flow = this.$refs['flow'] as VueFlowStore;
@@ -736,51 +762,56 @@ export default defineComponent({
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: var(--imsde-node-content-bg-color);
-  border: 1px solid var(--imsde-node-selected-color);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  gap: 2px;
+  padding: 2px 4px;
+  background-color: var(--dropdown-bg-color);
+  backdrop-filter: var(--dropdown-bg-filter);
+  box-shadow: var(--dropdown-box-shadow);
+  border-radius: var(--dropdown-border-radius);
 }
 
 .GraphEditor-colorSwatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid transparent;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  transition: transform 0.1s;
+  padding: 2px;
+  background: transparent;
+  color: var(--local-text-color);
   &:hover {
-    transform: scale(1.2);
+    background-color: var(--dropdown-hl-bg-color);
   }
   &.active {
-    border-color: var(--imsde-node-selected-color);
-    transform: scale(1.15);
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
   }
   i {
-    font-size: 12px;
-    color: #666;
+    font-size: 14px;
+    opacity: 0.5;
   }
 }
-
-.GraphEditor-colorPicker {
-  width: 22px;
-  height: 22px;
-  border: 1px solid #888;
+.GraphEditor-colorSwatch-inner {
+  display: block;
+  width: 16px;
+  height: 16px;
   border-radius: 3px;
-  padding: 0;
-  cursor: pointer;
-  &::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-  &::-webkit-color-swatch {
-    border: none;
-    border-radius: 2px;
-  }
+}
+
+.GraphEditor-colorBar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--local-border-color);
+  margin: 0 3px;
+}
+.GraphEditor-colorPicker {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
 }
 </style>
