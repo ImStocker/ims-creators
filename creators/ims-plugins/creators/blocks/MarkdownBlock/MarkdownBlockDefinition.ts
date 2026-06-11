@@ -11,6 +11,8 @@ export class MarkdownBlockDefinition extends BlockTypeDefinition {
 
   override hideInAdding = true;
   override focusOnAdded = true;
+  override aiSpec =
+    'This block stores Markdown text in the `value` prop (string — raw Markdown content). Uses ink-mde editor (CodeMirror-based) with wiki links and image upload via drag-and-drop. The controller extracts headers from Markdown (via @lezer/markdown parser) as BlockContentItem[] with itemId, title, level, and anchor for in-document navigation. System-internal (hideInAdding=true).';
 
   override createController(
     appManager: IAppManager,

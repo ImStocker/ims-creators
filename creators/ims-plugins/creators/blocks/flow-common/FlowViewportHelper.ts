@@ -48,6 +48,33 @@ export class FlowViewportHelper {
     this._flow = flow;
   }
 
+  async fitToAll(options?: {
+    duration?: number;
+    padding?: number;
+    maxZoom?: number;
+  }) {
+    if (!this._flow) return;
+    const nodes = unref(this._flow.getNodes);
+    if (!nodes.length) return;
+    return this.moveToNodes(nodes, {
+      duration: options?.duration ?? 500,
+      padding: options?.padding ?? 0.2,
+      maxZoom: options?.maxZoom ?? this.maxZoom,
+    });
+  }
+
+  setCenter(
+    x: number,
+    y: number,
+    options?: { duration?: number; zoom?: number },
+  ) {
+    if (!this._flow) return;
+    this._flow.setCenter(x, y, {
+      duration: options?.duration ?? 0,
+      zoom: options?.zoom ?? this.zoom,
+    });
+  }
+
   onViewportChangeStart(_e: ViewportTransform) {
     this._abortCurrentViewportChangeJob();
   }

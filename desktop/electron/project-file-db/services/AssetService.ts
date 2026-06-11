@@ -263,7 +263,7 @@ export class AssetService implements IProjectDatabaseAsset{
         total: number
     }>{
         let list = await this.searchAssets(query.where  ? query.where : {}) 
-        list = await this._sortAssets(list, query.order ?? []);
+        list = await this._sortAssets(list, query.order ?? ['index', 'title', 'name', 'createdAt', 'id']);
         const total = list.length;
         if(query.count || query.offset){
             list = list.slice(query.offset ?? 0, query.count);

@@ -14,9 +14,11 @@
       @drop="onDrop"
     >
       <teleport v-if="toolbarTarget" :to="toolbarTarget">
-        <dialog-play-toolbar
-          :dialog-player="dialogPlayer"
-        ></dialog-play-toolbar>
+        <slot name="play-toolbar" :dialog-player="dialogPlayer">
+          <dialog-play-toolbar
+            :dialog-player="dialogPlayer"
+          ></dialog-play-toolbar>
+        </slot>
       </teleport>
       <VueFlow
         ref="flow"
@@ -54,6 +56,7 @@
               ...(node_desc.params ? node_desc.params : {}),
             }"
             :is="node_desc.node"
+            :id="params.id"
             :ref="'node-' + params.id"
             :style="{
               '--imsde-node-color': node_desc.color,
@@ -85,7 +88,7 @@
           ></BezierEdge>
         </template>
         <Background :offset="19"></Background>
-        <MiniMap zoomable pannable class="DialogEditor-minimap"></MiniMap>
+        <GraphMiniMap :viewport-helper="viewportHelper" />
         <div
           v-if="scriptEndedPopup"
           class="DialogEditor-scriptEnded is-dropdown"
@@ -124,10 +127,23 @@
           :allowed-types="createNodeContext.allowedTypes"
           :need-data-in="createNodeContext.needDataIn"
           :need-data-out="createNodeContext.needDataOut"
+          :show-paste="!createNodeContext.connectStartDescriptor"
           @choose="createNode($event)"
           @choose-template="createNodeByTemplate($event)"
+          @paste="pasteFromClipboard"
         ></CreateNodeDropdown>
       </dropdown-element>
+    </div>
+    <div
+      v-if="selectionContextMenu"
+      class="DialogEditor-selectionContext"
+      :style="{
+        left: `${selectionContextMenu.x}px`,
+        top: `${selectionContextMenu.y}px`,
+      }"
+      @imc-menu-action-executed="selectionContextMenu = null"
+    >
+      <menu-list :menu-list="selectionMenuList" />
     </div>
     <div class="DialogEditor-topButtons">
       <menu-button
@@ -205,8 +221,8 @@ import {
   type NodeMouseEvent,
   type ViewportTransform,
 } from '@vue-flow/core';
-import { MiniMap } from '@vue-flow/minimap';
 import { defineComponent, type PropType } from 'vue';
+import GraphMiniMap from '../../flow-common/GraphMiniMap.vue';
 import DialogSpeechNode from '../nodes/DialogSpeechNode.vue';
 import DialogStartNode from '../nodes/DialogStartNode.vue';
 import DialogTriggerNode from '../nodes/DialogTriggerNode.vue';
@@ -234,8 +250,9 @@ import type {
 } from '~ims-app-base/logic/types/Props';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
-import { FlowViewportHelper } from './FlowViewportHelper';
+import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { computed } from 'vue';
 import { DialogPlayer } from '../play/DialogPlayer';
 import DialogPlayToolbar from '../play/DialogPlayToolbar.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
@@ -250,6 +267,7 @@ import ManageVariablesDropdown from '../parts/ManageVariablesDropdown.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import ManageActionsDropdown from '../parts/ManageActionsDropdown.vue';
 import { SCRIPT_ASSET_ID } from '~ims-app-base/logic/constants';
+import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 
 type CreateNodeContext = {
   clickedAt: { x: number; y: number } | null;
@@ -274,7 +292,7 @@ export default defineComponent({
     DialogTimerNode,
     DialogChanceNode,
     DialogBranchNode,
-    MiniMap,
+    GraphMiniMap,
     Background,
     CreateNodeDropdown,
     BezierEdge,
@@ -283,8 +301,14 @@ export default defineComponent({
     MenuButton,
     ManageVariablesDropdown,
     ManageActionsDropdown,
+    MenuList,
   },
   inject: ['projectContext'],
+  provide() {
+    return {
+      dialogBlockController: computed(() => this.blockControllerMut),
+    };
+  },
   props: {
     readonly: {
       type: Boolean,
@@ -320,6 +344,7 @@ export default defineComponent({
     );
     return {
       createNodeContext: null as CreateNodeContext | null,
+      selectionContextMenu: null as { x: number; y: number } | null,
       viewportHelper,
       dialogPlayer,
       isFocused: false,
@@ -342,6 +367,17 @@ export default defineComponent({
     },
     nodeDescriptors() {
       return getNodeDescriptors();
+    },
+    selectedNodes() {
+      return this.blockControllerMut.state.nodes.filter((n: any) => n.selected);
+    },
+    selectionMenuList() {
+      const ids = this.selectedNodes.map((n: any) => n.id);
+      const flow = this.$refs['flow'] as VueFlowStore | undefined;
+      return this.blockControllerMut.getNodeContextMenu(
+        ids,
+        flow?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+      );
     },
     hasStart() {
       return this.blockControllerMut.hasStart;
@@ -656,21 +692,33 @@ export default defineComponent({
         return;
       }
       this.createNodeContext = null;
+      this.selectionContextMenu = null;
       this.isFocused = true;
       this.mouseDownTime = Date.now();
     },
-    onContextMenu(ev: PointerEvent) {
+    onContextMenu(ev: MouseEvent) {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) {
-        return; // Clicked outside pane
+        return;
       }
+      if (this.readonlyComp) return;
       if (target.closest('.vue-flow__node')) {
-        return; // Clicked inside the node
+        return; // handled by ContextMenuZone on the node
+      }
+      if (target.closest('.vue-flow__nodesselection-rect')) {
+        if (this.selectedNodes.length === 0) return;
+        const editorBBox = this.$el.getBoundingClientRect();
+        this.selectionContextMenu = {
+          x: ev.clientX - editorBBox.x,
+          y: ev.clientY - editorBBox.y,
+        };
+        ev.preventDefault();
+        return;
       }
       ev.preventDefault();
     },
-    onMouseUp(ev: PointerEvent) {
+    async onMouseUp(ev: PointerEvent) {
       if (this.readonlyComp) {
         return;
       }
@@ -686,6 +734,9 @@ export default defineComponent({
       if (target.closest('.vue-flow__node')) {
         return; // Clicked inside the node
       }
+      if (target.closest('.vue-flow__nodesselection-rect')) {
+        return; // Handled by onContextMenu
+      }
       ev.preventDefault();
       const md_elapsed = Date.now() - this.mouseDownTime;
       if (md_elapsed > 200) {
@@ -694,6 +745,7 @@ export default defineComponent({
 
       const editor_bbox = this.$el.getBoundingClientRect();
       const allowed_types = this._getAvailableNodeTypes(null, null);
+      await new Promise((r) => setTimeout(r, 1));
       this.createNodeContext = {
         clickedAt: {
           x: ev.clientX - editor_bbox.x,
@@ -724,6 +776,12 @@ export default defineComponent({
         ev.targetHandle ?? undefined,
       );
       this.createNodeContext = null;
+    },
+    async pasteFromClipboard() {
+      this.createNodeContext = null;
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      await this.blockControllerMut.pasteNodesFromClipboard(flow.getViewport());
     },
     _getAvailableNodeTypes(
       edge: 'in' | 'out' | null,
@@ -1019,7 +1077,6 @@ export default defineComponent({
 <style lang="scss">
 @import '@vue-flow/core/dist/style.css';
 @import '@vue-flow/core/dist/theme-default.css';
-@import '@vue-flow/minimap/dist/style.css';
 
 .DialogEditor {
   --imsde-text-color: #333;
@@ -1066,14 +1123,24 @@ export default defineComponent({
   }
 }
 
+.DialogEditorNode-wrapper {
+  &.state-selected {
+    .DialogEditorNode {
+      border-color: var(--imsde-node-selected-color);
+      outline: var(--imsde-node-selected-outline-width) solid
+        var(--imsde-node-selected-color);
+    }
+  }
+  &.state-playing {
+    .DialogEditorNode {
+      outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
+        var(--imsde-node-playing-color);
+    }
+  }
+}
 .DialogEditorNode {
   border-radius: 4px;
   border: 1px solid transparent;
-  &.state-selected {
-    border-color: var(--imsde-node-selected-color);
-    outline: var(--imsde-node-selected-outline-width) solid
-      var(--imsde-node-selected-color);
-  }
   & > div:first-child {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
@@ -1081,10 +1148,6 @@ export default defineComponent({
   & > div:last-child {
     border-bottom-left-radius: 4px;
     border-bottom-right-radius: 4px;
-  }
-  &.state-playing {
-    outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
-      var(--imsde-node-playing-color);
   }
 }
 .DialogEditorNode-header {
@@ -1116,6 +1179,13 @@ export default defineComponent({
 .DialogEditor {
   position: relative;
 }
+.DialogEditor-selectionContext {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 100;
+}
+
 .DialogEditor-createNode {
   position: absolute;
   left: 0;
@@ -1126,20 +1196,6 @@ export default defineComponent({
   width: 100%;
   height: 100%;
 }
-.DialogEditor-minimap {
-  background-color: transparent;
-
-  :deep(svg) {
-    background-color: var(--imsde-minimap-bg-color);
-  }
-  :deep(.vue-flow__minimap-node) {
-    fill: var(--imsde-minimap-node-color);
-  }
-  :deep(.vue-flow__minimap-mask) {
-    fill: var(--imsde-minimap-mask-color);
-  }
-}
-
 :deep(.DialogNode-header) {
   color: var(--imsde-node-header-text-color);
 }

@@ -173,6 +173,9 @@ export default {
     },
     addStartLevelHint:
       'В сценарии нет стартового узла. Кликните правой кнопкой мыши по полю, чтобы создать узел',
+    cutNode: 'Вырезать',
+    pasteNode: 'Вставить из буфера',
+    noScriptInClipboard: 'В буфере нет сценария',
     trigger: {
       addInputParameter: 'Добавить входной параметр',
       addOutputParameter: 'Добавить выходной параметр',
@@ -279,5 +282,11 @@ export default {
       varGet: 'Получить',
       varSet: 'Задать',
     },
+    run: 'Запустить с этого узла',
+    debug: 'Отладить этого узла',
+    runFromNode: 'Запустить с этого узла',
+    debugFromNode: 'Отладить этого узла',
+    setServiceName: 'Задать служебное имя',
+    serviceNameAlreadyExists: 'Служебное имя уже существует',
   },
 };

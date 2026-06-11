@@ -1,35 +1,29 @@
 <template>
-  <div class="AssetEditorDialogBlock">
+  <div class="GraphBlock">
     <template v-if="displayMode !== 'print'">
       <div
-        v-if="dialogEditorComponentLoading"
-        class="AssetEditorDialogBlock-loading loaderSpinner"
+        v-if="editorComponentLoading"
+        class="GraphBlock-loading loaderSpinner"
       ></div>
       <div
-        v-else-if="dialogEditorComponentError"
-        class="AssetEditorDialogBlock-error error-message-block"
+        v-else-if="editorComponentError"
+        class="GraphBlock-error error-message-block"
       >
-        {{ dialogEditorComponentError }}
+        {{ editorComponentError }}
       </div>
       <component
-        :is="dialogEditorComponent"
-        v-else-if="dialogEditorComponent"
+        :is="editorComponent"
+        v-else-if="editorComponent"
         ref="editor"
         :readonly="readonly"
         :resolved-block="resolvedBlock"
         :asset-changer="assetChanger"
         :toolbar-target="toolbarTarget"
         :block-controller="blockController"
-        class="AssetEditorDialogBlock-editor"
+        class="GraphBlock-editor"
         @focus="enterEditMode()"
-      >
-        <template #play-toolbar="{ dialogPlayer }">
-          <slot name="play-toolbar" :dialog-player="dialogPlayer"></slot>
-        </template>
-      </component>
+      ></component>
     </template>
-
-    <dialog-print v-else :resolved-block="resolvedBlock"></dialog-print>
   </div>
 </template>
 
@@ -48,19 +42,15 @@ import type { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditor
 import type { EditorBlockHandler } from '~ims-app-base/components/Asset/Editor/EditorBlock';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import { isElementInteractive } from '~ims-app-base/components/utils/DomElementUtils';
-import DialogPrint from './print/DialogPrint.vue';
 import {
   type SetClickOutsideCancel,
   setImsClickOutside,
 } from '~ims-app-base/components/utils/ui';
-import type DialogEditor from './editor/DialogEditor.vue';
-import type { DialogBlockController } from './editor/DialogBlockController';
+import type GraphEditor from './editor/GraphEditor.vue';
+import type { GraphBlockController } from './editor/GraphBlockController';
 
 export default defineComponent({
-  name: 'DialogBlock',
-  components: {
-    DialogPrint,
-  },
+  name: 'GraphBlock',
   props: {
     readonly: {
       type: Boolean,
@@ -91,7 +81,7 @@ export default defineComponent({
       required: true,
     },
     blockController: {
-      type: Object as PropType<DialogBlockController>,
+      type: Object as PropType<GraphBlockController>,
       required: true,
     },
   },
@@ -99,9 +89,9 @@ export default defineComponent({
     let mountResolve!: (success: boolean) => void;
     const mountPromise = new Promise<boolean>((res) => (mountResolve = res));
     return {
-      dialogEditorComponent: shallowRef(null as null | Component),
-      dialogEditorComponentLoading: true,
-      dialogEditorComponentError: null as null | string,
+      editorComponent: shallowRef(null as null | Component),
+      editorComponentLoading: true,
+      editorComponentError: null as null | string,
       clickOutside: null as SetClickOutsideCancel | null,
       toolbarTarget: null as null | HTMLElement,
       mountPromise,
@@ -115,27 +105,25 @@ export default defineComponent({
   },
   async mounted() {
     this.toolbarTarget = await this.requestToolbarTarget();
-    const component_loaded = await this.reloadComponent();
+    const loaded = await this.reloadComponent();
     await new Promise((res) => setTimeout(res, 100));
-    this.mountResolve(component_loaded);
+    this.mountResolve(loaded);
   },
   unmounted() {
     this.mountResolve(false);
   },
   methods: {
     async reloadComponent() {
-      this.dialogEditorComponentLoading = true;
-      this.dialogEditorComponentError = null;
+      this.editorComponentLoading = true;
+      this.editorComponentError = null;
       try {
-        this.dialogEditorComponent = (
-          await import('./editor/DialogEditor.vue')
-        ).default;
+        this.editorComponent = (await import('./editor/GraphEditor.vue')).default;
         return true;
       } catch (err: any) {
-        this.dialogEditorComponentError = err.message;
+        this.editorComponentError = err.message;
         return false;
       } finally {
-        this.dialogEditorComponentLoading = false;
+        this.editorComponentLoading = false;
       }
     },
     async enterEditMode(ev?: MouseEvent) {
@@ -144,22 +132,20 @@ export default defineComponent({
       if (ev && isElementInteractive(ev.target as HTMLElement)) return;
 
       this.assetBlockEditor.enterEditMode(this.resolvedBlock.id);
-      this.resetGlobalClickOutside(true);
+      this.resetClickOutside(true);
     },
     async save() {
       if (this.readonly) return;
 
-      const editor = this.$refs['editor'] as InstanceType<
-        typeof DialogEditor
-      > | null;
+      const editor = this.$refs['editor'] as InstanceType<typeof GraphEditor> | null;
       if (!editor) return;
 
-      editor.saveProps();
+      this.blockController.saveProps();
       await this.editorBlockHandler.save();
       this.assetBlockEditor.exitEditMode();
-      this.resetGlobalClickOutside(false);
+      this.resetClickOutside(false);
     },
-    resetGlobalClickOutside(restart: boolean) {
+    resetClickOutside(restart: boolean) {
       if (this.clickOutside) {
         this.clickOutside();
         this.clickOutside = null;
@@ -170,30 +156,21 @@ export default defineComponent({
         });
       }
     },
-    async revealBlockAnchor(block_anchor: string): Promise<boolean> {
-      if (!block_anchor.startsWith('node-')) {
-        return false;
-      }
-      const node_id = block_anchor.slice('node-'.length);
+    async revealBlockAnchor(blockAnchor: string): Promise<boolean> {
+      if (!blockAnchor.startsWith('node-')) return false;
+      const node_id = blockAnchor.slice('node-'.length);
       const mounted = await this.mountPromise;
-      if (!mounted) {
-        return false;
-      }
-      const editor = this.$refs['editor'] as InstanceType<
-        typeof DialogEditor
-      > | null;
-      if (!editor) {
-        return false;
-      }
-
+      if (!mounted) return false;
+      const editor = this.$refs['editor'] as InstanceType<typeof GraphEditor> | null;
+      if (!editor) return false;
       return await editor.showNode(node_id);
     },
   },
 });
 </script>
 
-<style lang="scss" rel="stylesheet/scss" scoped>
-.AssetEditorDialogBlock-editor {
+<style lang="scss" scoped>
+.GraphBlock-editor {
   width: 100%;
   height: 100%;
 }

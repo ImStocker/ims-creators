@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogBranchNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogBranchNode DialogEditorNode"
+  >
     <div
       class="DialogBranchNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -41,7 +45,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -55,14 +59,25 @@ import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogBranchNode',
   components: {
     ExecHandle,
     DataField,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     readonly: {
       type: Boolean,
       default: false,

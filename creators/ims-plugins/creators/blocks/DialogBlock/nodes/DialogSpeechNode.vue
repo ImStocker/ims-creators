@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogSpeechNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogSpeechNode DialogEditorNode"
+  >
     <div
       class="DialogSpeechNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -232,7 +236,7 @@
         :position="Position.Right"
       ></ExecHandle>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -268,6 +272,7 @@ import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import DialogSpeechNodeAttachCover from './DialogSpeechNodeAttachCover.vue';
 import FilePresenter from '~ims-app-base/components/File/FilePresenter.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSpeechNode',
@@ -279,6 +284,7 @@ export default defineComponent({
     MenuList,
     DialogSpeechNodeAttachCover,
     FilePresenter,
+    DialogBaseNode,
   },
   inject: ['projectContext'],
   props: {
@@ -715,6 +721,9 @@ export default defineComponent({
       padding-left: 22px;
     }
   }
+}
+.DialogSpeechNode-options-one-param-input {
+  flex: 1;
 }
 .DialogSpeechNode-options {
   margin-top: 10px;

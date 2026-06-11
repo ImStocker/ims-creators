@@ -1,0 +1,27 @@
+export default {
+  graphBlock: {
+    node: {
+      title: 'Узел',
+      placeholder: 'Введите текст...',
+    },
+    editor: {
+      addNode: 'Добавить узел',
+      addCard: 'Добавить карточку',
+      addFile: 'Добавить файл',
+      addElement: 'Добавить элемент',
+      selectAsset: 'Выбрать элемент',
+      replaceFile: 'Заменить файл',
+      replaceAsset: 'Заменить элемент',
+      deleteNode: 'Удалить узел',
+      cutNode: 'Вырезать',
+      pasteNode: 'Вставить из буфера',
+      noGraphInClipboard: 'В буфере нет данных графа',
+      emptyHint: 'Кликните правой кнопкой на поле, чтобы создать узел.',
+      setServiceName: 'Задать служебное имя',
+      serviceNameAlreadyExists: 'Служебное имя уже существует',
+    },
+    outline: {
+      rootTitle: 'Граф',
+    },
+  },
+};

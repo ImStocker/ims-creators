@@ -41,11 +41,11 @@
       </span>
     </template>
     <DataFieldInput
-      v-if="!isInConnected && dataType && inId"
+      v-if="!isInConnected && (preferInputType || dataType) && inId"
       ref="input"
       v-model="valueForInput"
       class="DataField-input"
-      :data-type="dataType"
+      :data-type="preferInputType ? preferInputType : dataType"
       :placeholder="placeholder"
       :readonly="readonly"
     ></DataFieldInput>
@@ -69,6 +69,7 @@ import {
   AssetPropType,
   getAssetPropType,
   type AssetPropValue,
+  type AssetPropValueType,
 } from '~ims-app-base/logic/types/Props';
 import DataFieldInput from './DataFieldInput.vue';
 import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
@@ -114,6 +115,10 @@ export default defineComponent({
     playValueSet: {
       type: Boolean,
       default: false,
+    },
+    preferInputType: {
+      type: [Object, null] as PropType<AssetPropValueType | null>,
+      default: null,
     },
   },
   emits: ['update:modelValue', 'update:playValue'],

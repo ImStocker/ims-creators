@@ -1,7 +1,8 @@
 <template>
-  <ContextMenuZone
-    class="DialogActionNode DialogEditorNode"
-    :menu-list="contextMenu"
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    :additional-menu-list="contextMenu"
   >
     <div
       class="DialogActionNode-header DialogNode-header DialogEditorNode-header"
@@ -50,7 +51,7 @@
         </button>
       </div>
     </div>
-  </ContextMenuZone>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -62,7 +63,7 @@ import {
   AssetPropType,
   castAssetPropValueToString,
 } from '~ims-app-base/logic/types/Props';
-import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import DialogBaseNode from './DialogBaseNode.vue';
 import type {
   DialogBlockController,
   DialogVariable,
@@ -87,7 +88,7 @@ export default defineComponent({
   name: 'DialogActionNode',
   components: {
     ExecHandle,
-    ContextMenuZone,
+    DialogBaseNode,
     NodeParametersGrid,
     ActionSelector,
   },
@@ -194,18 +195,7 @@ export default defineComponent({
             },
           },
         ];
-      return [
-        {
-          title: this.$t('imsDialogEditor.trigger.addInputParameter'),
-          action: () => this.addParameter(false),
-          icon: 'ri-arrow-right-circle-fill',
-        },
-        {
-          title: this.$t('imsDialogEditor.trigger.addOutputParameter'),
-          action: () => this.addParameter(true),
-          icon: 'ri-arrow-left-circle-line',
-        },
-      ];
+      return [];
     },
     action() {
       return this.dialogController

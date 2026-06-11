@@ -91,6 +91,7 @@ import {
   AssetPropType,
   castAssetPropValueToString,
   type AssetPropValueText,
+  castAssetPropValueToInt,
 } from '~ims-app-base/logic/types/Props';
 import isUUID from 'validator/es/lib/isUUID';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
@@ -145,6 +146,9 @@ export default defineComponent({
         return this.modelValue;
       },
       set(val: AssetPropValue) {
+        if (this.dataType && this.dataType.Type === AssetPropType.INTEGER) {
+          val = castAssetPropValueToInt(val);
+        }
         this.$emit('update:modelValue', val);
       },
     },

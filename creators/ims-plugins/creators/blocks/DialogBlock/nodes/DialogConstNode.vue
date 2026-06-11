@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogConstNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogConstNode DialogEditorNode"
+  >
     <div
       class="DialogConstNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -28,14 +32,17 @@
         :node-data-controller="nodeDataController"
       />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
 import type { NodeDescriptor } from './NodeDescriptor';
 import DataField from '../parts/DataField.vue';
-import type { NodeDataController } from '../editor/NodeDataController';
+import {
+  samePinDataTypes,
+  type NodeDataController,
+} from '../editor/NodeDataController';
 import {
   AssetPropType,
   type AssetPropValue,
@@ -45,14 +52,25 @@ import {
 import DataFieldInput from '../parts/DataFieldInput.vue';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { ScriptBlockPlainPropValueBind } from '../logic/nodeStoring';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogConstNode',
   components: {
     DataField,
     DataFieldInput,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
       required: true,
@@ -109,8 +127,10 @@ export default defineComponent({
     },
   },
   watch: {
-    inheritedOutType() {
-      this.updatePins();
+    inheritedOutType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
     },
   },
   mounted() {

@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogGetPropsNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogGetPropsNode DialogEditorNode"
+  >
     <div
       class="DialogGetPropsNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -44,7 +48,7 @@
         ></DataField>
       </div>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
@@ -66,12 +70,14 @@ import {
 import SelectAssetPropFields from '~ims-app-base/components/Asset/SelectAssetPropFields.vue';
 import type { AssetPropField } from '~ims-app-base/components/Asset/SelectAssetPropFields';
 import { convertTranslatedTitle } from '../../../../../../ims-app-base/app/logic/utils/assets';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogGetPropsNode',
   components: {
     DataField,
     SelectAssetPropFields,
+    DialogBaseNode,
   },
   props: {
     id: {

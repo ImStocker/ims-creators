@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogSetVarNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogSetVarNode DialogEditorNode"
+  >
     <div
       class="DialogSetVarNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -29,7 +33,7 @@
       </div>
       <ExecHandle id="out" type="source" :position="Position.Right" />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -42,7 +46,10 @@ import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
-import type { NodeDataController } from '../editor/NodeDataController';
+import {
+  samePinDataTypes,
+  type NodeDataController,
+} from '../editor/NodeDataController';
 import DataField from '../parts/DataField.vue';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type {
@@ -54,6 +61,8 @@ import {
   type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
+import type { DialogPlayer } from '../play/DialogPlayer';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSetVarNode',
@@ -61,8 +70,17 @@ export default defineComponent({
     ExecHandle,
     VariableSelector,
     DataField,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     readonly: {
       type: Boolean,
       default: false,
@@ -118,6 +136,10 @@ export default defineComponent({
         default: null,
       };
     },
+    variableType() {
+      if (!this.variable) return null;
+      return this.variable.type;
+    },
     valuePinId() {
       return generateDataPinId(false, 'value');
     },
@@ -134,8 +156,10 @@ export default defineComponent({
     },
   },
   watch: {
-    variable() {
-      this.updatePins();
+    variableType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
     },
   },
   mounted() {

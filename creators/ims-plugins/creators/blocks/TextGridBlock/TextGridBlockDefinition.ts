@@ -9,6 +9,8 @@ export class TextGridBlockDefinition extends BlockTypeDefinition {
   icon = 'layout-grid-fill';
   override hideInAdding = false;
   override focusOnAdded = false;
+  override aiSpec =
+    'This block stores a multi-column grid of rich-text cells. Props: `columns` (number, default 4, min 2) — number of grid columns. Each cell stored as: `{key}\\content` (AssetPropValue — typically rich text as AssetPropValueText {Str, Ops} or plain string), `{key}\\inherited` (boolean), `{key}\\index` (number). Cell key is a UUID. Cells are rendered in CSS grid layout with columns count.';
   override async beforeBlockCreate(
     appManager: IAppManager,
     params: { title: string },

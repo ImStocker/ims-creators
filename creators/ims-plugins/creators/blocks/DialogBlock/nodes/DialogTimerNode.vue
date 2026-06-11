@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogTimerNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogTimerNode DialogEditorNode"
+  >
     <div
       class="DialogTimerNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -22,7 +26,7 @@
       </div>
       <ExecHandle id="out" type="source" :position="Position.Right" />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -36,14 +40,21 @@ import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { NodeDataController } from '../editor/NodeDataController';
 import DataField from '../parts/DataField.vue';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogTimerNode',
   components: {
     ExecHandle,
     DataField,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
     nodeDescriptor: {
       type: Object as PropType<NodeDescriptor>,
       required: true,
@@ -63,6 +74,10 @@ export default defineComponent({
     playingNodeData: {
       type: [Object, null] as PropType<ScriptPlayNode> | null,
       default: null,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
     },
   },
   computed: {

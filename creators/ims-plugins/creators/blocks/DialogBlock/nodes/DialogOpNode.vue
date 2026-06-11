@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogOpNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogOpNode DialogEditorNode"
+  >
     <div
       v-if="!sign"
       class="DialogOpNode-header DialogNode-header DialogEditorNode-header"
@@ -21,6 +25,7 @@
           v-model="arg1Val"
           :in-id="arg1PinId"
           :play-value="arg1PlayVal"
+          :prefer-input-type="arg1PreferInputType"
           class="DialogBranchNode-condition"
           :caption="$t('imsDialogEditor.dataFields.value')"
           :node-data-controller="nodeDataController"
@@ -38,6 +43,7 @@
             v-model="arg2Val"
             :in-id="arg2PinId"
             :play-value="arg2PlayVal"
+            :prefer-input-type="arg2PreferInputType"
             class="DialogBranchNode-condition"
             :caption="$t('imsDialogEditor.dataFields.value')"
             :node-data-controller="nodeDataController"
@@ -51,7 +57,7 @@
         :node-data-controller="nodeDataController"
       />
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -59,7 +65,10 @@ import { defineComponent, type PropType } from 'vue';
 import { Position } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import DataField from '../parts/DataField.vue';
-import type { NodeDataController } from '../editor/NodeDataController';
+import {
+  samePinDataTypes,
+  type NodeDataController,
+} from '../editor/NodeDataController';
 import {
   AssetPropType,
   type AssetPropValueType,
@@ -69,14 +78,25 @@ import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import { opOptions } from './getNodeDescriptiors';
 import OpNodeTypeSelector from '../parts/OpNodeTypeSelector.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
+import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
   name: 'DialogOpNode',
   components: {
     DataField,
     OpNodeTypeSelector,
+    DialogBaseNode,
   },
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
     readonly: {
       type: Boolean,
       default: false,
@@ -113,8 +133,27 @@ export default defineComponent({
     sign() {
       return opOptions[this.operator] ? opOptions[this.operator].sign : null;
     },
-    inputDataType() {
+    arg1DataType() {
       return this.nodeDataController.getPinDataType(this.arg1PinId) ?? [];
+    },
+    arg2DataType() {
+      return this.nodeDataController.getPinDataType(this.arg2PinId) ?? [];
+    },
+    arg1PreferInputType() {
+      if (
+        !this.nodeDataController.isPinConnected(this.arg1PinId) &&
+        this.arg2DataType.length === 1
+      ) {
+        return this.arg2DataType[0];
+      } else return null;
+    },
+    arg2PreferInputType() {
+      if (
+        !this.nodeDataController.isPinConnected(this.arg2PinId) &&
+        this.arg1DataType.length === 1
+      ) {
+        return this.arg1DataType[0];
+      } else return null;
     },
     arg1PinId() {
       return generateDataPinId(false, 'arg1');
@@ -149,8 +188,15 @@ export default defineComponent({
     },
   },
   watch: {
-    inputDataType() {
-      this.updatePins();
+    arg1DataType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
+    },
+    arg2DataType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
     },
   },
   mounted() {
@@ -161,10 +207,6 @@ export default defineComponent({
       this.$emit('change-type', opName);
     },
     updatePins() {
-      this.nodeDataController.setPinDataType(
-        this.arg2PinId,
-        this.inputDataType,
-      );
       let out_type = null as null | AssetPropValueType;
       switch (this.operator) {
         case 'opEqual':
@@ -172,33 +214,76 @@ export default defineComponent({
         case 'opLess':
         case 'opLessEqual':
         case 'opMore':
-        case 'opMoreEqual':
+        case 'opMoreEqual': {
+          this.nodeDataController.setPinDataType(
+            this.arg2PinId,
+            this.arg1DataType,
+          );
           out_type = {
             Type: AssetPropType.BOOLEAN,
           };
           break;
+        }
         case 'opPlus':
         case 'opMinus':
         case 'opMult':
         case 'opDiv':
-        case 'opMod':
+        case 'opMod': {
+          this.nodeDataController.setPinDataType(this.arg1PinId, [
+            { Type: AssetPropType.INTEGER },
+            { Type: AssetPropType.FLOAT },
+          ]);
+          this.nodeDataController.setPinDataType(this.arg2PinId, [
+            { Type: AssetPropType.INTEGER },
+            { Type: AssetPropType.FLOAT },
+          ]);
+          const arg1Type =
+            this.arg1DataType && this.arg1DataType.length === 1
+              ? this.arg1DataType[0].Type
+              : null;
+          const arg2Type =
+            this.arg2DataType && this.arg2DataType.length === 1
+              ? this.arg2DataType[0].Type
+              : null;
+
           if (
-            this.inputDataType &&
-            this.inputDataType.length === 1 &&
-            [AssetPropType.INTEGER, AssetPropType.FLOAT].includes(
-              this.inputDataType[0].Type,
-            )
+            arg1Type &&
+            [AssetPropType.INTEGER, AssetPropType.FLOAT].includes(arg1Type) &&
+            !arg2Type
           ) {
-            out_type = this.inputDataType[0];
+            out_type = this.arg1DataType[0];
+          } else if (
+            arg2Type &&
+            [AssetPropType.INTEGER, AssetPropType.FLOAT].includes(arg2Type) &&
+            !arg1Type
+          ) {
+            out_type = this.arg2DataType[0];
+          } else if (
+            arg1Type &&
+            [AssetPropType.INTEGER, AssetPropType.FLOAT].includes(arg1Type) &&
+            arg2Type &&
+            [AssetPropType.INTEGER, AssetPropType.FLOAT].includes(arg2Type)
+          ) {
+            if (arg2Type === AssetPropType.FLOAT) {
+              out_type = this.arg2DataType[0];
+            } else {
+              out_type = this.arg1DataType[0];
+            }
           }
           break;
+        }
         case 'opAnd':
         case 'opOr':
-        case 'opNot':
+        case 'opNot': {
+          this.nodeDataController.setPinDataType(
+            this.arg2PinId,
+            this.arg1DataType,
+          );
           out_type = {
             Type: AssetPropType.BOOLEAN,
           };
           break;
+        }
       }
       this.nodeDataController.setPinDataType(this.outPinId, out_type);
     },
