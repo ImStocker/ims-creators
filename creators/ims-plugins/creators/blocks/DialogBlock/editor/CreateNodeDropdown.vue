@@ -9,11 +9,13 @@
       @choose="chooseOption($event)"
       @choose-template="chooseTemplate($event)"
     />
-    <div class="CreateNodeDropdown-sep"></div>
-    <button class="CreateNodeDropdown-paste" @click="$emit('paste')">
-      <i class="ri-clipboard-line"></i>
-      {{ $t('imsDialogEditor.pasteNode') }}
-    </button>
+    <template v-if="showPaste">
+      <div class="CreateNodeDropdown-sep"></div>
+      <button class="CreateNodeDropdown-paste" @click="$emit('paste')">
+        <i class="ri-clipboard-line"></i>
+        {{ $t('imsDialogEditor.pasteNode') }}
+      </button>
+    </template>
   </div>
 </template>
 
@@ -58,6 +60,10 @@ export default defineComponent({
         AssetPropValueType[] | null
       >,
       default: null,
+    },
+    showPaste: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ['choose', 'choose-template', 'paste'],
@@ -128,7 +134,6 @@ export default defineComponent({
 .CreateNodeDropdown-sep {
   height: 1px;
   background: var(--local-border-color, #ddd);
-  margin: 4px 0;
 }
 .CreateNodeDropdown-item {
   display: flex;

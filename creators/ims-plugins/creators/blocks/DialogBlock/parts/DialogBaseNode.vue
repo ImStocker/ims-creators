@@ -1,10 +1,17 @@
 <template>
-  <ContextMenuZone
-    class="DialogActionNode DialogEditorNode"
-    :menu-list="contextMenuComp"
-  >
-    <slot></slot>
-  </ContextMenuZone>
+  <div class="DialogBaseNode DialogEditorNode-wrapper">
+    <div
+      v-if="showServiceName"
+      class="DialogBaseNode-serviceName"
+      @dblclick.stop="onDblClickServiceName"
+    >
+      <i class="ri-price-tag-3-fill"></i>
+      {{ nodeId }}
+    </div>
+    <ContextMenuZone class="DialogEditorNode" :menu-list="contextMenuComp">
+      <slot></slot>
+    </ContextMenuZone>
+  </div>
 </template>
 
 <script lang="ts">
@@ -13,6 +20,7 @@ import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import type { DialogBlockController } from '../editor/DialogBlockController';
+import isUUID from 'validator/es/lib/isUUID';
 
 export default defineComponent({
   name: 'DialogBaseNode',
@@ -37,6 +45,9 @@ export default defineComponent({
     },
   },
   computed: {
+    showServiceName() {
+      return !isUUID(this.nodeId);
+    },
     contextMenuComp() {
       const controller = unref(
         this.dialogBlockController,
@@ -60,5 +71,29 @@ export default defineComponent({
       return menu;
     },
   },
+  methods: {
+    onDblClickServiceName() {
+      const controller = unref(
+        this.dialogBlockController,
+      ) as DialogBlockController | null;
+      if (!controller) return;
+      if (controller.readonly) return;
+      controller.setNodeServiceName(this.nodeId);
+    },
+  },
 });
 </script>
+
+<style lang="scss" scoped>
+.DialogBaseNode-serviceName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--local-sub-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

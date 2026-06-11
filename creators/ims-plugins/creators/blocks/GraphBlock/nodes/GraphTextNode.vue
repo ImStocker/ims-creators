@@ -1,161 +1,171 @@
 <template>
-  <context-menu-zone
-    class="GraphTextNode GraphEditorNode"
-    :class="{ 'state-selected': selected }"
-    :style="nodeStyle"
-    :menu-list="menuList"
-  >
-    <div v-if="projectInfo" class="GraphTextNode-body GraphEditorNode-body">
-      <div class="GraphTextNode-content">
-        <file-presenter
-          v-if="isFileValue"
-          :value="localValue"
-          :inline="true"
-          :width="nodeWidth"
-          :height="nodeHeight"
-          is-static
-          class="GraphTextNode-filePresenter"
-        />
-        <div
-          v-else-if="isAssetValue && assetLink"
-          class="GraphTextNode-asset tiny-scrollbars"
-          :class="{
-            'type-has-image': assetHasImage,
-          }"
-          @dblclick="onDblClickAsset"
-        >
-          <asset-icon-image
-            v-if="assetHasImage"
-            :asset="assetLink"
-            :width="96"
-            :height="96"
-            class="GraphTextNode-assetIcon"
-          />
-          <asset-link
-            class="GraphTextNode-assetTitle"
-            :project="projectInfo"
-            :asset="assetLink"
-            :show-icon="!assetHasImage"
-            :draggable="false"
-            @click.prevent
-          ></asset-link>
-        </div>
-        <template v-else>
-          <imc-editor
-            v-if="editing"
-            ref="editorRef"
-            v-model="localValue"
-            class="GraphTextNode-editor nodrag nopan nowheel tiny-scrollbars"
-            :multiline="true"
-            toolbar="inline"
-            :placeholder="$t('graphBlock.node.placeholder')"
-            @update:model-value="onValueChange"
-            @blur="onEditorBlur"
-          ></imc-editor>
-          <imc-presenter
-            v-else
+  <div class="GraphTextNode GraphEditorNode-wrapper">
+    <div
+      v-if="showServiceName"
+      class="GraphTextNode-serviceName"
+      @dblclick.stop="onDblClickServiceName"
+    >
+      <i class="ri-price-tag-3-fill"></i>
+      {{ id }}
+    </div>
+    <context-menu-zone
+      class="GraphEditorNode GraphTextNode-box"
+      :class="{ 'state-selected': selected }"
+      :style="nodeStyle"
+      :menu-list="menuList"
+    >
+      <div v-if="projectInfo" class="GraphTextNode-body GraphEditorNode-body">
+        <div class="GraphTextNode-content">
+          <file-presenter
+            v-if="isFileValue"
             :value="localValue"
-            class="GraphTextNode-presenter tiny-scrollbars"
-            @dblclick="onDblClickText"
-          ></imc-presenter>
+            :inline="true"
+            :width="nodeWidth"
+            :height="nodeHeight"
+            is-static
+            class="GraphTextNode-filePresenter"
+          />
+          <div
+            v-else-if="isAssetValue && assetLink"
+            class="GraphTextNode-asset tiny-scrollbars"
+            :class="{
+              'type-has-image': assetHasImage,
+            }"
+            @dblclick="onDblClickAsset"
+          >
+            <asset-icon-image
+              v-if="assetHasImage"
+              :asset="assetLink"
+              :width="96"
+              :height="96"
+              class="GraphTextNode-assetIcon"
+            />
+            <asset-link
+              class="GraphTextNode-assetTitle"
+              :project="projectInfo"
+              :asset="assetLink"
+              :show-icon="!assetHasImage"
+              :draggable="false"
+              @click.prevent
+            ></asset-link>
+          </div>
+          <template v-else>
+            <imc-editor
+              v-if="editing"
+              ref="editorRef"
+              v-model="localValue"
+              class="GraphTextNode-editor nodrag nopan nowheel tiny-scrollbars"
+              :multiline="true"
+              toolbar="inline"
+              :placeholder="$t('graphBlock.node.placeholder')"
+              @update:model-value="onValueChange"
+              @blur="onEditorBlur"
+            ></imc-editor>
+            <imc-presenter
+              v-else
+              :value="localValue"
+              class="GraphTextNode-presenter tiny-scrollbars"
+              @dblclick="onDblClickText"
+            ></imc-presenter>
+          </template>
+        </div>
+        <div class="GraphTextNode-top">
+          <div
+            v-if="!readonly"
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-t"
+            @mousedown.stop="(e) => onResizeStart(e, 't')"
+          ></div>
+          <Handle
+            id="source-top"
+            type="source"
+            :position="Position.Top"
+            class="GraphTextNode-handle"
+          />
+          <Handle
+            id="target-top"
+            type="target"
+            :position="Position.Top"
+            class="GraphTextNode-targetHandle"
+          />
+        </div>
+        <div class="GraphTextNode-right">
+          <div
+            v-if="!readonly"
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-r"
+            @mousedown.stop="(e) => onResizeStart(e, 'r')"
+          ></div>
+          <Handle
+            id="source-right"
+            type="source"
+            :position="Position.Right"
+            class="GraphTextNode-handle"
+          />
+          <Handle
+            id="target-right"
+            type="target"
+            :position="Position.Right"
+            class="GraphTextNode-targetHandle"
+          />
+        </div>
+        <div class="GraphTextNode-bottom">
+          <div
+            v-if="!readonly"
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-b"
+            @mousedown.stop="(e) => onResizeStart(e, 'b')"
+          ></div>
+          <Handle
+            id="source-bottom"
+            type="source"
+            :position="Position.Bottom"
+            class="GraphTextNode-handle"
+          />
+          <Handle
+            id="target-bottom"
+            type="target"
+            :position="Position.Bottom"
+            class="GraphTextNode-targetHandle"
+          />
+        </div>
+        <div class="GraphTextNode-left">
+          <div
+            v-if="!readonly"
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-l"
+            @mousedown.stop="(e) => onResizeStart(e, 'l')"
+          ></div>
+          <Handle
+            id="source-left"
+            type="source"
+            :position="Position.Left"
+            class="GraphTextNode-handle"
+          />
+          <Handle
+            id="target-left"
+            type="target"
+            :position="Position.Left"
+            class="GraphTextNode-targetHandle"
+          />
+        </div>
+        <template v-if="!readonly">
+          <div
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tl"
+            @mousedown.stop="(e) => onResizeStart(e, 'tl')"
+          ></div>
+          <div
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tr"
+            @mousedown.stop="(e) => onResizeStart(e, 'tr')"
+          ></div>
+          <div
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-br"
+            @mousedown.stop="(e) => onResizeStart(e, 'br')"
+          ></div>
+          <div
+            class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-bl"
+            @mousedown.stop="(e) => onResizeStart(e, 'bl')"
+          ></div>
         </template>
       </div>
-      <div class="GraphTextNode-top">
-        <div
-          v-if="!readonly"
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-t"
-          @mousedown.stop="(e) => onResizeStart(e, 't')"
-        ></div>
-        <Handle
-          id="source-top"
-          type="source"
-          :position="Position.Top"
-          class="GraphTextNode-handle"
-        />
-        <Handle
-          id="target-top"
-          type="target"
-          :position="Position.Top"
-          class="GraphTextNode-targetHandle"
-        />
-      </div>
-      <div class="GraphTextNode-right">
-        <div
-          v-if="!readonly"
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-r"
-          @mousedown.stop="(e) => onResizeStart(e, 'r')"
-        ></div>
-        <Handle
-          id="source-right"
-          type="source"
-          :position="Position.Right"
-          class="GraphTextNode-handle"
-        />
-        <Handle
-          id="target-right"
-          type="target"
-          :position="Position.Right"
-          class="GraphTextNode-targetHandle"
-        />
-      </div>
-      <div class="GraphTextNode-bottom">
-        <div
-          v-if="!readonly"
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-b"
-          @mousedown.stop="(e) => onResizeStart(e, 'b')"
-        ></div>
-        <Handle
-          id="source-bottom"
-          type="source"
-          :position="Position.Bottom"
-          class="GraphTextNode-handle"
-        />
-        <Handle
-          id="target-bottom"
-          type="target"
-          :position="Position.Bottom"
-          class="GraphTextNode-targetHandle"
-        />
-      </div>
-      <div class="GraphTextNode-left">
-        <div
-          v-if="!readonly"
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-l"
-          @mousedown.stop="(e) => onResizeStart(e, 'l')"
-        ></div>
-        <Handle
-          id="source-left"
-          type="source"
-          :position="Position.Left"
-          class="GraphTextNode-handle"
-        />
-        <Handle
-          id="target-left"
-          type="target"
-          :position="Position.Left"
-          class="GraphTextNode-targetHandle"
-        />
-      </div>
-      <template v-if="!readonly">
-        <div
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tl"
-          @mousedown.stop="(e) => onResizeStart(e, 'tl')"
-        ></div>
-        <div
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-tr"
-          @mousedown.stop="(e) => onResizeStart(e, 'tr')"
-        ></div>
-        <div
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-br"
-          @mousedown.stop="(e) => onResizeStart(e, 'br')"
-        ></div>
-        <div
-          class="GraphTextNode-resizeHandle GraphTextNode-resizeHandle-bl"
-          @mousedown.stop="(e) => onResizeStart(e, 'bl')"
-        ></div>
-      </template>
-    </div>
-  </context-menu-zone>
+    </context-menu-zone>
+  </div>
 </template>
 
 <script lang="ts">
@@ -178,6 +188,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import AssetLink from '~ims-app-base/components/Asset/AssetLink.vue';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { getAssetImageFromPreview } from '~ims-app-base/components/Asset/AssetIconImage.vue';
+import isUUID from 'validator/es/lib/isUUID';
 
 type ResizeDirection = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l';
 const MIN_NODE_WIDTH = 60;
@@ -328,6 +339,9 @@ export default defineComponent({
         this.viewportTransform,
       );
     },
+    showServiceName() {
+      return !isUUID(this.id);
+    },
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
     },
@@ -381,6 +395,10 @@ export default defineComponent({
             .get(EditorManager)
             .openAsset(this.assetLink.id, open_blank ? 'new-tab' : 'popup');
         });
+    },
+    onDblClickServiceName() {
+      if (this.readonly) return;
+      this.dialogController.setNodeServiceName(this.id);
     },
     onEditorBlur() {
       this.$emit('request-view');
@@ -701,5 +719,16 @@ export default defineComponent({
   line-height: 1.4;
   color: var(--local-text-color);
   text-decoration: none;
+}
+.GraphTextNode-serviceName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--local-sub-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

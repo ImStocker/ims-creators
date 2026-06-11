@@ -722,6 +722,9 @@ export default defineComponent({
     }
   }
 }
+.DialogSpeechNode-options-one-param-input {
+  flex: 1;
+}
 .DialogSpeechNode-options {
   margin-top: 10px;
 }

@@ -127,6 +127,7 @@
           :allowed-types="createNodeContext.allowedTypes"
           :need-data-in="createNodeContext.needDataIn"
           :need-data-out="createNodeContext.needDataOut"
+          :show-paste="!createNodeContext.connectStartDescriptor"
           @choose="createNode($event)"
           @choose-template="createNodeByTemplate($event)"
           @paste="pasteFromClipboard"
@@ -1122,14 +1123,24 @@ export default defineComponent({
   }
 }
 
+.DialogEditorNode-wrapper {
+  &.state-selected {
+    .DialogEditorNode {
+      border-color: var(--imsde-node-selected-color);
+      outline: var(--imsde-node-selected-outline-width) solid
+        var(--imsde-node-selected-color);
+    }
+  }
+  &.state-playing {
+    .DialogEditorNode {
+      outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
+        var(--imsde-node-playing-color);
+    }
+  }
+}
 .DialogEditorNode {
   border-radius: 4px;
   border: 1px solid transparent;
-  &.state-selected {
-    border-color: var(--imsde-node-selected-color);
-    outline: var(--imsde-node-selected-outline-width) solid
-      var(--imsde-node-selected-color);
-  }
   & > div:first-child {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
@@ -1137,10 +1148,6 @@ export default defineComponent({
   & > div:last-child {
     border-bottom-left-radius: 4px;
     border-bottom-right-radius: 4px;
-  }
-  &.state-playing {
-    outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
-      var(--imsde-node-playing-color);
   }
 }
 .DialogEditorNode-header {

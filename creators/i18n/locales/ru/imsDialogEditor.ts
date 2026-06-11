@@ -286,5 +286,7 @@ export default {
     debug: 'Отладить этого узла',
     runFromNode: 'Запустить с этого узла',
     debugFromNode: 'Отладить этого узла',
+    setServiceName: 'Задать служебное имя',
+    serviceNameAlreadyExists: 'Служебное имя уже существует',
   },
 };
