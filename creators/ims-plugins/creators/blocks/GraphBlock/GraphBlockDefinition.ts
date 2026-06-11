@@ -7,7 +7,7 @@ import { GraphBlockController } from './editor/GraphBlockController';
 export class GraphBlockDefinition extends BlockTypeDefinition {
   name = 'graph';
   component = async () => (await import('./GraphBlock.vue')).default;
-  icon = 'ri-node-tree';
+  icon = 'node-tree';
   override resizableBlockHeight = true;
 
   override createController(
