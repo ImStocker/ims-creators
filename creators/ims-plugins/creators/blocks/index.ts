@@ -8,10 +8,10 @@ import { TextGridBlockDefinition } from './TextGridBlock/TextGridBlockDefinition
 
 const list = [
   new MarkdownBlockDefinition(),
-  new DiagramBlockDefinition(),
   new DialogBlockDefinition(),
   new GraphBlockDefinition(),
   new LevelEditorBlockDefinition(),
+  new DiagramBlockDefinition(),
   new TextGridBlockDefinition(),
   new LocaleBlockDefinition(),
 ];
