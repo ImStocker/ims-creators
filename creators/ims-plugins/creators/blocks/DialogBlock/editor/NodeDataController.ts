@@ -1,6 +1,7 @@
-import type {
-  AssetPropValue,
-  AssetPropValueType,
+import {
+  sameAssetPropValues,
+  type AssetPropValue,
+  type AssetPropValueType,
 } from '~ims-app-base/logic/types/Props';
 import type {
   ScriptBlockPlainProps,
@@ -25,6 +26,26 @@ export type NodeData = {
   };
   index: number;
 };
+
+export function samePinDataTypes(
+  pin1: AssetPropValueType | AssetPropValueType[] | null,
+  pin2: AssetPropValueType | AssetPropValueType[] | null,
+): boolean {
+  if (!pin1 && !pin2) return true;
+  else if (!pin1 && pin2) return false;
+  else if (pin1 && !pin2) return false;
+  else if (pin1 && pin2) {
+    if (!Array.isArray(pin1)) pin1 = [pin1];
+    if (!Array.isArray(pin2)) pin2 = [pin2];
+    if (pin1.length !== pin2.length) return false;
+    for (let i = 0; i < pin1.length; i++) {
+      if (!sameAssetPropValues(pin1[i], pin2[i], true)) {
+        return false;
+      }
+    }
+    return true;
+  } else return false;
+}
 
 export type NodeDataController = {
   get values(): ScriptBlockPlainProps;

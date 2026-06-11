@@ -22,6 +22,7 @@ import {
   castAssetPropValueToText,
   diffAssetPropObjects,
   makeBlockRef,
+  sameAssetPropValues,
   truncateAssetPropValueText,
   type AssetProps,
   type AssetPropValue,
@@ -362,19 +363,21 @@ export class DialogBlockController extends BlockEditorController {
     if (!own_valid) return connected_valid;
     if (!connected_valid) return own_valid;
 
-    const merged = [...own_valid];
-    for (const c_type of connected_valid) {
-      const existing = merged.find((t) => t.Type === c_type.Type);
-      if (!existing) {
-        merged.push(c_type);
-      } else {
+    const merged: AssetPropValueType[] = [];
+    for (const o_type of own_valid) {
+      const c_type = connected_valid.find((t) => t.Type === o_type.Type);
+      if (!c_type) continue;
+      const existing = merged.find((t) => t.Type === o_type.Type);
+      if (existing) {
         merged[merged.indexOf(existing)] = pickMoreSpecificType(
-          c_type,
+          o_type,
           existing,
         );
+      } else {
+        merged.push(pickMoreSpecificType(c_type, o_type));
       }
     }
-    return merged;
+    return merged.length ? merged : null;
   }
 
   getNodeDataController(node_id: string): NodeDataController {
@@ -627,11 +630,21 @@ export class DialogBlockController extends BlockEditorController {
       },
       getPinDataType: (pin_id) => this.getNodePinDataType(node_id, pin_id),
       setPinDataType: (pin_id, type) => {
+        let current = this._assignedDataTypePins.get(node_id + '|' + pin_id);
         if (type) {
           if (!Array.isArray(type)) type = [type];
-          this._assignedDataTypePins.set(node_id + '|' + pin_id, type);
+          if (!current) current = [];
+          let same = current.length === type.length;
+          for (let i = 0; same && i < type.length; i++) {
+            same = sameAssetPropValues(current[i], type[i], true);
+          }
+          if (!same) {
+            this._assignedDataTypePins.set(node_id + '|' + pin_id, type);
+          }
         } else {
-          this._assignedDataTypePins.delete(node_id + '|' + pin_id);
+          if (current) {
+            this._assignedDataTypePins.delete(node_id + '|' + pin_id);
+          }
         }
       },
       addParam: (scope: 'in' | 'out', variable: DialogVariable) => {
