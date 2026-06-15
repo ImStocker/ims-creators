@@ -70,7 +70,7 @@ import {
 import SelectAssetPropFields from '~ims-app-base/components/Asset/SelectAssetPropFields.vue';
 import type { AssetPropField } from '~ims-app-base/components/Asset/SelectAssetPropFields';
 import { convertTranslatedTitle } from '../../../../../../ims-app-base/app/logic/utils/assets';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogGetPropsNode',

@@ -272,7 +272,7 @@ import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import DialogSpeechNodeAttachCover from './DialogSpeechNodeAttachCover.vue';
 import FilePresenter from '~ims-app-base/components/File/FilePresenter.vue';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSpeechNode',
@@ -721,6 +721,9 @@ export default defineComponent({
       padding-left: 22px;
     }
   }
+}
+.DialogSpeechNode-options-one-param-input {
+  flex: 1;
 }
 .DialogSpeechNode-options {
   margin-top: 10px;

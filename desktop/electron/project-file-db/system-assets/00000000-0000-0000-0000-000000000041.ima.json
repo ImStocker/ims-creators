@@ -1,0 +1,72 @@
+{
+ "id": "00000000-0000-0000-0000-000000000041",
+ "blocks": [
+  {
+   "id": "00000000-0000-0000-0000-000000000100",
+   "name": "__meta",
+   "title": null,
+   "own": true,
+   "type": "props",
+   "props": {
+    "complete_set": null,
+    "complete_comp": 0,
+    "complete_track": true,
+    "plan_milestone": null,
+    "complete_progress": null
+   },
+   "computed": {
+    "complete_set": null,
+    "complete_comp": 0,
+    "complete_track": true,
+    "plan_milestone": null,
+    "complete_progress": null
+   },
+   "inherited": null,
+   "index": 0,
+   "createdAt": "2026-06-10T12:55:34.293Z",
+   "updatedAt": "2026-06-10T12:55:34.293Z"
+  },
+  {
+   "id": "00000000-0000-0000-0000-410000000001",
+   "name": "content",
+   "title": "[[t:Content]]",
+   "own": true,
+   "type": "graph",
+   "props": {},
+   "computed": {},
+   "inherited": null,
+   "index": 1,
+   "createdAt": "2026-06-10T19:42:06.175Z",
+   "updatedAt": "2026-06-10T22:44:32.491Z"
+  },
+  {
+   "id": "00000000-0000-0000-0000-410000000100",
+   "name": "props",
+   "title": "[[t:Properties]]",
+   "own": true,
+   "type": "props",
+   "props": {},
+   "computed": {},
+   "inherited": null,
+   "index": 3,
+   "createdAt": "2026-06-10T12:55:34.293Z",
+   "updatedAt": "2026-06-10T12:55:34.293Z"
+  }
+ ],
+ "isAbstract": true,
+ "projectId": "111112",
+ "references": [],
+ "icon": "node-tree",
+ "index": null,
+ "name": "graph",
+ "ownIcon": "node-tree",
+ "ownTitle": "[[t:GraphElement]]",
+ "parentIds": [],
+ "title": "[[t:GraphElement]]",
+ "typeIds": [],
+ "workspaceId": "00000000-0000-0000-0000-000000000002",
+ "values": {
+  "content": {},
+  "props": {}
+ }
+}

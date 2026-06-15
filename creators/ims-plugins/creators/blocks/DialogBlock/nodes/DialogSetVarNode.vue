@@ -46,7 +46,10 @@ import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
-import type { NodeDataController } from '../editor/NodeDataController';
+import {
+  samePinDataTypes,
+  type NodeDataController,
+} from '../editor/NodeDataController';
 import DataField from '../parts/DataField.vue';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type {
@@ -59,7 +62,7 @@ import {
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogSetVarNode',
@@ -133,6 +136,10 @@ export default defineComponent({
         default: null,
       };
     },
+    variableType() {
+      if (!this.variable) return null;
+      return this.variable.type;
+    },
     valuePinId() {
       return generateDataPinId(false, 'value');
     },
@@ -149,8 +156,10 @@ export default defineComponent({
     },
   },
   watch: {
-    variable() {
-      this.updatePins();
+    variableType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
     },
   },
   mounted() {

@@ -59,7 +59,7 @@ import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({

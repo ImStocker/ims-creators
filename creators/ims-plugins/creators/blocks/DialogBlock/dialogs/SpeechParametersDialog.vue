@@ -171,7 +171,6 @@ export default defineComponent({
       this.mainSpeechController.addEntity(new_variable);
     },
     async addSettingSpeechOption() {
-      debugger;
       const new_variable = await this.optionSpeechController.createEntity();
       if (!new_variable) return;
       this.optionSpeechController.addEntity(new_variable);

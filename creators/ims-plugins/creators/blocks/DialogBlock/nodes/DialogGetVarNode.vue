@@ -33,7 +33,10 @@
 import { defineComponent, type PropType } from 'vue';
 import { Position } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
-import type { NodeDataController } from '../editor/NodeDataController';
+import {
+  samePinDataTypes,
+  type NodeDataController,
+} from '../editor/NodeDataController';
 import type {
   DialogBlockController,
   DialogVariable,
@@ -46,7 +49,7 @@ import {
   type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type { ScriptBlockPlainPropValueBind } from '../logic/nodeStoring';
-import DialogBaseNode from './DialogBaseNode.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
 export default defineComponent({
@@ -116,13 +119,19 @@ export default defineComponent({
         default: null,
       };
     },
+    variableType() {
+      if (!this.variable) return null;
+      return this.variable.type;
+    },
     outPinId() {
       return generateDataPinId(true, 'result');
     },
   },
   watch: {
-    variable() {
-      this.updatePins();
+    variableType(newVal, oldVal) {
+      if (!samePinDataTypes(newVal, oldVal)) {
+        this.updatePins();
+      }
     },
   },
   mounted() {

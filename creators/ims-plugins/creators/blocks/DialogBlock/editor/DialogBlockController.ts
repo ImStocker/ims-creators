@@ -22,6 +22,7 @@ import {
   castAssetPropValueToText,
   diffAssetPropObjects,
   makeBlockRef,
+  sameAssetPropValues,
   truncateAssetPropValueText,
   type AssetProps,
   type AssetPropValue,
@@ -50,10 +51,15 @@ import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefini
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptiors';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
+import type { DialogPlayer } from '../play/DialogPlayer';
 import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
 import type { IDialogCollectionController } from './DialogVariableController';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import { nodeVariableAdd } from '../logic/nodeVariables';
+import isUUID from 'validator/es/lib/isUUID';
+import PromptDialog from '~ims-app-base/components/Common/PromptDialog.vue';
+
+export const SCRIPT_BLOCK_CLIPBOARD_TYPE = 'script-block';
 
 export type DialogVariable = ScriptBlockPlainVariable;
 export type DialogAction = ScriptBlockPlainAction;
@@ -181,6 +187,7 @@ export class DialogBlockController extends BlockEditorController {
     }
     clipboardCopyPlainText(
       JSON.stringify({
+        type: SCRIPT_BLOCK_CLIPBOARD_TYPE,
         nodes: Object.values(nodes_to_copy),
         viewport,
       }),
@@ -198,7 +205,19 @@ export class DialogBlockController extends BlockEditorController {
     const pasted_data = await clipboardReadPlainText();
 
     try {
-      const parsed = JSON.parse(pasted_data);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(pasted_data);
+      } catch {
+        throw new Error(
+          this.appManager.$t('imsDialogEditor.noScriptInClipboard'),
+        );
+      }
+      if (parsed.type !== SCRIPT_BLOCK_CLIPBOARD_TYPE) {
+        throw new Error(
+          this.appManager.$t('imsDialogEditor.noScriptInClipboard'),
+        );
+      }
       const nodes = parsed.nodes;
 
       if (!Array.isArray(nodes)) return;
@@ -284,8 +303,8 @@ export class DialogBlockController extends BlockEditorController {
           this.appManager.get(UiManager).showError(err);
         }
       }
-    } catch {
-      // do nothing
+    } catch (err: any) {
+      this.appManager.get(UiManager).showError(err.message);
     }
   }
 
@@ -344,19 +363,21 @@ export class DialogBlockController extends BlockEditorController {
     if (!own_valid) return connected_valid;
     if (!connected_valid) return own_valid;
 
-    const merged = [...own_valid];
-    for (const c_type of connected_valid) {
-      const existing = merged.find((t) => t.Type === c_type.Type);
-      if (!existing) {
-        merged.push(c_type);
-      } else {
+    const merged: AssetPropValueType[] = [];
+    for (const o_type of own_valid) {
+      const c_type = connected_valid.find((t) => t.Type === o_type.Type);
+      if (!c_type) continue;
+      const existing = merged.find((t) => t.Type === o_type.Type);
+      if (existing) {
         merged[merged.indexOf(existing)] = pickMoreSpecificType(
-          c_type,
+          o_type,
           existing,
         );
+      } else {
+        merged.push(pickMoreSpecificType(c_type, o_type));
       }
     }
-    return merged;
+    return merged.length ? merged : null;
   }
 
   getNodeDataController(node_id: string): NodeDataController {
@@ -609,11 +630,21 @@ export class DialogBlockController extends BlockEditorController {
       },
       getPinDataType: (pin_id) => this.getNodePinDataType(node_id, pin_id),
       setPinDataType: (pin_id, type) => {
+        let current = this._assignedDataTypePins.get(node_id + '|' + pin_id);
         if (type) {
           if (!Array.isArray(type)) type = [type];
-          this._assignedDataTypePins.set(node_id + '|' + pin_id, type);
+          if (!current) current = [];
+          let same = current.length === type.length;
+          for (let i = 0; same && i < type.length; i++) {
+            same = sameAssetPropValues(current[i], type[i], true);
+          }
+          if (!same) {
+            this._assignedDataTypePins.set(node_id + '|' + pin_id, type);
+          }
         } else {
-          this._assignedDataTypePins.delete(node_id + '|' + pin_id);
+          if (current) {
+            this._assignedDataTypePins.delete(node_id + '|' + pin_id);
+          }
         }
       },
       addParam: (scope: 'in' | 'out', variable: DialogVariable) => {
@@ -1411,13 +1442,212 @@ export class DialogBlockController extends BlockEditorController {
     return [root_anchor];
   }
 
+  async setNodeServiceName(nodeId: string): Promise<void> {
+    const node = this.state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const existingIds = new Set(this.state.nodes.map((n) => n.id));
+    const result = await this.appManager.get(DialogManager).show(PromptDialog, {
+      header: this.appManager.$t('imsDialogEditor.setServiceName'),
+      value: nodeId,
+      validate: (val: string) => {
+        if (!val || val === nodeId) return val;
+        if (existingIds.has(val)) {
+          throw this.appManager.$t('imsDialogEditor.serviceNameAlreadyExists');
+        }
+        return val;
+      },
+    });
+
+    if (!result) {
+      if (result !== '') return; // cancelled
+      if (isUUID(nodeId)) return; // no service name to reset, nothing to do
+    } else if (result === nodeId) {
+      return;
+    }
+
+    const newId = result || uuidv4();
+    const nodeIndex = this.state.nodes.findIndex((n) => n.id === nodeId);
+    if (nodeIndex === -1) return;
+    const newState = {
+      ...this.state,
+      nodes: [...this.state.nodes],
+      edges: [...this.state.edges],
+    };
+    newState.nodes[nodeIndex] = {
+      ...this.state.nodes[nodeIndex],
+      id: newId,
+    };
+
+    for (let index = 0; index < this.state.edges.length; index++) {
+      let newEdge: Edge | undefined;
+      const edge = this.state.edges[index];
+      const parts = edge.id.split('|');
+      if (parts.length >= 4) {
+        let changed = false;
+        if (edge.source === nodeId && parts[0] === nodeId) {
+          parts[0] = newId;
+          changed = true;
+        }
+        if (edge.target === nodeId && parts[parts.length - 1] === nodeId) {
+          parts[parts.length - 1] = newId;
+          changed = true;
+        }
+        if (changed) {
+          newEdge = { ...edge, id: parts.join('|') };
+        }
+      }
+      if (edge.source === nodeId) {
+        if (!newEdge) newEdge = { ...edge };
+        newEdge.source = newId;
+      }
+      if (edge.target === nodeId) {
+        if (!newEdge) newEdge = { ...edge };
+        newEdge.target = newId;
+      }
+      if (newEdge) {
+        newState.edges[index] = newEdge;
+      }
+    }
+
+    for (let index = 0; index < this.state.nodes.length; index++) {
+      const node = this.state.nodes[index];
+      if (!node.data) continue;
+      const newNode = JSON.parse(JSON.stringify(node));
+      const newNodeData = newNode.data as NodeData;
+      const updateBind = (v: any) => {
+        if (v && typeof v === 'object' && 'get' in v && v.get === nodeId) {
+          v.get = newId;
+        }
+      };
+      if (newNodeData.values) {
+        for (const key of Object.keys(newNodeData.values)) {
+          updateBind(newNodeData.values[key]);
+        }
+      }
+      if (newNodeData.options) {
+        for (const opt of newNodeData.options) {
+          if (opt.values) {
+            for (const key of Object.keys(opt.values)) {
+              updateBind(opt.values[key]);
+            }
+          }
+        }
+      }
+      this.state.nodes[index] = newNode;
+    }
+
+    this.state = newState; // Change nodes and edges simultaneously to make VueFlow work corretly
+
+    this.savePropsDelayed();
+  }
+
+  getNodeContextMenu(
+    nodeIds: string[],
+    viewport: ViewportTransform,
+    dialogPlayer?: DialogPlayer,
+  ): MenuListItem[] {
+    if (!nodeIds.length) return [];
+    const count = nodeIds.length;
+    const suffix = count > 1 ? ` (${count})` : '';
+    const items: MenuListItem[] = [];
+
+    if (count === 1 && dialogPlayer) {
+      items.push(
+        {
+          name: 'run',
+          title: this.appManager.$t('imsDialogEditor.runFromNode'),
+          icon: 'ri-play-fill',
+          action: async () => {
+            await this.appManager.get(UiManager).doTask(async () => {
+              dialogPlayer.startRunWithNode(false, nodeIds[0]);
+            });
+          },
+        },
+        {
+          name: 'debug',
+          title: this.appManager.$t('imsDialogEditor.debugFromNode'),
+          icon: 'ri-bug-fill',
+          action: async () => {
+            await this.appManager.get(UiManager).doTask(async () => {
+              dialogPlayer.startRunWithNode(true, nodeIds[0]);
+            });
+          },
+        },
+        { type: 'separator', name: 'sep-run' },
+      );
+    }
+
+    if (count === 1) {
+      items.push(
+        {
+          name: 'set-service-name',
+          title: this.appManager.$t('imsDialogEditor.setServiceName'),
+          icon: 'ri-price-tag-3-fill',
+          action: () => this.setNodeServiceName(nodeIds[0]),
+        },
+        { type: 'separator', name: 'sep-service-name' },
+      );
+    }
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node) {
+        const descriptor = getNodeDescriptorOfType(node.type ?? '');
+        if (descriptor?.getContextMenuItems) {
+          const nodeItems = descriptor.getContextMenuItems(
+            this,
+            nodeIds[0],
+            (key: string) => this.appManager.$t(key),
+          );
+          if (nodeItems.length > 0) {
+            items.push({ type: 'separator', name: 'sep-value' });
+            items.push(...nodeItems);
+          }
+        }
+      }
+    }
+
+    items.push(
+      {
+        name: 'copy',
+        title: this.appManager.$t('common.dialogs.copy') + suffix,
+        icon: 'ri-file-copy-line',
+        action: () => this.copyNodesToClipboard(nodeIds, viewport),
+      },
+      {
+        name: 'cut',
+        title: this.appManager.$t('imsDialogEditor.cutNode') + suffix,
+        icon: 'ri-scissors-cut-line',
+        action: () => this.cutNodes(nodeIds, viewport),
+      },
+      {
+        name: 'delete',
+        title: this.appManager.$t('common.dialogs.delete') + suffix,
+        icon: 'ri-delete-bin-line',
+        danger: true,
+        action: async () => {
+          for (const id of nodeIds) {
+            await this.deleteNodeById(id);
+          }
+        },
+      },
+    );
+    return items;
+  }
+
+  get readonly() {
+    if (!this.assetBlockEditor) return null;
+    return this.assetBlockEditor.getIsReadonly();
+  }
+
   override getContentItemsMenu(
     items: BlockContentItem<DialogBlockContentUserData>[],
   ): MenuListItem[] {
     if ((items.length === 1 && !items[0].userData) || !this.assetBlockEditor) {
       return [];
     }
-    if (this.assetBlockEditor.getIsReadonly()) {
+    if (this.readonly) {
       return [];
     }
 

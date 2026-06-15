@@ -17,6 +17,8 @@ export default {
       pasteNode: 'Paste from clipboard',
       noGraphInClipboard: 'No graph data in clipboard',
       emptyHint: 'Right-click on the field to create a node.',
+      setServiceName: 'Set service name',
+      serviceNameAlreadyExists: 'Service name already exists',
     },
     outline: {
       rootTitle: 'Graph',

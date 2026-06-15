@@ -47,6 +47,8 @@ import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptors';
+import isUUID from 'validator/es/lib/isUUID';
+import PromptDialog from '~ims-app-base/components/Common/PromptDialog.vue';
 
 export const GRAPH_BLOCK_CLIPBOARD_TYPE = 'graph-block';
 
@@ -80,6 +82,11 @@ export class GraphBlockController extends BlockEditorController {
 
   get changer(): AssetChanger | null {
     return this.assetBlockEditor ? this.assetBlockEditor.assetChanger : null;
+  }
+
+  get readonly() {
+    if (!this.assetBlockEditor) return null;
+    return this.assetBlockEditor.getIsReadonly();
   }
 
   private _onBlockUpdated() {
@@ -493,7 +500,7 @@ export class GraphBlockController extends BlockEditorController {
     if ((items.length === 1 && !items[0].userData) || !this.assetBlockEditor) {
       return [];
     }
-    if (this.assetBlockEditor.getIsReadonly()) {
+    if (this.readonly) {
       return [];
     }
 
@@ -545,6 +552,79 @@ export class GraphBlockController extends BlockEditorController {
     };
   }
 
+  async setNodeServiceName(nodeId: string): Promise<void> {
+    const node = this.state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const existingIds = new Set(this.state.nodes.map((n) => n.id));
+    const result = await this.appManager.get(DialogManager).show(PromptDialog, {
+      header: this.appManager.$t('graphBlock.editor.setServiceName'),
+      value: nodeId,
+      validate: (val: string) => {
+        if (!val || val === nodeId) return val;
+        if (existingIds.has(val)) {
+          throw this.appManager.$t(
+            'graphBlock.editor.serviceNameAlreadyExists',
+          );
+        }
+        return val;
+      },
+    });
+
+    if (!result) {
+      if (result !== '') return; // cancelled
+      if (isUUID(nodeId)) return; // no service name to reset, nothing to do
+    } else if (result === nodeId) {
+      return;
+    }
+
+    const newId = result || uuidv4();
+    const nodeIndex = this.state.nodes.findIndex((n) => n.id === nodeId);
+    if (nodeIndex === -1) return;
+    const newState = {
+      nodes: [...this.state.nodes],
+      edges: [...this.state.edges],
+    };
+    newState.nodes[nodeIndex] = {
+      ...this.state.nodes[nodeIndex],
+      id: newId,
+    };
+
+    for (let index = 0; index < this.state.edges.length; index++) {
+      let newEdge: Edge | undefined;
+      const edge = this.state.edges[index];
+      const parts = edge.id.split('|');
+      if (parts.length >= 4) {
+        let changed = false;
+        if (edge.source === nodeId && parts[0] === nodeId) {
+          parts[0] = newId;
+          changed = true;
+        }
+        if (edge.target === nodeId && parts[parts.length - 1] === nodeId) {
+          parts[parts.length - 1] = newId;
+          changed = true;
+        }
+        if (changed) {
+          newEdge = { ...edge, id: parts.join('|') };
+        }
+      }
+      if (edge.source === nodeId) {
+        if (!newEdge) newEdge = { ...edge };
+        newEdge.source = newId;
+      }
+      if (edge.target === nodeId) {
+        if (!newEdge) newEdge = { ...edge };
+        newEdge.target = newId;
+      }
+      if (newEdge) {
+        newState.edges[index] = newEdge;
+      }
+    }
+
+    this.state = newState; // Change nodes and edges simultaneously to make VueFlow work corretly
+    this.savePropsDelayed();
+  }
+
   getNodeContextMenu(
     nodeIds: string[],
     viewport: ViewportTransform,
@@ -552,7 +632,39 @@ export class GraphBlockController extends BlockEditorController {
     if (!nodeIds.length) return [];
     const count = nodeIds.length;
     const suffix = count > 1 ? ` (${count})` : '';
-    const items: MenuListItem[] = [
+    const items: MenuListItem[] = [];
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node) {
+        const descriptor = getNodeDescriptorOfType(node.type ?? '');
+        if (descriptor?.getContextMenuItems) {
+          const nodeItems = descriptor.getContextMenuItems(
+            this,
+            nodeIds[0],
+            (key: string) => this.appManager.$t(key),
+          );
+          if (nodeItems.length > 0) {
+            items.push({ type: 'separator', name: 'sep-value' });
+            items.push(...nodeItems);
+          }
+        }
+      }
+    }
+
+    if (count === 1) {
+      items.push(
+        {
+          name: 'set-service-name',
+          title: this.appManager.$t('graphBlock.editor.setServiceName'),
+          icon: 'ri-price-tag-3-fill',
+          action: () => this.setNodeServiceName(nodeIds[0]),
+        },
+        { type: 'separator', name: 'sep-service-name' },
+      );
+    }
+
+    items.push(
       {
         name: 'copy',
         title: this.appManager.$t('common.dialogs.copy') + suffix,
@@ -576,24 +688,7 @@ export class GraphBlockController extends BlockEditorController {
           }
         },
       },
-    ];
-    if (count === 1) {
-      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
-      if (node) {
-        const descriptor = getNodeDescriptorOfType(node.type ?? '');
-        if (descriptor?.getContextMenuItems) {
-          const nodeItems = descriptor.getContextMenuItems(
-            this,
-            nodeIds[0],
-            (key: string) => this.appManager.$t(key),
-          );
-          if (nodeItems.length > 0) {
-            items.unshift({ type: 'separator', name: 'sep-value' });
-            items.unshift(...nodeItems);
-          }
-        }
-      }
-    }
+    );
     return items;
   }
 

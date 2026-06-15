@@ -17,6 +17,8 @@ export default {
       pasteNode: 'Вставить из буфера',
       noGraphInClipboard: 'В буфере нет данных графа',
       emptyHint: 'Кликните правой кнопкой на поле, чтобы создать узел.',
+      setServiceName: 'Задать служебное имя',
+      serviceNameAlreadyExists: 'Служебное имя уже существует',
     },
     outline: {
       rootTitle: 'Граф',

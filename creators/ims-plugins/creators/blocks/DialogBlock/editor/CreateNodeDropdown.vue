@@ -1,12 +1,22 @@
 <template>
-  <node-descriptors-dropdown
-    class="CreateNodeDropdown"
-    :node-descriptors="nodeDescriptors"
-    :dialog-block-controller="dialogBlockController"
-    @choose="chooseOption($event)"
-    @choose-template="chooseTemplate($event)"
-  >
-  </node-descriptors-dropdown>
+  <div class="CreateNodeDropdown">
+    <NodeDescriptorsItem
+      v-for="option of nodeDescriptors"
+      :key="option.name"
+      class="CreateNodeDropdown-item"
+      :option="option"
+      :dialog-block-controller="dialogBlockController"
+      @choose="chooseOption($event)"
+      @choose-template="chooseTemplate($event)"
+    />
+    <template v-if="showPaste">
+      <div class="CreateNodeDropdown-sep"></div>
+      <button class="CreateNodeDropdown-paste" @click="$emit('paste')">
+        <i class="ri-clipboard-line"></i>
+        {{ $t('imsDialogEditor.pasteNode') }}
+      </button>
+    </template>
+  </div>
 </template>
 
 <script lang="ts">
@@ -22,13 +32,13 @@ import {
   AssetPropType,
   type AssetPropValueType,
 } from '~ims-app-base/logic/types/Props';
-import NodeDescriptorsDropdown from './NodeDescriptorsDropdown.vue';
+import NodeDescriptorsItem from './NodeDescriptorsItem.vue';
 import type { DialogBlockController } from './DialogBlockController';
 
 export default defineComponent({
   name: 'CreateNodeDropdown',
   components: {
-    NodeDescriptorsDropdown,
+    NodeDescriptorsItem,
   },
   props: {
     dialogBlockController: {
@@ -51,8 +61,12 @@ export default defineComponent({
       >,
       default: null,
     },
+    showPaste: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ['choose', 'choose-template'],
+  emits: ['choose', 'choose-template', 'paste'],
   computed: {
     nodeDescriptors() {
       const need_data_in_set = this.needDataIn
@@ -103,7 +117,7 @@ export default defineComponent({
       template,
     }: {
       descriptor: NodeDescriptor;
-      template: NodeDescriptorTemplate;
+      template?: NodeDescriptorTemplate;
     }) {
       this.$emit('choose-template', { descriptor, template });
     },
@@ -117,23 +131,40 @@ export default defineComponent({
   border-radius: var(--imsde-dropdown-border-radius);
   box-shadow: var(--imsde-dropdown-box-shadow);
 }
+.CreateNodeDropdown-sep {
+  height: 1px;
+  background: var(--local-border-color, #ddd);
+}
 .CreateNodeDropdown-item {
+  display: flex;
+  justify-content: space-between;
   padding: 5px 10px;
   cursor: pointer;
-
+  color: var(--local-text-color);
   &:not(:last-child) {
     border-bottom: 1px solid var(--imsde-dropdown-border-color);
   }
-
   &:hover {
-    color: var(--imsde-text-color);
+    --local-text-color: var(--imsde-dropdown-text-color);
     background: var(--imsde-node-color);
-    .CreateNodeDropdown-item-icon {
-      color: var(--imsde-text-color);
+    &:deep(.NodeDescriptorsDropdown-item-icon) {
+      color: var(--local-text-color);
     }
   }
 }
-.CreateNodeDropdown-item-icon {
-  color: var(--imsde-node-color);
+.CreateNodeDropdown-paste {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--local-text-color);
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover {
+    background: var(--dropdown-hl-bg-color, #eee);
+  }
 }
 </style>

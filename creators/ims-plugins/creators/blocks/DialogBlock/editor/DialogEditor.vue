@@ -127,10 +127,23 @@
           :allowed-types="createNodeContext.allowedTypes"
           :need-data-in="createNodeContext.needDataIn"
           :need-data-out="createNodeContext.needDataOut"
+          :show-paste="!createNodeContext.connectStartDescriptor"
           @choose="createNode($event)"
           @choose-template="createNodeByTemplate($event)"
+          @paste="pasteFromClipboard"
         ></CreateNodeDropdown>
       </dropdown-element>
+    </div>
+    <div
+      v-if="selectionContextMenu"
+      class="DialogEditor-selectionContext"
+      :style="{
+        left: `${selectionContextMenu.x}px`,
+        top: `${selectionContextMenu.y}px`,
+      }"
+      @imc-menu-action-executed="selectionContextMenu = null"
+    >
+      <menu-list :menu-list="selectionMenuList" />
     </div>
     <div class="DialogEditor-topButtons">
       <menu-button
@@ -239,6 +252,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { computed } from 'vue';
 import { DialogPlayer } from '../play/DialogPlayer';
 import DialogPlayToolbar from '../play/DialogPlayToolbar.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
@@ -253,6 +267,7 @@ import ManageVariablesDropdown from '../parts/ManageVariablesDropdown.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import ManageActionsDropdown from '../parts/ManageActionsDropdown.vue';
 import { SCRIPT_ASSET_ID } from '~ims-app-base/logic/constants';
+import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 
 type CreateNodeContext = {
   clickedAt: { x: number; y: number } | null;
@@ -286,8 +301,14 @@ export default defineComponent({
     MenuButton,
     ManageVariablesDropdown,
     ManageActionsDropdown,
+    MenuList,
   },
   inject: ['projectContext'],
+  provide() {
+    return {
+      dialogBlockController: computed(() => this.blockControllerMut),
+    };
+  },
   props: {
     readonly: {
       type: Boolean,
@@ -323,6 +344,7 @@ export default defineComponent({
     );
     return {
       createNodeContext: null as CreateNodeContext | null,
+      selectionContextMenu: null as { x: number; y: number } | null,
       viewportHelper,
       dialogPlayer,
       isFocused: false,
@@ -345,6 +367,17 @@ export default defineComponent({
     },
     nodeDescriptors() {
       return getNodeDescriptors();
+    },
+    selectedNodes() {
+      return this.blockControllerMut.state.nodes.filter((n: any) => n.selected);
+    },
+    selectionMenuList() {
+      const ids = this.selectedNodes.map((n: any) => n.id);
+      const flow = this.$refs['flow'] as VueFlowStore | undefined;
+      return this.blockControllerMut.getNodeContextMenu(
+        ids,
+        flow?.getViewport() ?? { x: 0, y: 0, zoom: 1 },
+      );
     },
     hasStart() {
       return this.blockControllerMut.hasStart;
@@ -659,6 +692,7 @@ export default defineComponent({
         return;
       }
       this.createNodeContext = null;
+      this.selectionContextMenu = null;
       this.isFocused = true;
       this.mouseDownTime = Date.now();
     },
@@ -666,10 +700,21 @@ export default defineComponent({
       const target = ev.target as HTMLElement | null;
       if (!target) return;
       if (!target.closest('.vue-flow__pane')) {
-        return; // Clicked outside pane
+        return;
       }
+      if (this.readonlyComp) return;
       if (target.closest('.vue-flow__node')) {
-        return; // Clicked inside the node
+        return; // handled by ContextMenuZone on the node
+      }
+      if (target.closest('.vue-flow__nodesselection-rect')) {
+        if (this.selectedNodes.length === 0) return;
+        const editorBBox = this.$el.getBoundingClientRect();
+        this.selectionContextMenu = {
+          x: ev.clientX - editorBBox.x,
+          y: ev.clientY - editorBBox.y,
+        };
+        ev.preventDefault();
+        return;
       }
       ev.preventDefault();
     },
@@ -688,6 +733,9 @@ export default defineComponent({
       }
       if (target.closest('.vue-flow__node')) {
         return; // Clicked inside the node
+      }
+      if (target.closest('.vue-flow__nodesselection-rect')) {
+        return; // Handled by onContextMenu
       }
       ev.preventDefault();
       const md_elapsed = Date.now() - this.mouseDownTime;
@@ -728,6 +776,12 @@ export default defineComponent({
         ev.targetHandle ?? undefined,
       );
       this.createNodeContext = null;
+    },
+    async pasteFromClipboard() {
+      this.createNodeContext = null;
+      const flow = this.$refs['flow'] as VueFlowStore;
+      if (!flow) return;
+      await this.blockControllerMut.pasteNodesFromClipboard(flow.getViewport());
     },
     _getAvailableNodeTypes(
       edge: 'in' | 'out' | null,
@@ -1069,14 +1123,24 @@ export default defineComponent({
   }
 }
 
+.DialogEditorNode-wrapper {
+  &.state-selected {
+    .DialogEditorNode {
+      border-color: var(--imsde-node-selected-color);
+      outline: var(--imsde-node-selected-outline-width) solid
+        var(--imsde-node-selected-color);
+    }
+  }
+  &.state-playing {
+    .DialogEditorNode {
+      outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
+        var(--imsde-node-playing-color);
+    }
+  }
+}
 .DialogEditorNode {
   border-radius: 4px;
   border: 1px solid transparent;
-  &.state-selected {
-    border-color: var(--imsde-node-selected-color);
-    outline: var(--imsde-node-selected-outline-width) solid
-      var(--imsde-node-selected-color);
-  }
   & > div:first-child {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
@@ -1084,10 +1148,6 @@ export default defineComponent({
   & > div:last-child {
     border-bottom-left-radius: 4px;
     border-bottom-right-radius: 4px;
-  }
-  &.state-playing {
-    outline: calc(2px + var(--imsde-node-selected-outline-width)) solid
-      var(--imsde-node-playing-color);
   }
 }
 .DialogEditorNode-header {
@@ -1119,6 +1179,13 @@ export default defineComponent({
 .DialogEditor {
   position: relative;
 }
+.DialogEditor-selectionContext {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 100;
+}
+
 .DialogEditor-createNode {
   position: absolute;
   left: 0;

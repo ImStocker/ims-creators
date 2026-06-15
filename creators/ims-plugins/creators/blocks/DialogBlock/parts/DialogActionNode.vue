@@ -1,7 +1,8 @@
 <template>
-  <ContextMenuZone
-    class="DialogActionNode DialogEditorNode"
-    :menu-list="contextMenu"
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    :additional-menu-list="contextMenu"
   >
     <div
       class="DialogActionNode-header DialogNode-header DialogEditorNode-header"
@@ -50,7 +51,7 @@
         </button>
       </div>
     </div>
-  </ContextMenuZone>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -62,7 +63,7 @@ import {
   AssetPropType,
   castAssetPropValueToString,
 } from '~ims-app-base/logic/types/Props';
-import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import DialogBaseNode from './DialogBaseNode.vue';
 import type {
   DialogBlockController,
   DialogVariable,
@@ -82,13 +83,12 @@ import ActionSelector from '../parts/ActionSelector.vue';
 import { NodeType, type NodeDescriptor } from '../nodes/NodeDescriptor';
 import { getActionNodeParams } from '../logic/nodeParams';
 import NodeParametersGrid from './NodeParametersGrid.vue';
-import UiManager from '~ims-app-base/logic/managers/UiManager.js';
 
 export default defineComponent({
   name: 'DialogActionNode',
   components: {
     ExecHandle,
-    ContextMenuZone,
+    DialogBaseNode,
     NodeParametersGrid,
     ActionSelector,
   },
@@ -181,21 +181,8 @@ export default defineComponent({
     },
     contextMenu() {
       if (this.readonly) return [];
-      const menu = [
-        {
-          title: this.$t('imsDialogEditor.run'),
-          action: async () => await this.startRunWithNode(false),
-          icon: 'ri-play-fill',
-        },
-        {
-          title: this.$t('imsDialogEditor.debug'),
-          action: async () => await this.startRunWithNode(true),
-          icon: 'ri-bug-fill',
-        },
-      ];
       if (!this.action)
         return [
-          ...menu,
           {
             title: this.$t(
               `imsDialogEditor.nodes.${this.nodeDescriptor.name}.manageCaption`,
@@ -208,19 +195,7 @@ export default defineComponent({
             },
           },
         ];
-      return [
-        ...menu,
-        {
-          title: this.$t('imsDialogEditor.trigger.addInputParameter'),
-          action: () => this.addParameter(false),
-          icon: 'ri-arrow-right-circle-fill',
-        },
-        {
-          title: this.$t('imsDialogEditor.trigger.addOutputParameter'),
-          action: () => this.addParameter(true),
-          icon: 'ri-arrow-left-circle-line',
-        },
-      ];
+      return [];
     },
     action() {
       return this.dialogController
@@ -230,13 +205,6 @@ export default defineComponent({
   },
 
   methods: {
-    async startRunWithNode(debug: boolean) {
-      await this.$getAppManager()
-        .get(UiManager)
-        .doTask(async () => {
-          this.dialogPlayer.startRunWithNode(debug, this.id);
-        });
-    },
     generateDataPinId,
     async addParameter(is_out: boolean) {
       const new_variable = await nodeVariableAdd(
