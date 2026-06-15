@@ -20,6 +20,7 @@ import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IPr
 import { sendEventToProjectDbWindows } from "./project-registry";
 import { SettingsService } from "./services/SettingsService";
 import type { SyncCurrentState } from "#bridge/types/SyncTypes";
+import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
 
 export type ProjectFileDbAssetBlock = {
     id: string;
@@ -125,14 +126,14 @@ export class ProjectFileDb  {
         await fs.promises.mkdir(path.join(this.localPath, PROJECT_META_FOLDER), {
           recursive: true
         });
-
+debugger
         let need_recreate = !!initParams?.recreate;
         if (!need_recreate){
             try {
             const projectInfoText = await fs.promises.readFile(path.join(this.localPath, PROJECT_META_INDEX), 'utf-8')
             const projectInfo = JSON.parse(projectInfoText);
             this._info = {
-                id: projectInfo.id ?? '',
+                id: projectInfo.id && isValidBigNumberKey(projectInfo.id) ? projectInfo.id : '',
                 title:projectInfo.title,
                 inited: projectInfo.inited,
                 rootWorkspaceId: projectInfo.rootWorkspaceId

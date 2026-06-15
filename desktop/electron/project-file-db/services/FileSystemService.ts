@@ -117,6 +117,9 @@ export class FileSystemService{
                 workspace_info.updatedAt = updated_at;
                 workspace_info.projectId = this.db.info.id ?? '';
                 workspace_info.rights = AssetRights.FULL_ACCESS;
+                if(workspace_info.name === 'gdd') {
+                    workspace_info.name = null; // gdd is reserved workspace name
+                }
                 return {
                     type: 'workspace',
                     localPath: local_path,

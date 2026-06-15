@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import axios from "axios";
 import type { SyncInfo } from "#logic/types/SyncTypes";
 import { SyncCurrentStateStatus, type SyncCurrentState } from "#bridge/types/SyncTypes";
+import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
 
 const SYNC_CHUNK_SIZE = 50;
 export const SQLITE_NOW_STM = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
@@ -223,7 +224,7 @@ export class SyncService {
 
     async syncProject(){
         if (this._syncProcessRunning) return;
-        if (!this.db.info.id) return;
+        if (!this.db.info.id || !isValidBigNumberKey(this.db.info.id)) return;
 
         const account = this.db.api.getTokenInfo();
         if (!account) return;
