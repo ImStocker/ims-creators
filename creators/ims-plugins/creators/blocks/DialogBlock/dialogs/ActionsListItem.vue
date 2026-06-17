@@ -51,11 +51,16 @@
           :key="param.name"
           class="ActionsListItem-params-list-item"
         >
-          <span class="ActionsListItem-params-list-item-title">
-            {{ param.title }}
-          </span>
+          <caption-string  
+            class="ActionsListItem-params-list-item-title"
+            :value="param.title"
+            :title="param.title"
+          ></caption-string>
           —
-          <span class="ActionsListItem-params-list-item-type">
+          <span class="ActionsListItem-params-list-item-type" :title="$t(
+                'imsDialogEditor.var.types.' +
+                  (param.type?.Type.toString() ?? 'any'),
+              )">
             <div
               class="ActionsListItem-params-list-item-type-ellipse"
               :class="'type-' + (param.type?.Type ?? 'any')"
@@ -80,11 +85,16 @@
           :key="param.name"
           class="ActionsListItem-params-list-item"
         >
-          <span class="ActionsListItem-params-list-item-title">
-            {{ param.title }}
-          </span>
+          <caption-string  
+            class="ActionsListItem-params-list-item-title"
+            :value="param.title"
+            :title="param.title"
+          ></caption-string>
           —
-          <span class="ActionsListItem-params-list-item-type">
+          <span class="ActionsListItem-params-list-item-type" :title="$t(
+                'imsDialogEditor.var.types.' +
+                  (param.type?.Type.toString() ?? 'any'),
+              )">
             <div
               class="ActionsListItem-params-list-item-type-ellipse"
               :class="'type-' + (param.type?.Type ?? 'any')"
@@ -129,6 +139,7 @@ import {
   checkParamsExists,
   guessDuplicatedItemTitle,
 } from '../logic/nodeVariables';
+import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
 
 export default defineComponent({
   name: 'ActionsListItem',
@@ -138,6 +149,7 @@ export default defineComponent({
     ImsSelect,
     MenuButton,
     MenuList,
+    CaptionString,
   },
   props: {
     action: {
@@ -324,7 +336,6 @@ export default defineComponent({
   column-gap: var(--actions-list-column-gap);
 }
 .ActionsListItem-column {
-  // border: 1px solid #eee;
   display: flex;
   align-items: center;
 }
@@ -366,9 +377,15 @@ export default defineComponent({
   gap: 5px;
 }
 .ActionsListItem-params-list-item-title {
+  flex:1;
   text-wrap: nowrap;
   text-overflow: ellipsis;
-  max-width: 50%;
+  overflow: hidden;
+}
+.ActionsListItem-params-list-item-type{
+  flex: 1;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
   overflow: hidden;
 }
 </style>
