@@ -126,7 +126,7 @@ export class ProjectFileDb  {
         await fs.promises.mkdir(path.join(this.localPath, PROJECT_META_FOLDER), {
           recursive: true
         });
-debugger
+
         let need_recreate = !!initParams?.recreate;
         if (!need_recreate){
             try {
