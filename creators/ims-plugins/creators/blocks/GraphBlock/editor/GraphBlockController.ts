@@ -461,9 +461,9 @@ export class GraphBlockController extends BlockEditorController {
           icon = 'ri-link-m';
           title = (nodeData.value as AssetPropValueAsset).Title
             ? convertTranslatedTitle(
-                (nodeData.value as AssetPropValueAsset).Title,
-                (key: any) => this.appManager.$t(key),
-              )
+              (nodeData.value as AssetPropValueAsset).Title,
+              (key: any) => this.appManager.$t(key),
+            )
             : ((nodeData.value as AssetPropValueAsset).Name ??
               castAssetPropValueToString(nodeData.value));
         } else {
@@ -573,7 +573,7 @@ export class GraphBlockController extends BlockEditorController {
 
     if (!result) {
       if (result !== '') return; // cancelled
-      if (isUUID(nodeId)) return; // no service name to reset, nothing to do
+      if (isUUID(nodeId), 'loose') return; // no service name to reset, nothing to do
     } else if (result === nodeId) {
       return;
     }

@@ -46,7 +46,7 @@ export default defineComponent({
   },
   computed: {
     showServiceName() {
-      return !isUUID(this.nodeId);
+      return !isUUID(this.nodeId, 'loose');
     },
     contextMenuComp() {
       const controller = unref(

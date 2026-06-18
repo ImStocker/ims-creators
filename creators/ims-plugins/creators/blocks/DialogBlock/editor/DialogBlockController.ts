@@ -1408,7 +1408,7 @@ export class DialogBlockController extends BlockEditorController {
           title_val =
             this.appManager.$t(
               'imsDialogEditor.contents.' +
-                (node.type === 'getVar' ? 'varGet' : 'varSet'),
+              (node.type === 'getVar' ? 'varGet' : 'varSet'),
             ) +
             ' ' +
             variable.title;
@@ -1461,7 +1461,7 @@ export class DialogBlockController extends BlockEditorController {
 
     if (!result) {
       if (result !== '') return; // cancelled
-      if (isUUID(nodeId)) return; // no service name to reset, nothing to do
+      if (isUUID(nodeId, 'loose')) return; // no service name to reset, nothing to do
     } else if (result === nodeId) {
       return;
     }

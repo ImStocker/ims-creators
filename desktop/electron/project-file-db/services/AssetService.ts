@@ -26,47 +26,47 @@ import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import { ASSET_BASE_ORDERING } from "../project-db-constants";
 
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
-   
+
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
 
 export type AssetServiceAssetChangeBatchOpDTO = {
-  create?: boolean | { id?: string | null, localName?: string };
-  set: AssetSetDTO;
-  where?: AssetWhereParams;
+    create?: boolean | { id?: string | null, localName?: string };
+    set: AssetSetDTO;
+    where?: AssetWhereParams;
 };
 
-export class AssetService implements IProjectDatabaseAsset{
+export class AssetService implements IProjectDatabaseAsset {
 
 
     private _sessionChangeHistory = new Map<string, HistoryChangeRecord>()
     private _sessionDeletedAssets = new ProjectFileDbCollection<ProjectFileDbAsset>();
     assets = new ProjectFileDbCollection<ProjectFileDbAsset>();
     systemAssets = new ProjectFileDbCollection<ProjectFileDbAsset>();
-    
-    constructor(public db: ProjectFileDb){
+
+    constructor(public db: ProjectFileDb) {
 
     }
 
     private _getAssetProp(asset: ProjectFileDbAsset, assetName: string): AssetPropsPlainObjectValue {
         const prop = getFieldDescriptor(assetName);
-        if(prop){
-            if(prop.get){
+        if (prop) {
+            if (prop.get) {
                 return prop.get(asset);
             }
-            else if(prop.jsonName){
+            else if (prop.jsonName) {
                 return (asset as any)[prop.jsonName];
             }
         }
         return null;
     }
-    
-    private _readAssetPropBySelectField(target: AssetPropsPlainObject, asset: ProjectFileDbAsset, prop: AssetPropsSelectionField){
-        if(typeof prop === 'string'){
+
+    private _readAssetPropBySelectField(target: AssetPropsPlainObject, asset: ProjectFileDbAsset, prop: AssetPropsSelectionField) {
+        if (typeof prop === 'string') {
             target[prop] = this._getAssetProp(asset, prop);
         }
         else {
             let val = this._getAssetProp(asset, prop.prop);
-            if (prop.func === 'notEmpty'){
+            if (prop.func === 'notEmpty') {
                 val = !!val;
             }
             target[prop.as ?? prop.prop] = val
@@ -74,8 +74,8 @@ export class AssetService implements IProjectDatabaseAsset{
     }
 
 
-    public async searchAssets(where: AssetQueryWhere): Promise<ProjectFileDbAsset[]>{
-        if (Object.keys(where).length === 0){
+    public async searchAssets(where: AssetQueryWhere): Promise<ProjectFileDbAsset[]> {
+        if (Object.keys(where).length === 0) {
             return [...this.assets.iterate()]
         }
 
@@ -83,18 +83,18 @@ export class AssetService implements IProjectDatabaseAsset{
         const result = filter.apply(this.assets.iterate());
         return [...result];
     }
-    
-    public getAssetField(asset: ProjectFileDbAsset, field: string): AssetPropValue{
+
+    public getAssetField(asset: ProjectFileDbAsset, field: string): AssetPropValue {
         return (asset as unknown as Record<string, AssetPropValue>)[field]
     }
 
-    private async _sortAssets(assets: ProjectFileDbAsset[], order: AssetPropsSelectionOrder[]): Promise<ProjectFileDbAsset[]>{
+    private async _sortAssets(assets: ProjectFileDbAsset[], order: AssetPropsSelectionOrder[]): Promise<ProjectFileDbAsset[]> {
         const order_items = order ? order : ASSET_BASE_ORDERING;
-        return assets.sort((a,b) => {
-            for(const order_item of order_items){
+        return assets.sort((a, b) => {
+            for (const order_item of order_items) {
                 let order_field: string;
                 let order_desc = false;
-                if(typeof order_item === 'object'){
+                if (typeof order_item === 'object') {
                     order_field = order_item.prop;
                     order_desc = order_item.desc ?? false;
                 }
@@ -104,7 +104,7 @@ export class AssetService implements IProjectDatabaseAsset{
                 const a_val = this.getAssetField(a, order_field);
                 const b_val = this.getAssetField(b, order_field);
                 const res = compareAssetPropValues(a_val, b_val);
-                if(res !== 0){
+                if (res !== 0) {
                     return order_desc ? res : -res;
                 }
             }
@@ -154,12 +154,12 @@ export class AssetService implements IProjectDatabaseAsset{
                     prop: 'projectid',
                     as: 'projectId',
                 },
-                { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty'}
+                { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty' }
             ]
         },
-        {
-            folded: true,
-        });
+            {
+                folded: true,
+            });
         const workspaces = await this.db.workspace.loadAssetWorkspacesTree(result.list.map(item => (item as any).workspaceId));
         return {
             list: result.list.map(item => {
@@ -176,7 +176,7 @@ export class AssetService implements IProjectDatabaseAsset{
                         ...workspace,
                         unread: 0,
                         props: props
-                    }] as any 
+                    }] as any
                 })),
                 users: {},
             },
@@ -186,7 +186,7 @@ export class AssetService implements IProjectDatabaseAsset{
 
     private async _getAssetFullById(asset_id: string): Promise<ProjectFileDbAsset | null> {
         const db_asset = this.assets.byId.get(asset_id);
-        if(!db_asset) return null;
+        if (!db_asset) return null;
 
         const asset: ProjectFileDbAsset = {
             ...db_asset,
@@ -200,53 +200,53 @@ export class AssetService implements IProjectDatabaseAsset{
 
         const parent_id = db_asset.parentIds && db_asset.parentIds.length > 0 ? db_asset.parentIds[0] : null
         const parent_asset = parent_id ? await this._getAssetFullById(parent_id) : null;
-        if(parent_asset) {
+        if (parent_asset) {
 
             asset.typeIds = [parent_asset.id, ...parent_asset.typeIds]
 
-            if(!asset.ownIcon) {
+            if (!asset.ownIcon) {
                 asset.icon = parent_asset.icon;
             }
 
-            for(const parent_block of parent_asset.blocks){
+            for (const parent_block of parent_asset.blocks) {
                 let ind = -1
                 if (parent_block.name) ind = asset.blocks.findIndex(b => b.name === parent_block.name)
                 else if (ind < 0) ind = asset.blocks.findIndex(b => b.id === parent_block.id);
-                if(ind < 0){
+                if (ind < 0) {
                     asset.blocks.push({
                         ...parent_block,
                         props: {},
-                        inherited: {...parent_block.computed},
+                        inherited: { ...parent_block.computed },
                     })
                 }
                 else {
                     asset.blocks[ind] = {
                         ...asset.blocks[ind],
-                        inherited: {...parent_block.computed},
+                        inherited: { ...parent_block.computed },
                     }
                 }
-            }            
+            }
         }
 
         const existing_blocks: ProjectFileDbAssetBlock[] = [];
-        for(const block of asset.blocks){
-            if(!block.delete){
+        for (const block of asset.blocks) {
+            if (!block.delete) {
 
                 const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
                 const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
 
                 let block_computed = block_props;
-                if (block_inherited){
-                    const {normalProps, remapParentProps} = extractRemapParentProps(block_props);
-                    if (remapParentProps){
+                if (block_inherited) {
+                    const { normalProps, remapParentProps } = extractRemapParentProps(block_props);
+                    if (remapParentProps) {
                         block_computed = remapAssetProps(block_inherited, remapParentProps);
                     }
                     else {
                         block_computed = block_inherited;
                     }
-                    block_computed = { ...block_computed, ...normalProps};
+                    block_computed = { ...block_computed, ...normalProps };
                 }
-            
+
                 existing_blocks.push({
                     ...block,
                     computed: convertAssetPropsToPlainObject(block_computed)
@@ -261,15 +261,15 @@ export class AssetService implements IProjectDatabaseAsset{
     async getAssetFulls(query: ApiRequestList<AssetQueryWhere>): Promise<{
         list: ProjectFileDbAsset[],
         total: number
-    }>{
-        let list = await this.searchAssets(query.where  ? query.where : {}) 
+    }> {
+        let list = await this.searchAssets(query.where ? query.where : {})
         list = await this._sortAssets(list, query.order ?? ['index', 'title', 'name', 'createdAt', 'id']);
         const total = list.length;
-        if(query.count || query.offset){
+        if (query.count || query.offset) {
             list = list.slice(query.offset ?? 0, query.count);
         }
         const actual_list = [];
-        for(let asset of list){
+        for (let asset of list) {
             const actual_asset = await this._getAssetFullById(asset.id);
             assert(actual_asset);
             actual_list.push(actual_asset);
@@ -281,7 +281,7 @@ export class AssetService implements IProjectDatabaseAsset{
     }
 
     async assetsGetFull(query: ApiRequestList<AssetQueryWhere>): Promise<AssetsFullResult> {
-        const {list, total} = await this.getAssetFulls(query);
+        const { list, total } = await this.getAssetFulls(query);
         const workspaces = await this.db.workspace.loadAssetWorkspacesTree(list.map(item => (item as any).workspaceId));
         const asset_ids = list.map(asset => asset.id);
         const type_ids_set = new Set<string>();
@@ -296,7 +296,7 @@ export class AssetService implements IProjectDatabaseAsset{
             objects: {
                 assetFulls: Object.fromEntries([...list.entries()].map(([, asset]) => {
                     const new_blocks: AssetBlockEntity[] = [];
-                    for(const block of asset.blocks){
+                    for (const block of asset.blocks) {
                         new_blocks.push({
                             ...block,
                             rights: 5,
@@ -306,10 +306,10 @@ export class AssetService implements IProjectDatabaseAsset{
                         })
                     }
 
-                    const changed_asset = {...asset};
+                    const changed_asset = { ...asset };
                     delete (changed_asset as any)['values'];
-                    
-                    this._readAssetPropBySelectField(changed_asset, asset, { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty'})
+
+                    this._readAssetPropBySelectField(changed_asset, asset, { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty' })
                     return [changed_asset.id, {
                         ...changed_asset,
                         lastViewedAt: undefined,
@@ -333,18 +333,18 @@ export class AssetService implements IProjectDatabaseAsset{
                         ...workspace,
                         unread: 0,
                         props: props
-                    }] as any 
+                    }] as any
                 })),
                 users: {},
             },
             total: total,
         };
     }
-  
-    async getAssetLocalPath(asset_id: string){
+
+    async getAssetLocalPath(asset_id: string) {
         return getAssetLocalPathById(asset_id, this.db);
     }
-    
+
     async assetsGetView<T extends AssetProps>(
         query: AssetPropsSelection,
         options?: { folded: false },
@@ -357,14 +357,14 @@ export class AssetService implements IProjectDatabaseAsset{
         query: AssetPropsSelection,
         options?: { folded: boolean },
     ): Promise<ApiResultListWithTotal<T>> {
-        const {list, total} = await this.getAssetFulls(query);
+        const { list, total } = await this.getAssetFulls(query);
         const res = {
             list: list.map(asset => {
                 const view: AssetPropsPlainObject = {};
-                for(const prop of query.select){
+                for (const prop of query.select) {
                     this._readAssetPropBySelectField(view, asset, prop)
                 }
-                if (!options?.folded){
+                if (!options?.folded) {
                     return assignPlainValueToAssetProps({}, view) as T;
                 }
                 return view as T;
@@ -376,7 +376,7 @@ export class AssetService implements IProjectDatabaseAsset{
 
     private _checkLinksInAssetBlockProps(asset: ProjectFileDbAsset): AssetsGraphItem[] {
         const list: AssetsGraphItem[] = [];
-        for(const asset_block of asset.blocks){
+        for (const asset_block of asset.blocks) {
             const props: AssetPropsPlainObject = assignPlainValueToAssetProps({}, asset_block.props);
             for (const [prop, val] of Object.entries(props)) {
                 if (!val) continue;
@@ -387,7 +387,7 @@ export class AssetService implements IProjectDatabaseAsset{
                     )) {
                         if (
                             op_struct.attributeAsset &&
-                            isUUID(op_struct.attributeAsset.value.AssetId)
+                            isUUID(op_struct.attributeAsset.value.AssetId, 'loose')
                         ) {
                             list.push({
                                 source: asset.id,
@@ -397,7 +397,7 @@ export class AssetService implements IProjectDatabaseAsset{
                         }
                         if (
                             op_struct.insertTask &&
-                            isUUID(op_struct.insertTask.value.AssetId)
+                            isUUID(op_struct.insertTask.value.AssetId, 'loose')
                         ) {
                             list.push({
                                 source: asset.id,
@@ -408,18 +408,18 @@ export class AssetService implements IProjectDatabaseAsset{
                         if (
                             op_struct.insertProp &&
                             op_struct.insertProp.value &&
-                            isUUID((op_struct.insertProp.value as AssetPropValueAsset).AssetId)
+                            isUUID((op_struct.insertProp.value as AssetPropValueAsset).AssetId, 'loose')
                         ) {
                             list.push({
                                 source: asset.id,
                                 target: (op_struct.insertProp.value as AssetPropValueAsset)
-                                .AssetId,
+                                    .AssetId,
                                 type: 'mention',
                             });
                         }
                     }
                 } else if ((val as AssetPropValueAsset).AssetId) {
-                    if (isUUID((val as AssetPropValueAsset).AssetId)) {
+                    if (isUUID((val as AssetPropValueAsset).AssetId), 'loose') {
                         list.push({
                             source: asset.id,
                             target: (val as AssetPropValueAsset).AssetId,
@@ -440,10 +440,10 @@ export class AssetService implements IProjectDatabaseAsset{
         // target - от кого наследуется. От кого идет стрелка
         const assets = await this.getAssetFulls(query);
         let list: AssetsGraphItem[] = [];
-        for(const graph_asset of assets.list){
+        for (const graph_asset of assets.list) {
             //input links and parents
-            for(const parent_id of graph_asset.parentIds){
-               const graph_item: AssetsGraphItem = {
+            for (const parent_id of graph_asset.parentIds) {
+                const graph_item: AssetsGraphItem = {
                     source: graph_asset.id,
                     target: parent_id,
                     type: 'inherit'
@@ -452,9 +452,9 @@ export class AssetService implements IProjectDatabaseAsset{
             }
             list = [...list, ...this._checkLinksInAssetBlockProps(graph_asset)]
             // output links and children
-            for(const asset of this.db.asset.assets.iterate()){
-                for(const parent_id of asset.parentIds){
-                    if(parent_id === graph_asset.id) {
+            for (const asset of this.db.asset.assets.iterate()) {
+                for (const parent_id of asset.parentIds) {
+                    if (parent_id === graph_asset.id) {
                         const graph_item: AssetsGraphItem = {
                             source: asset.id,
                             target: graph_asset.id,
@@ -463,11 +463,13 @@ export class AssetService implements IProjectDatabaseAsset{
                         list.push(graph_item);
                     }
                 }
-                const links = this._checkLinksInAssetBlockProps(asset).filter(item => item.target === graph_asset.id).map(item => {return {
-                    source: item.target,
-                    target: item.source,
-                    type: item.type
-                }});
+                const links = this._checkLinksInAssetBlockProps(asset).filter(item => item.target === graph_asset.id).map(item => {
+                    return {
+                        source: item.target,
+                        target: item.source,
+                        type: item.type
+                    }
+                });
                 list = [...list, ...links];
             }
         }
@@ -482,15 +484,15 @@ export class AssetService implements IProjectDatabaseAsset{
             }
         })
         const graph_assets_obj: { [key: string]: AssetShort } = {}
-        graph_assets.list.forEach(asset => graph_assets_obj[asset.id] = {...asset})
+        graph_assets.list.forEach(asset => graph_assets_obj[asset.id] = { ...asset })
         return {
-          list,
-          more: false,
-          objects: {
-            assets: {
-              ...graph_assets_obj,
+            list,
+            more: false,
+            objects: {
+                assets: {
+                    ...graph_assets_obj,
+                }
             }
-          }
         }
     }
 
@@ -498,16 +500,15 @@ export class AssetService implements IProjectDatabaseAsset{
         old_blocks: ProjectFileDbAssetBlock[],
         new_blocks: {
             [blockKey: string]: AssetBlockParamsDTO;
-        }, 
+        },
         undo?: AssetSetDTO
-    ): ProjectFileDbAssetBlock[]
-    {
+    ): ProjectFileDbAssetBlock[] {
         const result: ProjectFileDbAssetBlock[] = [];
         const changed_block_ids = new Set();
-        for(const [block_key, new_block] of Object.entries(new_blocks)){
+        for (const [block_key, new_block] of Object.entries(new_blocks)) {
             const { blockId, blockName } = parseAssetNewBlockRef(block_key);
             const old_block = old_blocks.find(block => {
-                if(blockId) {
+                if (blockId) {
                     return block.id === blockId;
                 }
                 else if (blockName) {
@@ -515,31 +516,31 @@ export class AssetService implements IProjectDatabaseAsset{
                 }
             });
             let block_undo: AssetBlockParamsDTO | undefined;
-            if (undo){
+            if (undo) {
                 if (!undo.blocks) undo.blocks = {};
                 if (blockId) {
                     undo.blocks[`@${blockId}`] = {};
                     block_undo = undo.blocks[`@${blockId}`]
                 }
-                else if (blockName){
+                else if (blockName) {
                     undo.blocks[blockName] = {};
                     block_undo = undo.blocks[blockName]
                 }
             }
             const result_block = this._prepareBlockToSave(
-                block_key, 
-                old_block ? old_block : null, 
+                block_key,
+                old_block ? old_block : null,
                 new_block,
                 block_undo
             );
-            if(result_block){
+            if (result_block) {
                 result.push(result_block);
                 changed_block_ids.add(result_block.id);
             }
-            if(old_block) changed_block_ids.add(old_block.id);
+            if (old_block) changed_block_ids.add(old_block.id);
         }
-        for(const old_block of old_blocks) {
-            if(!changed_block_ids.has(old_block.id)){
+        for (const old_block of old_blocks) {
+            if (!changed_block_ids.has(old_block.id)) {
                 result.push(old_block);
             }
         }
@@ -553,35 +554,34 @@ export class AssetService implements IProjectDatabaseAsset{
         old_block: Partial<ProjectFileDbAssetBlock> | null,
         new_block: AssetBlockParamsDTO,
         block_undo?: AssetBlockParamsDTO
-    ): ProjectFileDbAssetBlock | null
-    {
+    ): ProjectFileDbAssetBlock | null {
         const { blockId, blockName } = parseAssetNewBlockRef(block_key);
-        if(!(old_block?.type || new_block.type)){
+        if (!(old_block?.type || new_block.type)) {
             throw new Error("Type is not set");
         }
         const old_block_props = assignPlainValueToAssetProps({}, old_block?.props ?? {});
         const old_block_inherited = old_block?.inherited ? assignPlainValueToAssetProps({}, old_block.inherited ?? {}) : null;
-       
+
         let result_props = old_block_props;
         let result_props_undo: AssetProps[] | undefined
-        if (new_block.props){
+        if (new_block.props) {
             const new_block_props_change = (Array.isArray(new_block.props) ? new_block.props : [new_block.props]);
             const result_props_applied_change = applyPropsChange(old_block_props, old_block_inherited ?? {}, new_block_props_change)
             result_props = result_props_applied_change.props
             result_props_undo = result_props_applied_change.undo;
         }
-        
-        const {normalProps, remapParentProps} = extractRemapParentProps(result_props);
+
+        const { normalProps, remapParentProps } = extractRemapParentProps(result_props);
         let computed_props: AssetProps = {};
         if (old_block_inherited) {
-            if (remapParentProps){
+            if (remapParentProps) {
                 computed_props = remapAssetProps(old_block_inherited, remapParentProps);
             }
             else {
                 computed_props = old_block_inherited;
             }
         }
-        computed_props = { ...computed_props, ...normalProps};
+        computed_props = { ...computed_props, ...normalProps };
 
 
         const block_entity: ProjectFileDbAssetBlock = {
@@ -599,25 +599,25 @@ export class AssetService implements IProjectDatabaseAsset{
             props: convertAssetPropsToPlainObject(result_props),
         };
 
-        if (block_undo){
-            
-            if(new_block.delete || new_block.reset){
-                if (old_block){
-                    block_undo = {                    
+        if (block_undo) {
+
+            if (new_block.delete || new_block.reset) {
+                if (old_block) {
+                    block_undo = {
                         index: old_block.index,
                         name: old_block.name,
                         title: old_block.title,
-                        props: assignPlainValueToAssetProps({}, old_block.props ??{}),
+                        props: assignPlainValueToAssetProps({}, old_block.props ?? {}),
                         type: old_block.type,
                     }
                 }
             }
             else {
 
-                if (old_block){                
-                    if (block_undo){
-                        for (const [prop, val] of Object.entries(new_block) as [keyof AssetBlockParamsDTO, any][]){
-                            switch (prop){
+                if (old_block) {
+                    if (block_undo) {
+                        for (const [prop, val] of Object.entries(new_block) as [keyof AssetBlockParamsDTO, any][]) {
+                            switch (prop) {
                                 case 'delete':
                                 case 'props':
                                 case 'reset':
@@ -630,7 +630,7 @@ export class AssetService implements IProjectDatabaseAsset{
                     }
                 }
                 else {
-                    if (block_undo){
+                    if (block_undo) {
                         block_undo = {
                             delete: true
                         }
@@ -639,27 +639,27 @@ export class AssetService implements IProjectDatabaseAsset{
             }
         }
 
-        if(new_block.delete){
-            if(old_block?.inherited) {
+        if (new_block.delete) {
+            if (old_block?.inherited) {
                 block_entity.delete = true;
                 block_entity.props = {}
                 block_entity.computed = {}
             }
             else return null;
         }
-        else if (new_block.reset){
+        else if (new_block.reset) {
             block_entity.props = {}
-            block_entity.computed = {...block_entity.inherited}
+            block_entity.computed = { ...block_entity.inherited }
         }
 
         return block_entity;
-    }   
-    
+    }
+
     async assetsCreate(params: AssetServiceAssetCreateDTO): Promise<AssetsChangeResult> {
         const change = await this.assetsChangeBatch({
             ops: [
                 {
-                    create: params.id || params.localName ? { id: params.id, localName: params.localName} : true,
+                    create: params.id || params.localName ? { id: params.id, localName: params.localName } : true,
                     set: params.set ?? {}
                 }
             ]
@@ -687,7 +687,7 @@ export class AssetService implements IProjectDatabaseAsset{
         let asset_is_abstract = false;
         let asset_index = null;
         let asset_parent_ids: string[] = [];
-        if(system_asset){
+        if (system_asset) {
             parent_props = [...system_asset.blocks];
             asset_name = system_asset.name;
             asset_title = system_asset.title;
@@ -698,23 +698,23 @@ export class AssetService implements IProjectDatabaseAsset{
             type_ids = [...system_asset.typeIds];
         }
         else {
-            if(params.set?.parentIds && params.set?.parentIds.length > 0){
-                if(params.set?.parentIds.length > 1){
+            if (params.set?.parentIds && params.set?.parentIds.length > 0) {
+                if (params.set?.parentIds.length > 1) {
                     throw new Error("Need be 1 parent");
                 }
                 const parent_asset = this.assets.byId.get(params.set?.parentIds[0])
-                if(!parent_asset){
+                if (!parent_asset) {
                     throw new Error("Parent with this id is not found");
                 }
-                for(const block of parent_asset.blocks){
+                for (const block of parent_asset.blocks) {
                     parent_props.push({
                         ...block,
-                        inherited: {...block.computed},
-                        computed: {...block.props},
+                        inherited: { ...block.computed },
+                        computed: { ...block.props },
                         props: {},
                     })
                 }
-                if(parent_asset.typeIds){
+                if (parent_asset.typeIds) {
                     type_ids = [...parent_asset.typeIds];
                 }
                 type_ids.unshift(parent_asset.id);
@@ -756,18 +756,18 @@ export class AssetService implements IProjectDatabaseAsset{
         }
     }
 
-    private _checkIsMdFile(asset_full: ProjectFileDbAsset){
+    private _checkIsMdFile(asset_full: ProjectFileDbAsset) {
         const meta_block = asset_full.blocks.find(block => block.name === BLOCK_NAME_META && block.computed.format === 'md');
         return !!meta_block;
     }
 
-    async saveAssetFile(asset_full: ProjectFileDbAsset){
+    async saveAssetFile(asset_full: ProjectFileDbAsset) {
         assert(asset_full.localName)
         const local_path = getAssetLocalPath(asset_full, this.db);
         await this.saveAssetFileToFile(asset_full, local_path);
     }
 
-    async saveAssetFileToFile(asset_full: ProjectFileDbAsset, file_path: string){  
+    async saveAssetFileToFile(asset_full: ProjectFileDbAsset, file_path: string) {
         await this.db.fileSystem.expectFsChange([file_path], async () => {
             const writableStream = fs.createWriteStream(file_path);
             this.saveAssetFileToStream(asset_full, writableStream);
@@ -777,18 +777,18 @@ export class AssetService implements IProjectDatabaseAsset{
                 if (err) reject(err)
                 else resolve();
             }));
-        })      
+        })
     }
 
-    saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable){
-        if(this._checkIsMdFile(asset_full)) {
+    saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable) {
+        if (this._checkIsMdFile(asset_full)) {
             const md_block = asset_full.blocks.find(block => block.type === 'markdown');
-            target.write( md_block ? (md_block.computed.value ?? '').toString() : '')
+            target.write(md_block ? (md_block.computed.value ?? '').toString() : '')
             return;
         }
-        
+
         // Save as ima.json
-        const ima_asset  = {
+        const ima_asset = {
             ...asset_full,
             localName: undefined,
             rights: undefined,
@@ -798,11 +798,11 @@ export class AssetService implements IProjectDatabaseAsset{
             hasImage: undefined,
             createdAt: undefined,
             updatedAt: undefined,
-            values: {} as {[key: string]: AssetPropsPlainObject}
+            values: {} as { [key: string]: AssetPropsPlainObject }
         }
-        const blocks_for_values = asset_full.blocks.filter((block) => block.name && !block.name.startsWith('__'));      
+        const blocks_for_values = asset_full.blocks.filter((block) => block.name && !block.name.startsWith('__'));
         for (const block of blocks_for_values) {
-            if (!block.name){
+            if (!block.name) {
                 continue;
             }
             const values_block_props = { ...block.props };
@@ -817,9 +817,9 @@ export class AssetService implements IProjectDatabaseAsset{
         target.write(JSON.stringify(ima_asset, null, 1))
     }
 
-    getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean){
+    getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean) {
         let ext = '.ima.json'
-        if(this._checkIsMdFile(asset_full)) {
+        if (this._checkIsMdFile(asset_full)) {
             ext = '.md'
         }
         return generateNextUniqueNameNumber(
@@ -847,24 +847,24 @@ export class AssetService implements IProjectDatabaseAsset{
             touchedWIds: change.touchedWIds
         }
     }
-    
+
     private async _assetsChangeImpl(tx: ProjectFileDbTransaction, changeRecord: HistoryChangeRecord, params: AssetChangeDTO, options?: { pid?: string; }): Promise<{
         ids: string[]
     }> {
         const assets_from_db = await this.searchAssets(params.where);
         const changing_assets_ids = assets_from_db.map(asset => asset.id);
-        if(assets_from_db.length > 0){
+        if (assets_from_db.length > 0) {
             const changing_assets = [...assets_from_db];
-            for(let changing_asset of changing_assets){
+            for (let changing_asset of changing_assets) {
                 const undo: AssetSetDTO = {};
-                for (const [prop, val] of Object.entries(params.set) as [keyof AssetSetDTO, any][]){
-                    switch (prop){
+                for (const [prop, val] of Object.entries(params.set) as [keyof AssetSetDTO, any][]) {
+                    switch (prop) {
                         case 'blocks':
                         case 'delete':
                         case 'restore':
                             continue;
                         default:
-                            if ((changing_asset)[prop] !== val){
+                            if ((changing_asset)[prop] !== val) {
                                 undo[prop] = (changing_asset)[prop] as any;
                             }
                     }
@@ -894,19 +894,19 @@ export class AssetService implements IProjectDatabaseAsset{
                     },
                     set: change.undo
                 }
-            }, options): []
+            }, options) : []
         })
     }
 
     async assetsChangeBatch(params: { ops: AssetServiceAssetChangeBatchOpDTO[]; }, options?: { pid?: string; }): Promise<AssetsBatchChangeResultDTO> {
         const changeRecord = new HistoryChangeRecord();
-        const createdIds = new  Set<string>()
-        const updatedIds = new  Set<string>()
-        const deletedIds = new  Set<string>()
+        const createdIds = new Set<string>()
+        const updatedIds = new Set<string>()
+        const deletedIds = new Set<string>()
         const tx = new ProjectFileDbTransaction(this.db)
 
-        for (const op of params.ops){
-            if (op.create){
+        for (const op of params.ops) {
+            if (op.create) {
                 const res = await this._assetsCreateImpl(tx, changeRecord, {
                     id: (typeof op.create === 'object' ? op.create.id : undefined) ?? undefined,
                     localName: (typeof op.create === 'object' ? op.create.localName : undefined) ?? undefined,
@@ -914,17 +914,17 @@ export class AssetService implements IProjectDatabaseAsset{
                 }, options)
                 createdIds.add(res.id)
             }
-            else if (op.set.delete){
+            else if (op.set.delete) {
                 assert(op.where, "Where is required for delete actions")
                 const res = await this._assetsDeleteImpl(tx, changeRecord, op.where, options)
-                for (const id of res.ids){
+                for (const id of res.ids) {
                     deletedIds.add(id)
                 }
             }
             else if (op.set.restore) {
                 assert(op.where, "Where is required for restore actions")
                 const res = await this._assetsRestoreImpl(tx, changeRecord, op.where, options)
-                for (const id of res.ids){
+                for (const id of res.ids) {
                     createdIds.add(id)
                 }
             }
@@ -934,7 +934,7 @@ export class AssetService implements IProjectDatabaseAsset{
                     set: op.set,
                     where: op.where
                 }, options)
-                for (const id of res.ids){
+                for (const id of res.ids) {
                     updatedIds.add(id)
                 }
 
@@ -946,7 +946,7 @@ export class AssetService implements IProjectDatabaseAsset{
             where: {
                 id: [...createdIds, ...updatedIds],
             }
-          })
+        })
 
         this._sessionChangeHistory.set(changeRecord.changeId, changeRecord)
 
@@ -954,7 +954,7 @@ export class AssetService implements IProjectDatabaseAsset{
             ...updatedOrCreated,
             changeId: changeRecord.changeId,
             createdIds: [...createdIds],
-            deletedIds:  [...deletedIds],
+            deletedIds: [...deletedIds],
             updatedIds: [...updatedIds],
             touchedWIds: tx.touchedWIds
         };
@@ -980,8 +980,8 @@ export class AssetService implements IProjectDatabaseAsset{
     public deleteOwnAssetFromCollectionOnly(asset_id: string): void {
         this.assets.delete(asset_id)
         const system_asset = this.systemAssets.byId.get(asset_id);
-        if(system_asset){
-            this.assets.add({...system_asset});
+        if (system_asset) {
+            this.assets.add({ ...system_asset });
         }
     }
 
@@ -992,8 +992,8 @@ export class AssetService implements IProjectDatabaseAsset{
             ...where,
             isSystem: false
         });
-        if(deleting_assets.length > 0){
-            for(const asset of deleting_assets){
+        if (deleting_assets.length > 0) {
+            for (const asset of deleting_assets) {
                 tx.changeAsset(asset, null);
                 changeRecord.addChange(asset.id, {
                     restore: true
@@ -1007,7 +1007,7 @@ export class AssetService implements IProjectDatabaseAsset{
             ids: deleting_asset_ids,
         }
     }
-   async assetsRestore( where: AssetWhereParams, options?: { pid?: string; }): Promise<AssetsChangeResult> {
+    async assetsRestore(where: AssetWhereParams, options?: { pid?: string; }): Promise<AssetsChangeResult> {
         const change = await this.assetsChangeBatch({
             ops: [
                 {
@@ -1024,17 +1024,17 @@ export class AssetService implements IProjectDatabaseAsset{
             total: change.total,
             changeId: change.changeId,
             touchedWIds: change.touchedWIds
-        }    
+        }
     }
-    
-   private async _assetsRestoreImpl(tx: ProjectFileDbTransaction, changeRecord: HistoryChangeRecord,where: AssetWhereParams, options?: { pid?: string; }): Promise<{ 
-        ids: string[],    
+
+    private async _assetsRestoreImpl(tx: ProjectFileDbTransaction, changeRecord: HistoryChangeRecord, where: AssetWhereParams, options?: { pid?: string; }): Promise<{
+        ids: string[],
     }> {
         const filter = await AssetSearchFilter.Create(where, this.db);
         const result = filter.apply(this._sessionDeletedAssets.iterate());
         const restoring_assets = [...result];
-        for (const asset_full of restoring_assets){
-            this._sessionDeletedAssets.delete(asset_full.id);   
+        for (const asset_full of restoring_assets) {
+            this._sessionDeletedAssets.delete(asset_full.id);
             tx.changeAsset(null, asset_full);
             changeRecord.addChange(asset_full.id, {
                 delete: true
@@ -1061,11 +1061,11 @@ export class AssetService implements IProjectDatabaseAsset{
 
         let cur_index: number | null | undefined = undefined;
         let index_step: number = 0;
-        if (params.indexFrom !== undefined || params.indexTo !== undefined){
-            if (params.indexFrom === null){
+        if (params.indexFrom !== undefined || params.indexTo !== undefined) {
+            if (params.indexFrom === null) {
                 cur_index = null
             }
-            else if (params.indexTo === null){
+            else if (params.indexTo === null) {
                 cur_index = params.indexFrom;
             }
             else {
@@ -1079,17 +1079,17 @@ export class AssetService implements IProjectDatabaseAsset{
         const ops: AssetChangeBatchOpDTO[] = [];
 
         const avail_assets_map = new Map(avail_assets.list.map(item => {
-            return [item.id, {...item}]
+            return [item.id, { ...item }]
         }));
         for (const asset_id of params.ids) {
             const avail_asset = avail_assets_map.get(asset_id)
             if (avail_asset) {
                 const set: AssetSetDTO = {}
-                if (cur_index !== undefined){
+                if (cur_index !== undefined) {
                     avail_asset.index = cur_index;
                     set.index = cur_index;
                 }
-                if (params.workspaceId !== undefined && avail_asset.workspaceId !== params.workspaceId){
+                if (params.workspaceId !== undefined && avail_asset.workspaceId !== params.workspaceId) {
                     avail_asset.workspaceId = params.workspaceId;
                     set.workspaceId = params.workspaceId;
                 }
@@ -1099,7 +1099,7 @@ export class AssetService implements IProjectDatabaseAsset{
                         id: asset_id,
                     }
                 })
-                if (cur_index !== null && cur_index !== undefined){
+                if (cur_index !== null && cur_index !== undefined) {
                     cur_index += index_step;
                 }
             }
@@ -1124,18 +1124,18 @@ export class AssetService implements IProjectDatabaseAsset{
         throw new Error("Method not implemented.");
     }
 
-    async exportToFile(assetId: string, target: string){
+    async exportToFile(assetId: string, target: string) {
         const assets = await this.getAssetFulls({
             where: {
                 id: assetId
             }
         })
-        if (assets.list.length === 0){
+        if (assets.list.length === 0) {
             throw new Error('Asset not found')
         }
         await this.saveAssetFileToFile(assets.list[0], target);
     }
-    findByLocalPath(localPath: string): ProjectFileDbAsset| null {
+    findByLocalPath(localPath: string): ProjectFileDbAsset | null {
         const dirpath = node_path.dirname(localPath);
         const local_name = node_path.basename(localPath);
         const workspace = this.db.workspace.findByLocalDirPath(dirpath);

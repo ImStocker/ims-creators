@@ -162,7 +162,7 @@ export default defineComponent({
             .get(ProjectManager)
             .getWorkspaceIdByName('gdd') ?? null,
       };
-      if (this.dataType.Kind && isUUID(this.dataType.Kind)) {
+      if (this.dataType.Kind && isUUID(this.dataType.Kind, 'loose')) {
         res.typeids = this.dataType.Kind;
       }
       return res;

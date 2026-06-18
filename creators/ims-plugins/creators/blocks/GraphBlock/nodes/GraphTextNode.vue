@@ -340,7 +340,7 @@ export default defineComponent({
       );
     },
     showServiceName() {
-      return !isUUID(this.id);
+      return !isUUID(this.id, 'loose');
     },
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();

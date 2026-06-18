@@ -104,7 +104,7 @@ export default defineComponent({
       if (this.modelValue.Type !== AssetPropType.ASSET) return null;
       if (!this.modelValue.Kind) return null;
       const asset_id = this.modelValue.Kind;
-      if (!isUUID(asset_id)) return null;
+      if (!isUUID(asset_id, 'loose')) return null;
       return (
         this.$getAppManager()
           .get(CreatorAssetManager)

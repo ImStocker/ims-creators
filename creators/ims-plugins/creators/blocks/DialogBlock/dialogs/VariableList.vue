@@ -156,7 +156,7 @@ export default defineComponent({
           continue;
         }
         const asset_id = variable.type.Kind;
-        if (!asset_id || !isUUID(asset_id)) {
+        if (!asset_id || !isUUID(asset_id, 'loose')) {
           continue;
         }
         asset_ids.push(asset_id);
