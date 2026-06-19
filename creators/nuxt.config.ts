@@ -47,6 +47,11 @@ export default defineNuxtConfig({
     plugins: [
       nodePolyfills({
         include: ['path'],
+        globals: {
+          process: false,
+          Buffer: false,
+          global: false,
+        },
       }),
     ],
     optimizeDeps: {
