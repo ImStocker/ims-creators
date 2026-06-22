@@ -29,6 +29,7 @@
                 :isOpened="activeTab === tab.name"
                 @changeActiveTab="changeActiveTab($event)"
                 v-show="activeTab === tab.name"
+                @update:isEmpty="emptyTabs[tab.name] = $event"
             ></component>
         </div>
     </div>
@@ -81,6 +82,7 @@ export default defineComponent({
         emptyTabs: {
           common: false,
           other: false,
+          plugins: false,
         },
         tabOptions
       }

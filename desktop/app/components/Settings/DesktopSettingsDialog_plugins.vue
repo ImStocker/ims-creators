@@ -36,6 +36,10 @@ export default defineComponent({
     FormSearch,
     DesktopSettingsDialog_plugins_plugin
   },
+  props:{
+    search: {},
+    isEmpty: {}
+  },
   data() {
     return {
       searchQuery: '',
@@ -48,9 +52,44 @@ export default defineComponent({
     await this.loadPluginsList();
   },
   computed: {
+    searchTexts() {
+      return (el: PluginListItemEntity) => [
+        el.entity.title,
+        el.entity.description,
+        el.entity.version,
+      ]
+    },
     filteredPlugins() {
       const external_plugins = this.allPlugins.filter(el => el.from !== 'internal');
-      return external_plugins.filter(el => el.entity.title.includes(this.searchQuery))
+      let result = external_plugins.filter(el => {
+        const texts = this.searchTexts(el);
+        return texts.some(t => t && t.toString().toLowerCase().includes(this.searchQuery.toLowerCase()))
+      })
+      if (this.search) {
+        const regex = new RegExp(".*" + this.search + ".*", 'i');
+        result = result.filter(el => {
+          const texts = this.searchTexts(el);
+          return texts.some(t => t && regex.test(t.toString()))
+        })
+      }
+      return result;
+    },
+    hasSearchValues(){
+      if(this.search){
+        const texts = [
+            this.$t('desktop.settings.plugins.searchPlugin'),
+            this.$t('desktop.settings.plugins.installFromDisk')
+        ]
+        const research = new RegExp(".*"+this.search+".*",'i');
+        const somethingMatch = texts.some(t => research.test(t.valueOf()))
+        return somethingMatch;
+      }
+      return true;
+    }
+  },
+  watch:{
+    filteredPlugins(){
+        this.$emit('update:isEmpty', this.filteredPlugins.length === 0 && !this.hasSearchValues)
     }
   },
   methods: {

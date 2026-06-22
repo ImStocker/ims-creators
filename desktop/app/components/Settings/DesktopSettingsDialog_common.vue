@@ -117,7 +117,15 @@ export default defineComponent({
             const search = new RegExp(".*"+this.search+".*",'i');
             return [...this.formSchema].filter(field => {
                 const caption = field ? (field.caption ? field.caption : "") : "";
-                return search.test(caption);
+                if (search.test(caption)) return true;
+                const options = field.editorProps && field.editorProps.options;
+                if (options) {
+                    for (const opt of options) {
+                        const label = opt.title || opt.label || '';
+                        if (search.test(label)) return true;
+                    }
+                }
+                return false;
             })
         }
         else return [...this.formSchema];

@@ -34,19 +34,31 @@ export default defineComponent({
     }
   },
   computed: {
+    allTabTexts(){
+        const texts = [
+            this.$t('desktop.settings.fields.maintenance'),
+            this.$t('desktop.settings.fields.openLogsFolder'),
+        ]
+        for(const setting of this.maintenance){
+            texts.push(this.$t('desktop.settings.' + setting))
+        }
+        return texts;
+    },
     formSchemaFiltered(){
         let answer=false;
         let filterMaintenance =[];
         if(this.search)
         {
             const research = new RegExp(".*"+this.search+".*",'i');
+            const somethingMatch = this.allTabTexts.some(t => research.test(t.valueOf()))
+            if (!somethingMatch) {
+                answer = true;
+            }
             for(const setting of this.maintenance){
                 if(!research.test(this.$t('desktop.settings.' + setting).valueOf())){
                     filterMaintenance.push(setting);
                 }
             }
-            if(filterMaintenance.length === this.maintenance.length) 
-            answer=true;
         }
         return {answer,filterMaintenance};
     }
