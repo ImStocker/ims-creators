@@ -19,6 +19,7 @@
               class="VariableTypeSelector-selectAsset"
               :model-value="callScriptForSelection"
               :where="selectAssetWhere"
+              :has-create-new-option="true"
               @update:model-value="selectExternalAsset"
             >
             </select-asset-combo-box>
