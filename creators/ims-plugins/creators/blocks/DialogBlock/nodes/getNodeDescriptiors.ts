@@ -17,6 +17,7 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptNode from './DialogCallScriptNode.vue';
+import DialogCommentNode from './DialogCommentNode.vue';
 
 const opOptionsEq = {
   opEqual: {
@@ -272,6 +273,18 @@ export function getNodeDescriptors(): NodeDescriptor[] {
         };
       },
     },*/
+    {
+      name: 'comment',
+      icon: 'ri-chat-4-line',
+      node: DialogCommentNode,
+      color: '#b5d8d4',
+      type: NodeType.DATA,
+      params: {
+        dataType: {
+          Type: AssetPropType.STRING,
+        },
+      },
+    },
     {
       name: 'setVar',
       icon: 'ri-edit-fill',

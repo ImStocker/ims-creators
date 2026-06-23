@@ -1408,7 +1408,7 @@ export class DialogBlockController extends BlockEditorController {
           title_val =
             this.appManager.$t(
               'imsDialogEditor.contents.' +
-              (node.type === 'getVar' ? 'varGet' : 'varSet'),
+                (node.type === 'getVar' ? 'varGet' : 'varSet'),
             ) +
             ' ' +
             variable.title;

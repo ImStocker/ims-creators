@@ -44,6 +44,10 @@ export default {
         title: 'Branch',
         description: 'Select one of the script path depending on conditions',
       },
+      comment: {
+        title: 'Comment',
+        description: 'Set comment',
+      },
       setVar: {
         title: 'Set variable',
         description: 'Set the value of a variable at runtime',
