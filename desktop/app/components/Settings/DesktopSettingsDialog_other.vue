@@ -55,7 +55,7 @@ export default defineComponent({
                 answer = true;
             }
             for(const setting of this.maintenance){
-                if(!research.test(this.$t('desktop.settings.' + setting).valueOf())){
+                if(!research.test(this.$t('desktop.settings.fields.' + setting).valueOf())){
                     filterMaintenance.push(setting);
                 }
             }
