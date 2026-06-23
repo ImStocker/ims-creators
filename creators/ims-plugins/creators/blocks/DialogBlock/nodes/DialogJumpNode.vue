@@ -11,7 +11,7 @@
       </div>
       <div class="DialogJumpNode-body DialogEditorNode-body">
         <NodeSelector
-          v-model="targetNodeId"
+          v-model="to"
           :dialog-controller="dialogController"
           :node-data-controller="nodeDataController"
           :readonly="readonly"
@@ -59,14 +59,14 @@ export default defineComponent({
     Position() {
       return Position;
     },
-    targetNodeId: {
+    to: {
       get(): string | null {
         return (
-          this.nodeDataController.values['targetNodeId']?.toString() ?? null
+          this.nodeDataController.values['to']?.toString() ?? null
         );
       },
       set(val: ScriptBlockPlainPropValue) {
-        this.nodeDataController.setValue('targetNodeId', val);
+        this.nodeDataController.setValue('to', val);
       },
     },
   },

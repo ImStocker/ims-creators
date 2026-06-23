@@ -286,9 +286,9 @@ export function getNodeDescriptors(): NodeDescriptor[] {
         const node = controller.state.nodes.find((n) => n.id === nodeId);
         if (!node) return [];
         const nodeData = node.data as any;
-        const targetNodeId: string | null = nodeData?.values?.targetNodeId ?? null;
-        if (!targetNodeId) return [];
-        const targetNode = controller.state.nodes.find((n) => n.id === targetNodeId);
+        const to: string | null = nodeData?.values?.to ?? null;
+        if (!to) return [];
+        const targetNode = controller.state.nodes.find((n) => n.id === to);
         if (!targetNode) return [];
         return [
           {
@@ -296,7 +296,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
             title: $t('imsDialogEditor.nodes.jump.goToTarget'),
             icon: 'ri-share-forward-2-line',
             action: () => {
-              controller.revealBlockContentItem('node-' + targetNodeId);
+              controller.revealBlockContentItem('node-' + to);
             },
           },
         ];
