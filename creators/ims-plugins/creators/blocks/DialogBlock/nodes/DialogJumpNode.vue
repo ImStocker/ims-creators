@@ -61,7 +61,9 @@ export default defineComponent({
     },
     targetNodeId: {
       get(): string | null {
-        return this.nodeDataController.values['targetNodeId'] ?? null;
+        return (
+          this.nodeDataController.values['targetNodeId']?.toString() ?? null
+        );
       },
       set(val: ScriptBlockPlainPropValue) {
         this.nodeDataController.setValue('targetNodeId', val);

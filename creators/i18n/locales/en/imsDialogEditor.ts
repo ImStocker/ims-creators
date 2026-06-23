@@ -39,7 +39,7 @@ export default {
         selectNode: 'Select node',
         changeNode: 'Change',
         goToTarget: 'Go to target node',
-        dblClickToGo: 'Double-click to go to this node',
+        clickToGo: 'Click to go to this node',
         pickNodeHint: 'Select a node to jump to',
       },
       callScript: {

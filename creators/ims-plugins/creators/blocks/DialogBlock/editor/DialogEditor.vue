@@ -316,6 +316,7 @@ export default defineComponent({
     return {
       dialogBlockController: computed(() => this.blockControllerMut),
       nodePicker: this.nodePicker,
+      navigateToNode: (nodeId: string) => this.showNode(nodeId),
     };
   },
   props: {

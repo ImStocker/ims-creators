@@ -39,7 +39,7 @@ export default {
         selectNode: 'Выбрать узел',
         changeNode: 'Сменить',
         goToTarget: 'Перейти к целевому узлу',
-        dblClickToGo: 'Двойной клик для перехода к этому узлу',
+        clickToGo: 'Клик для перехода к этому узлу',
         pickNodeHint: 'Выберите узел для прыжка',
       },
       callScript: {

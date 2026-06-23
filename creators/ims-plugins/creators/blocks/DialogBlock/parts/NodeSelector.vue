@@ -3,8 +3,8 @@
     <div
       v-if="modelValue"
       class="NodeSelector-value"
-      :title="$t('imsDialogEditor.nodes.jump.dblClickToGo')"
-      @dblclick="goToNode"
+      :title="$t('imsDialogEditor.nodes.jump.clickToGo')"
+      @click.stop="goToNode"
     >
       <i :class="targetIcon"></i>
       <span class="NodeSelector-name">{{ targetTitle }}</span>
@@ -42,6 +42,7 @@ export default defineComponent({
   name: 'NodeSelector',
   inject: {
     nodePicker: { default: null },
+    navigateToNode: { default: null },
   },
   props: {
     modelValue: {
@@ -127,7 +128,11 @@ export default defineComponent({
     },
     goToNode() {
       if (!this.modelValue) return;
-      this.dialogController.revealBlockContentItem('node-' + this.modelValue);
+      this.dialogController.setSelectedNodeIds(new Set([this.modelValue]));
+      this.dialogController.setSelectedEdgeIds(new Set());
+      if (this.navigateToNode) {
+        this.navigateToNode(this.modelValue);
+      }
     },
   },
 });
