@@ -33,6 +33,15 @@ export default {
         manageCaption: 'Управлять функциями',
         create: 'Создать функцию',
       },
+      jump: {
+        title: 'Прыжок',
+        description: 'Безусловный прыжок к другому узлу',
+        selectNode: 'Выбрать узел',
+        changeNode: 'Сменить',
+        goToTarget: 'Перейти к целевому узлу',
+        dblClickToGo: 'Двойной клик для перехода к этому узлу',
+        pickNodeHint: 'Выберите узел для прыжка',
+      },
       callScript: {
         title: 'Вызвать сценарий',
         description: 'Запустить другой сценарий внутри текущего',
@@ -168,6 +177,7 @@ export default {
       no: 'Нет',
       random: 'Случайно',
       else: 'Иначе',
+      targetNode: 'Целевой узел',
     },
     common: {
       noValue: 'Не задано',

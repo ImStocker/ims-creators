@@ -18,6 +18,9 @@ import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptNode from './DialogCallScriptNode.vue';
 import DialogCommentNode from './DialogCommentNode.vue';
+import DialogTimerNode from './DialogTimerNode.vue';
+import DialogChanceNode from './DialogChanceNode.vue';
+import DialogJumpNode from './DialogJumpNode.vue';
 
 const opOptionsEq = {
   opEqual: {
@@ -237,7 +240,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
     //   type: NodeType.DATA_START,
     // },
 
-    /*{
+    {
       name: 'timer',
       icon: 'ri-time-line',
       node: DialogTimerNode,
@@ -250,7 +253,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       node: DialogChanceNode,
       color: '#ea95c3',
       type: NodeType.EXEC,
-      initData: () => {
+      /*initData: () => {
         return {
           options: [
             {
@@ -271,8 +274,34 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           subject: '',
           values: {},
         };
+      },*/
+    },
+    {
+      name: 'jump',
+      icon: 'ri-arrow-right-circle-line',
+      node: DialogJumpNode,
+      color: '#c9a9ff',
+      type: NodeType.EXEC,
+      getContextMenuItems: (controller, nodeId, $t) => {
+        const node = controller.state.nodes.find((n) => n.id === nodeId);
+        if (!node) return [];
+        const nodeData = node.data as any;
+        const targetNodeId: string | null = nodeData?.values?.targetNodeId ?? null;
+        if (!targetNodeId) return [];
+        const targetNode = controller.state.nodes.find((n) => n.id === targetNodeId);
+        if (!targetNode) return [];
+        return [
+          {
+            name: 'go-to-target',
+            title: $t('imsDialogEditor.nodes.jump.goToTarget'),
+            icon: 'ri-share-forward-2-line',
+            action: () => {
+              controller.revealBlockContentItem('node-' + targetNodeId);
+            },
+          },
+        ];
       },
-    },*/
+    },
     {
       name: 'comment',
       icon: 'ri-chat-4-line',
@@ -281,7 +310,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       type: NodeType.DATA,
       params: {
         dataType: {
-          Type: AssetPropType.STRING,
+          Type: AssetPropType.TEXT,
         },
       },
     },

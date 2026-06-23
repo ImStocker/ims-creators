@@ -33,6 +33,15 @@ export default {
         manageCaption: 'Manage functions',
         create: 'Create function',
       },
+      jump: {
+        title: 'Jump',
+        description: 'Unconditional jump to another node',
+        selectNode: 'Select node',
+        changeNode: 'Change',
+        goToTarget: 'Go to target node',
+        dblClickToGo: 'Double-click to go to this node',
+        pickNodeHint: 'Select a node to jump to',
+      },
       callScript: {
         title: 'Call script',
         description: 'Run another script inside the current one',
@@ -169,6 +178,7 @@ export default {
       no: 'No',
       random: 'Random',
       else: 'Else',
+      targetNode: 'Target node',
     },
     common: {
       noValue: 'Not set',

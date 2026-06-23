@@ -113,6 +113,14 @@
         {{ $t('imsDialogEditor.addStartLevelHint') }}
       </div>
     </div>
+    <div v-if="nodePicker.active" class="DialogEditor-pickerHint">
+      <div class="DialogEditor-pickerHint-inner">
+        {{ $t('imsDialogEditor.nodes.jump.pickNodeHint') }}
+        <button class="is-button is-button-small" @click="nodePicker.active = false; nodePicker.callback = null">
+          {{ $t('common.dialogs.cancel') }}
+        </button>
+      </div>
+    </div>
     <div
       v-if="createNodeContext && createNodeContext.clickedAt"
       class="DialogEditor-createNode"
@@ -307,6 +315,7 @@ export default defineComponent({
   provide() {
     return {
       dialogBlockController: computed(() => this.blockControllerMut),
+      nodePicker: this.nodePicker,
     };
   },
   props: {
@@ -350,6 +359,7 @@ export default defineComponent({
       isFocused: false,
       clickOutside: null as SetClickOutsideCancel | null,
       mouseDownTime: 0,
+      nodePicker: { active: false, callback: null as ((nodeId: string) => void) | null },
     };
   },
   computed: {
@@ -1051,7 +1061,11 @@ export default defineComponent({
       }
     },
     onNodeClick({ node }: NodeMouseEvent) {
-      this.blockControllerMut.revealBlockContentItem('node-' + node.id);
+      if (this.nodePicker.active && this.nodePicker.callback) {
+        this.nodePicker.callback(node.id);
+      } else {
+        this.blockControllerMut.revealBlockContentItem('node-' + node.id);
+      }
     },
     async showNode(node_id: string): Promise<boolean> {
       const node = this.blockControllerMut.state.nodes.find(
@@ -1261,6 +1275,26 @@ export default defineComponent({
   padding: 10px 20px;
   border-radius: 4px;
   background: var(--dropdown-bg-color);
+  pointer-events: all;
+}
+.DialogEditor-pickerHint {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 300;
+}
+.DialogEditor-pickerHint-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 4px;
+  background: var(--dropdown-bg-color);
+  border: 2px solid var(--imsde-node-selected-color);
   pointer-events: all;
 }
 .DialogEditor-scriptEnded {

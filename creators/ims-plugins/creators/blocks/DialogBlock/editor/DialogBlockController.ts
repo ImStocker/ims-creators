@@ -1523,6 +1523,9 @@ export class DialogBlockController extends BlockEditorController {
       if (newNodeData.values) {
         for (const key of Object.keys(newNodeData.values)) {
           updateBind(newNodeData.values[key]);
+          if (key === 'targetNodeId' && newNodeData.values[key] === nodeId) {
+            newNodeData.values[key] = newId;
+          }
         }
       }
       if (newNodeData.options) {

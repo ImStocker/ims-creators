@@ -105,6 +105,8 @@ export default defineComponent({
 .DialogCommentNode-body {
   padding: 7px 10px;
   position: relative;
+  background-color: var(--imsde-node-color);
+  color: var(--imsde-node-header-text-color);
 }
 .DialogGonstNode-body-dataOut {
   position: absolute;
