@@ -16,6 +16,9 @@ export default {
       chance: {
         title: 'Шанс',
         description: 'Случайный выбор одного из путей сценария',
+        exit: 'Выход',
+        else: 'Иначе',
+        sumExceeds: 'Сумма шанса превышает 100%',
       },
       timer: {
         title: 'Таймер',

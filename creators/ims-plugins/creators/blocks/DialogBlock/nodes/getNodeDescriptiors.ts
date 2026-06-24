@@ -253,14 +253,12 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       node: DialogChanceNode,
       color: '#ea95c3',
       type: NodeType.EXEC,
-      /*initData: () => {
+      initData: () => {
         return {
           options: [
             {
               next: null,
-              values: {
-                chance: 0.5,
-              },
+              values: {},
             },
             {
               next: null,
@@ -274,7 +272,7 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           subject: '',
           values: {},
         };
-      },*/
+      },
     },
     {
       name: 'jump',

@@ -17,7 +17,7 @@
         <DataField
           :out-id="randomPinId"
           class="DialogChanceNode-random"
-          :caption="$t('imsDialogEditor.dataFields.random')"
+          :caption="randomCaption"
           :node-data-controller="nodeDataController"
         />
         <div class="DialogChanceNode-options">
@@ -25,36 +25,49 @@
             v-for="(option, option_index) of options"
             :key="option_index"
             class="DialogChanceNode-option"
-            :class="{ 'type-else': isElseOption(option_index) }"
+            :class="{ 'type-default': isDefaultOption(option_index) }"
           >
-            <div class="DialogChanceNode-option-main">
-              <template v-if="!isElseOption(option_index)">
-                <DataFieldInput
-                  :model-value="getOptionChance(option_index)"
-                  :data-type="floatType"
-                  :readonly="readonly"
-                  @update:model-value="
-                    (val: any) => setOptionChance(option_index, val)
-                  "
-                />
-                <span class="DialogChanceNode-option-unit">%</span>
-                <button
-                  v-if="!readonly && options.length > 2"
-                  class="is-button is-button-icon DialogChanceNode-option-delete"
-                  :title="$t('imsDialogEditor.speech.deleteOption')"
-                  @click="deleteOption(option_index)"
-                >
-                  <i class="ri-close-line"></i>
-                </button>
-              </template>
-              <span v-else class="DialogChanceNode-option-else">
-                {{ $t('imsDialogEditor.dataFields.else') || 'Else' }}
-                <span v-if="elseChance > 0"
-class="DialogChanceNode-else-pct"
-                  >({{ elseChance }}%)</span
-                >
+            <template v-if="isDefaultOption(option_index)">
+              <span
+                v-if="options.length <= 1"
+                class="DialogChanceNode-option-exit"
+              >
+                {{ $t('imsDialogEditor.nodes.chance.exit') }}
               </span>
-            </div>
+              <span v-else class="DialogChanceNode-option-else">
+                {{ $t('imsDialogEditor.nodes.chance.else') }}
+                <span v-if="elseChance > 0">
+                  ({{ formatFraction(elseChance) }},
+                  {{ computePercent(elseChance) }}%)
+                </span>
+              </span>
+            </template>
+            <template v-else>
+              <DataField
+                :model-value="getOptionChance(option_index)"
+                :in-id="getChancePinId(option_index)"
+                class="DialogChanceNode-option-field"
+                :node-data-controller="nodeDataController"
+                :readonly="readonly"
+                @update:model-value="
+                  (val: any) => setOptionChance(option_index, val)
+                "
+              />
+              <span
+                v-if="hasOptionChanceValue(option_index)"
+                class="DialogChanceNode-option-pct"
+              >
+                {{ computePercent(getOptionChance(option_index)) }}%
+              </span>
+              <button
+                v-if="!readonly"
+                class="is-button is-button-icon DialogChanceNode-option-delete"
+                :title="$t('imsDialogEditor.speech.deleteOption')"
+                @click="deleteOption(option_index)"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </template>
             <ExecHandle
               :id="'out-' + (option_index + 1)"
               type="source"
@@ -69,13 +82,10 @@ class="DialogChanceNode-else-pct"
         >
           + {{ $t('imsDialogEditor.speech.addOption') }}
         </div>
-        <div v-if="totalChance > 100" class="DialogChanceNode-warning">
+        <div v-if="totalChance > 1" class="DialogChanceNode-warning">
           <i class="ri-alert-line"></i>
-          {{
-            $t('imsDialogEditor.chance.sumExceeds') ||
-            'Sum of chances exceeds 100%'
-          }}
-          ({{ totalChance }}%)
+          {{ $t('imsDialogEditor.nodes.chance.sumExceeds') }}
+          ({{ computePercent(totalChance) }}%)
         </div>
       </div>
     </div>
@@ -88,11 +98,10 @@ import { Position } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import ExecHandle from '../parts/ExecHandle.vue';
 import DataField from '../parts/DataField.vue';
-import DataFieldInput from '../parts/DataFieldInput.vue';
 import type { NodeDataController } from '../editor/NodeDataController';
 import { AssetPropType } from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
-import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
+import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
@@ -101,7 +110,6 @@ export default defineComponent({
   components: {
     ExecHandle,
     DataField,
-    DataFieldInput,
     DialogBaseNode,
   },
   props: {
@@ -137,6 +145,10 @@ export default defineComponent({
     randomPinId() {
       return generateDataPinId(true, 'random');
     },
+    randomCaption() {
+      const sum = this.totalChance;
+      return 'Random: ' + (sum > 0 ? sum.toFixed(2) : '0');
+    },
     options() {
       return this.nodeDataController.options;
     },
@@ -145,8 +157,8 @@ export default defineComponent({
     },
     totalChance() {
       let sum = 0;
-      for (let i = 0; i < this.options.length - 1; i++) {
-        const chance = this.nodeDataController.getOptionValue(i, 'chance');
+      for (let i = 1; i < this.options.length; i++) {
+        const chance = this.getOptionChance(i);
         if (chance != null && chance !== '' && !isNaN(Number(chance))) {
           sum += Number(chance);
         }
@@ -154,7 +166,7 @@ export default defineComponent({
       return sum;
     },
     elseChance() {
-      const remaining = 100 - this.totalChance;
+      const remaining = 1 - this.totalChance;
       return remaining > 0 ? remaining : 0;
     },
   },
@@ -162,34 +174,48 @@ export default defineComponent({
     this.nodeDataController.setPinDataType(this.randomPinId, {
       Type: AssetPropType.FLOAT,
     });
+    for (let i = 1; i < this.options.length; i++) {
+      this.ensureChancePin(i);
+    }
   },
   methods: {
-    isElseOption(index: number) {
-      return index === this.options.length - 1;
+    getChancePinId(index: number) {
+      return generateDataPinId(false, 'chance', index);
+    },
+    ensureChancePin(index: number) {
+      const pinId = this.getChancePinId(index);
+      this.nodeDataController.setPinDataType(pinId, {
+        Type: AssetPropType.FLOAT,
+      });
+    },
+    isDefaultOption(index: number) {
+      return index === 0;
+    },
+    hasOptionChanceValue(index: number) {
+      const val = this.nodeDataController.getOptionValue(index, 'chance');
+      return val != null && val !== '';
     },
     getOptionChance(index: number) {
       return this.nodeDataController.getOptionValue(index, 'chance') ?? null;
     },
-    setOptionChance(index: number, val: AssetPropValue) {
+    setOptionChance(index: number, val: ScriptBlockPlainPropValue) {
       this.nodeDataController.setOptionValue(index, 'chance', val);
     },
+    computePercent(val: any) {
+      const num = Number(val);
+      if (isNaN(num)) return '0';
+      return (num * 100).toFixed(0);
+    },
+    formatFraction(val: number) {
+      return val.toFixed(2);
+    },
     addOption() {
-      const lastIdx = this.options.length - 1;
-      const lastOption = this.options[lastIdx];
-      const savedValues: Record<string, AssetPropValue> = {};
-      for (const key of Object.keys(lastOption.values)) {
-        savedValues[key] = lastOption.values[key];
-      }
-      this.nodeDataController.deleteOption(lastIdx);
       this.nodeDataController.addOption();
-      const newElseIdx = this.nodeDataController.addOption();
-      for (const [key, val] of Object.entries(savedValues)) {
-        this.nodeDataController.setOptionValue(newElseIdx, key, val);
-      }
+      const newIdx = this.options.length - 1;
+      this.ensureChancePin(newIdx);
     },
     deleteOption(index: number) {
-      if (this.options.length <= 2) return;
-      if (this.isElseOption(index)) return;
+      if (this.isDefaultOption(index)) return;
       this.nodeDataController.deleteOption(index);
     },
   },
@@ -222,23 +248,24 @@ export default defineComponent({
   position: relative;
   &:hover {
     .DialogChanceNode-option-delete {
-      opacity: 1;
+      opacity: 1 !important;
     }
   }
 }
-.DialogChanceNode-option-main {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.DialogChanceNode-option-field {
+  flex: 1;
 }
-.DialogChanceNode-option-unit {
+.DialogChanceNode-option-pct {
   font-size: 12px;
   color: var(--imsde-label-text-color);
+  min-width: 30px;
+  text-align: right;
+  margin-right: 4px;
 }
-.DialogChanceNode-option-delete {
-  opacity: 0;
-  transition: opacity 0.2s;
-  margin-left: 4px;
+.DialogChanceNode-option-exit {
+  font-size: 12px;
+  color: var(--imsde-label-text-color);
+  padding: 0 10px;
 }
 .DialogChanceNode-option-else {
   padding: 0 10px;
@@ -248,8 +275,11 @@ export default defineComponent({
   align-items: center;
   gap: 4px;
 }
-.DialogChanceNode-else-pct {
-  opacity: 0.6;
+.DialogChanceNode-option-delete {
+  opacity: 0 !important;
+  transition: opacity 0.2s;
+  margin-left: 4px;
+  margin-right: 8px;
 }
 .DialogChanceNode-addOption {
   font-weight: bold;

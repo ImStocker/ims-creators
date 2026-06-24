@@ -16,6 +16,9 @@ export default {
       chance: {
         title: 'Chance',
         description: 'Randomly select one of the script path',
+        exit: 'Exit',
+        else: 'Else',
+        sumExceeds: 'Sum of chances exceeds 100%',
       },
       timer: {
         title: 'Timer',
