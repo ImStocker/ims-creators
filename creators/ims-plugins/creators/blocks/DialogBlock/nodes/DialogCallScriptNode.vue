@@ -172,7 +172,6 @@ export default defineComponent({
         if (val) {
           await this.loadExternalScript(val);
         } else {
-          this.callScript = null;
           this.calledScriptController = null;
         }
       },

@@ -41,9 +41,6 @@
               </span>
               <span v-else class="DialogChanceNode-option-else">
                 {{ $t('imsDialogEditor.nodes.chance.else') }}
-                <span v-if="elseChance > 0">
-                  ({{ computePercent(elseChance) }}%)
-                </span>
               </span>
               <button
                 v-if="isPlaying"
@@ -65,10 +62,10 @@
                 "
               />
               <span
-                v-if="hasOptionChanceValue(option_index)"
+                v-if="isOptionPercentageVisible(option_index)"
                 class="DialogChanceNode-option-pct"
               >
-                {{ computePercent(getOptionChance(option_index)) }}%
+                {{ getOptionPercentageText(option_index) }}%
               </span>
               <button
                 v-if="!readonly"
@@ -164,8 +161,10 @@ export default defineComponent({
       return generateDataPinId(true, 'random');
     },
     randomCaption() {
-      const sum = this.totalChance;
-      return 'Random: ' + (sum > 0 ? sum.toFixed(2) : '0');
+      if (this.isPlaying && this.dialogPlayer.chanceRandomValue != null) {
+        return 'Random: ' + this.dialogPlayer.chanceRandomValue.toFixed(2);
+      }
+      return '';
     },
     options() {
       return this.nodeDataController.options;
@@ -218,6 +217,28 @@ export default defineComponent({
     hasOptionChanceValue(index: number) {
       const val = this.nodeDataController.getOptionValue(index, 'chance');
       return val != null && val !== '';
+    },
+    isOptionChanceBound(index: number) {
+      const pinId = this.getChancePinId(index);
+      return this.nodeDataController.isPinConnected(pinId);
+    },
+    isOptionPercentageVisible(index: number) {
+      if (this.isPlaying) return true;
+      if (this.isOptionChanceBound(index)) return false;
+      return this.hasOptionChanceValue(index);
+    },
+    getOptionPercentageText(index: number) {
+      if (this.isPlaying) {
+        return this.getPlayOptionChancePercent(index);
+      }
+      return this.computePercent(this.getOptionChance(index));
+    },
+    getPlayOptionChancePercent(index: number) {
+      const options = this.dialogPlayer.chanceOptions;
+      if (!options || !options[index]) return '0';
+      const chance = options[index].chance;
+      if (chance == null) return '0';
+      return (chance * 100).toFixed(0);
     },
     getOptionChance(index: number) {
       return this.nodeDataController.getOptionValue(index, 'chance') ?? null;

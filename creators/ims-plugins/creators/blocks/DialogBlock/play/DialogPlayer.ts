@@ -61,11 +61,13 @@ export class DialogPlayer {
   private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
   private _playEpoch = 0;
   private _chanceResolve: ((index: number) => void) | null = null;
+  private _pendingChanceChoice: number | null = null;
   private _timerResolve: (() => void) | null = null;
   private _timerInterval: ReturnType<typeof setInterval> | null = null;
   public displayingFrameIndex = 0;
   public chanceDefaultOptionIndex = 0;
-  public chanceOptions: { chance: number | null; nextNodeId: string | null }[] = [];
+  public chanceOptions: { chance: number | null; nextNodeId: string | null }[] =
+    [];
   public chanceRandomValue = 0;
   public timerRemaining = 0;
   public timerDuration = 0;
@@ -98,7 +100,7 @@ export class DialogPlayer {
       events: {
         onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
         onChance: (chanceEvent) => this._onChance(chanceEvent),
-    onDelay: ({ duration, nodeId }) => this._onDelay(duration, nodeId),
+        onDelay: ({ duration, nodeId }) => this._onDelay(duration, nodeId),
         onAction: ({ subject, inputs, node, nodeId, type }) => {
           if (type === 'trigger') {
             return this._onTrigger(subject, inputs, node, nodeId);
@@ -427,6 +429,7 @@ export class DialogPlayer {
     this._playingState = null;
     this._triggerResolve = null;
     this._chanceResolve = null;
+    this._pendingChanceChoice = null;
     this._scriptEnded = false;
     this.resolveTimer();
     this._player = null;
@@ -443,6 +446,10 @@ export class DialogPlayer {
     this.play(wasDebug);
   }
 
+  public get isChanceReady(): boolean {
+    return this._chanceResolve !== null;
+  }
+
   public async playChoose(choice: number | null) {
     if (this._triggerResolve) {
       const outputs = { ...this._triggerOutputs };
@@ -455,9 +462,26 @@ export class DialogPlayer {
     } else if (this._chanceResolve) {
       const resolve = this._chanceResolve;
       this._chanceResolve = null;
-      resolve(choice ?? this.chanceDefaultOptionIndex);
+      if (choice == null || choice === this.chanceDefaultOptionIndex) {
+        resolve(this.chanceRandomValue);
+      } else {
+        let lowerBound = 0;
+        for (let i = 0; i < choice; i++) {
+          lowerBound += this.chanceOptions[i]?.chance ?? 0;
+        }
+        resolve(lowerBound);
+      }
     } else if (this._player) {
-      this._player.continue(choice ?? undefined, true);
+      const currentFrame = this._player.currentFrame;
+      const currentNode = currentFrame?.currentNode;
+      const graphNode = currentNode
+        ? currentFrame.graph.nodes[currentNode.id]
+        : null;
+      if (graphNode?.type === 'chance' && !this._chanceResolve) {
+        this._pendingChanceChoice = choice;
+      } else {
+        this._player.continue(choice ?? undefined, true);
+      }
     }
   }
 
@@ -541,20 +565,37 @@ export class DialogPlayer {
   }
 
   private _onChance(event: {
-    randomValue: number;
     options: { chance: number | null; nextNodeId: string | null }[];
     nodeId: string;
-    defaultOptionIndex: number;
   }): number | Promise<number> | void {
     if (!this._playingState) return;
     if (!this._player) return;
 
-    this.chanceRandomValue = event.randomValue;
-    this.chanceOptions = event.options;
-    this.chanceDefaultOptionIndex = event.defaultOptionIndex;
+    const options = event.options;
+    const total = options.reduce((sum, opt) => sum + (opt.chance ?? 0), 0);
+    const randomValue = total > 0 ? Math.random() * total : 0;
+
+    let cumulative = 0;
+    let defaultOptionIndex = 0;
+    for (let i = 0; i < options.length; i++) {
+      cumulative += options[i]?.chance ?? 0;
+      if (randomValue < cumulative) {
+        defaultOptionIndex = i;
+        break;
+      }
+    }
+
+    this.chanceRandomValue = randomValue;
+    this.chanceOptions = options;
+    this.chanceDefaultOptionIndex = defaultOptionIndex;
 
     return new Promise<number>((resolve) => {
       this._chanceResolve = resolve;
+      if (this._pendingChanceChoice !== null) {
+        const pendingChoice = this._pendingChanceChoice;
+        this._pendingChanceChoice = null;
+        this.playChoose(pendingChoice);
+      }
     });
   }
 
@@ -743,7 +784,7 @@ export class DialogPlayer {
     });
   }
 
-  public startRunWithNode(debug: boolean = false, node_id: string){
+  public startRunWithNode(debug: boolean = false, node_id: string) {
     this.play(debug, node_id);
   }
 }

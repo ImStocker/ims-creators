@@ -419,7 +419,7 @@ export class DialogBlockController extends BlockEditorController {
         if (!node) return;
         const node_data = ensure_node_data();
         node_data.subject = val;
-        this.savePropsDelayed();
+        this.saveProps();
       },
       setValues: (vals) => {
         if (!node) return;

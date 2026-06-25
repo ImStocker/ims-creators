@@ -2,10 +2,8 @@ import type { Edge, Node } from '@vue-flow/core';
 import {
   AssetPropType,
   assignPlainValueToAssetProps,
-  castAssetPropValueToString,
   convertAssetPropsToPlainObject,
   type AssetProps,
-  type AssetPropValue,
 } from '~ims-app-base/logic/types/Props';
 import type {
   ScriptBlockPlain,
@@ -160,7 +158,7 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
       }
 
       if (node_plain.subject) {
-        node_data.subject = castAssetPropValueToString(node_plain.subject);
+        node_data.subject = node_plain.subject;
       } else {
         if (
           node.type === 'trigger' &&
@@ -174,9 +172,7 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
             trigger_subject &&
             !(trigger_subject as ScriptBlockPlainPropValueBind).get
           ) {
-            node_data.subject = castAssetPropValueToString(
-              trigger_subject as AssetPropValue,
-            );
+            node_data.subject = trigger_subject;
           }
         }
       }
