@@ -135,6 +135,11 @@ export default defineComponent({
           value: 'ru',
           title: 'Русский',
           enTitle: 'Russian',
+        }, 
+        {
+          value: 'de',
+          title: 'Deutsche',
+          enTitle: 'German',
         }];
     },
     languagesList() {
