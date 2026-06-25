@@ -68,7 +68,7 @@ export class DialogPlayer {
   public chanceDefaultOptionIndex = 0;
   public chanceOptions: { chance: number | null; nextNodeId: string | null }[] =
     [];
-  public chanceRandomValue = 0;
+  public chanceRandomValue: number | null = null;
   public timerRemaining = 0;
   public timerDuration = 0;
 
@@ -462,14 +462,24 @@ export class DialogPlayer {
     } else if (this._chanceResolve) {
       const resolve = this._chanceResolve;
       this._chanceResolve = null;
+      const chanceRandomValue = this.chanceRandomValue;
+      this.chanceRandomValue = null;
       if (choice == null || choice === this.chanceDefaultOptionIndex) {
-        resolve(this.chanceRandomValue);
+        resolve(chanceRandomValue ?? 0);
       } else {
-        let lowerBound = 0;
-        for (let i = 0; i < choice; i++) {
-          lowerBound += this.chanceOptions[i]?.chance ?? 0;
+        if (choice === -1) {
+          const sum = this.chanceOptions.reduce(
+            (acc, v) => acc + (v.chance ?? 0),
+            0,
+          );
+          resolve(sum);
+        } else {
+          let lowerBound = 0;
+          for (let i = 0; i < choice; i++) {
+            lowerBound += this.chanceOptions[i]?.chance ?? 0;
+          }
+          resolve(lowerBound);
         }
-        resolve(lowerBound);
       }
     } else if (this._player) {
       const currentFrame = this._player.currentFrame;
@@ -483,6 +493,10 @@ export class DialogPlayer {
         this._player.continue(choice ?? undefined, true);
       }
     }
+  }
+
+  public getNodePlayOutputs(nodeId: string) {
+    return this._player?.currentFrame.nodeOutputs[nodeId] ?? {};
   }
 
   public playGetCurrentNodeParam(param: string): AssetPropsPlainObjectValue {
@@ -572,11 +586,10 @@ export class DialogPlayer {
     if (!this._player) return;
 
     const options = event.options;
-    const total = options.reduce((sum, opt) => sum + (opt.chance ?? 0), 0);
-    const randomValue = total > 0 ? Math.random() * total : 0;
+    const randomValue = Math.random();
 
     let cumulative = 0;
-    let defaultOptionIndex = 0;
+    let defaultOptionIndex = -1;
     for (let i = 0; i < options.length; i++) {
       cumulative += options[i]?.chance ?? 0;
       if (randomValue < cumulative) {

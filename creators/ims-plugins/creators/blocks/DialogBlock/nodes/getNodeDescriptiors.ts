@@ -258,10 +258,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           options: [
             {
               next: null,
-              values: {},
-            },
-            {
-              next: null,
               values: { chance: 0.5 },
             },
           ],

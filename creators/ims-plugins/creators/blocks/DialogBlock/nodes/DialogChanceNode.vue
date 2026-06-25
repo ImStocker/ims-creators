@@ -22,67 +22,72 @@
         />
         <div class="DialogChanceNode-options">
           <div
+            class="DialogChanceNode-option"
+            :class="{
+              'state-default-computed':
+                isPlaying && -1 === dialogPlayer.chanceDefaultOptionIndex,
+            }"
+          >
+            <span
+              v-if="options.length === 0"
+              class="DialogChanceNode-option-exit"
+            >
+              {{ $t('imsDialogEditor.nodes.chance.exit') }}
+            </span>
+            <span v-else class="DialogChanceNode-option-else">
+              {{ $t('imsDialogEditor.nodes.chance.else') }}
+              {{ elseChancePercent !== null ? `${elseChancePercent}%` : '' }}
+            </span>
+            <button
+              v-if="isPlaying"
+              class="is-button DialogChanceNode-option-select"
+              @click="dialogPlayer.playChoose(-1)"
+            >
+              {{ $t('imsDialogEditor.play.select') }}
+            </button>
+            <ExecHandle :id="'out'" type="source" :position="Position.Right" />
+          </div>
+          <div
             v-for="(option, option_index) of options"
             :key="option_index"
             class="DialogChanceNode-option"
             :class="{
-              'type-default': isDefaultOption(option_index),
               'state-default-computed':
                 isPlaying &&
                 option_index === dialogPlayer.chanceDefaultOptionIndex,
             }"
           >
-            <template v-if="isDefaultOption(option_index)">
-              <span
-                v-if="options.length <= 1"
-                class="DialogChanceNode-option-exit"
-              >
-                {{ $t('imsDialogEditor.nodes.chance.exit') }}
-              </span>
-              <span v-else class="DialogChanceNode-option-else">
-                {{ $t('imsDialogEditor.nodes.chance.else') }}
-              </span>
-              <button
-                v-if="isPlaying"
-                class="is-button DialogChanceNode-option-select"
-                @click="dialogPlayer.playChoose(option_index)"
-              >
-                {{ $t('imsDialogEditor.play.select') }}
-              </button>
-            </template>
-            <template v-else>
-              <DataField
-                :model-value="getOptionChance(option_index)"
-                :in-id="getChancePinId(option_index)"
-                class="DialogChanceNode-option-field"
-                :node-data-controller="nodeDataController"
-                :readonly="readonly"
-                @update:model-value="
-                  (val: any) => setOptionChance(option_index, val)
-                "
-              />
-              <span
-                v-if="isOptionPercentageVisible(option_index)"
-                class="DialogChanceNode-option-pct"
-              >
-                {{ getOptionPercentageText(option_index) }}%
-              </span>
-              <button
-                v-if="!readonly"
-                class="is-button is-button-icon DialogChanceNode-option-delete"
-                :title="$t('imsDialogEditor.speech.deleteOption')"
-                @click="deleteOption(option_index)"
-              >
-                <i class="ri-close-line"></i>
-              </button>
-              <button
-                v-if="isPlaying"
-                class="is-button DialogChanceNode-option-select"
-                @click="dialogPlayer.playChoose(option_index)"
-              >
-                {{ $t('imsDialogEditor.play.select') }}
-              </button>
-            </template>
+            <DataField
+              :model-value="getOptionChance(option_index)"
+              :in-id="getChancePinId(option_index)"
+              class="DialogChanceNode-option-field"
+              :node-data-controller="nodeDataController"
+              :readonly="readonly"
+              @update:model-value="
+                (val: any) => setOptionChance(option_index, val)
+              "
+            />
+            <span
+              v-if="isOptionPercentageVisible(option_index)"
+              class="DialogChanceNode-option-pct"
+            >
+              {{ getOptionPercentageText(option_index) }}%
+            </span>
+            <button
+              v-if="!readonly"
+              class="is-button is-button-icon DialogChanceNode-option-delete"
+              :title="$t('imsDialogEditor.speech.deleteOption')"
+              @click="deleteOption(option_index)"
+            >
+              <i class="ri-close-line"></i>
+            </button>
+            <button
+              v-if="isPlaying"
+              class="is-button DialogChanceNode-option-select"
+              @click="dialogPlayer.playChoose(option_index)"
+            >
+              {{ $t('imsDialogEditor.play.select') }}
+            </button>
             <ExecHandle
               :id="'out-' + (option_index + 1)"
               type="source"
@@ -97,7 +102,10 @@
         >
           + {{ $t('imsDialogEditor.speech.addOption') }}
         </div>
-        <div v-if="totalChance > 1" class="DialogChanceNode-warning">
+        <div
+          v-if="totalChance && totalChance > 1"
+          class="DialogChanceNode-warning"
+        >
           <i class="ri-alert-line"></i>
           {{ $t('imsDialogEditor.nodes.chance.sumExceeds') }}
           ({{ computePercent(totalChance) }}%)
@@ -114,9 +122,16 @@ import type { NodeDescriptor } from './NodeDescriptor';
 import ExecHandle from '../parts/ExecHandle.vue';
 import DataField from '../parts/DataField.vue';
 import type { NodeDataController } from '../editor/NodeDataController';
-import { AssetPropType } from '~ims-app-base/logic/types/Props';
+import {
+  AssetPropType,
+  castAssetPropValueToFloat,
+  type AssetPropValue,
+} from '~ims-app-base/logic/types/Props';
 import { generateDataPinId } from '../editor/DialogEditor';
-import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
+import type {
+  ScriptBlockPlainPropValue,
+  ScriptBlockPlainPropValueBind,
+} from '../logic/nodeStoring';
 import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import type { DialogPlayer } from '../play/DialogPlayer';
 
@@ -161,10 +176,16 @@ export default defineComponent({
       return generateDataPinId(true, 'random');
     },
     randomCaption() {
+      const outRandom = this.dialogPlayer.getNodePlayOutputs(this.id)['random'];
       if (this.isPlaying && this.dialogPlayer.chanceRandomValue != null) {
         return 'Random: ' + this.dialogPlayer.chanceRandomValue.toFixed(2);
+      } else if (outRandom) {
+        return (
+          'Random: ' +
+          castAssetPropValueToFloat(outRandom as AssetPropValue)?.toFixed(2)
+        );
       }
-      return '';
+      return 'Random';
     },
     options() {
       return this.nodeDataController.options;
@@ -172,19 +193,27 @@ export default defineComponent({
     floatType() {
       return { Type: AssetPropType.FLOAT };
     },
-    totalChance() {
+    totalChance(): number | null {
       let sum = 0;
-      for (let i = 1; i < this.options.length; i++) {
+      for (let i = 0; i < this.options.length; i++) {
         const chance = this.getOptionChance(i);
-        if (chance != null && chance !== '' && !isNaN(Number(chance))) {
-          sum += Number(chance);
+        if (chance === null) {
+          return null;
         }
+        sum += Number(chance);
       }
       return sum;
     },
     elseChance() {
+      if (this.totalChance === null) {
+        return null;
+      }
       const remaining = 1 - this.totalChance;
       return remaining > 0 ? remaining : 0;
+    },
+    elseChancePercent() {
+      if (this.elseChance === null) return null;
+      return (Math.round(this.elseChance * 10) / 10) * 100;
     },
     isPlaying() {
       return (
@@ -197,7 +226,7 @@ export default defineComponent({
     this.nodeDataController.setPinDataType(this.randomPinId, {
       Type: AssetPropType.FLOAT,
     });
-    for (let i = 1; i < this.options.length; i++) {
+    for (let i = 0; i < this.options.length; i++) {
       this.ensureChancePin(i);
     }
   },
@@ -210,9 +239,6 @@ export default defineComponent({
       this.nodeDataController.setPinDataType(pinId, {
         Type: AssetPropType.FLOAT,
       });
-    },
-    isDefaultOption(index: number) {
-      return index === 0;
     },
     hasOptionChanceValue(index: number) {
       const val = this.nodeDataController.getOptionValue(index, 'chance');
@@ -240,8 +266,13 @@ export default defineComponent({
       if (chance == null) return '0';
       return (chance * 100).toFixed(0);
     },
-    getOptionChance(index: number) {
-      return this.nodeDataController.getOptionValue(index, 'chance') ?? null;
+    getOptionChance(index: number): number | null {
+      const val =
+        this.nodeDataController.getOptionValue(index, 'chance') ?? null;
+      if (val && (val as ScriptBlockPlainPropValueBind).get) {
+        return null;
+      }
+      return castAssetPropValueToFloat(val as AssetPropValue);
     },
     setOptionChance(index: number, val: ScriptBlockPlainPropValue) {
       this.nodeDataController.setOptionValue(index, 'chance', val);
@@ -260,7 +291,6 @@ export default defineComponent({
       this.ensureChancePin(newIdx);
     },
     deleteOption(index: number) {
-      if (this.isDefaultOption(index)) return;
       this.nodeDataController.deleteOption(index);
     },
   },
