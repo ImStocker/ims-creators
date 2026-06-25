@@ -13,7 +13,7 @@
       "
       class="DialogChanceDemoPlay-options"
     >
-      <div
+      <button
         v-for="(option, option_index) of playingNodeData.optionsInputs"
         :key="option_index"
         class="PlayerDemoDialog-option-button DialogChanceDemoPlay-options-one"
@@ -21,6 +21,7 @@
           'state-default':
             option_index === dialogPlayer.chanceDefaultOptionIndex,
         }"
+        @click="dialogPlayer.playChoose(option_index)"
       >
         <span class="DialogChanceDemoPlay-options-one-label">
           {{
@@ -40,14 +41,6 @@
         >
           {{ $t('imsDialogEditor.play.select') }}
         </span>
-      </div>
-    </div>
-    <div class="DialogChanceDemoPlay-options">
-      <button
-        class="PlayerDemoDialog-option-button"
-        @click="dialogPlayer.playChoose(null)"
-      >
-        {{ $t('imsDialogEditor.play.continue') }}
       </button>
     </div>
   </div>
