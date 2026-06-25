@@ -60,7 +60,15 @@ export class DialogPlayer {
   private _scriptEnded = false;
   private _loadedScripts = new Map<string, DialogPlayerLoadedScript>();
   private _playEpoch = 0;
+  private _chanceResolve: ((index: number) => void) | null = null;
+  private _timerResolve: (() => void) | null = null;
+  private _timerInterval: ReturnType<typeof setInterval> | null = null;
   public displayingFrameIndex = 0;
+  public chanceDefaultOptionIndex = 0;
+  public chanceOptions: { chance: number | null; nextNodeId: string | null }[] = [];
+  public chanceRandomValue = 0;
+  public timerRemaining = 0;
+  public timerDuration = 0;
 
   constructor(
     protected appManager: IAppManager,
@@ -89,7 +97,8 @@ export class DialogPlayer {
       initialVariables: defaultVariableValues,
       events: {
         onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
-        onChance: ({ defaultOptionIndex }) => this._onChance(defaultOptionIndex),
+        onChance: (chanceEvent) => this._onChance(chanceEvent),
+    onDelay: ({ duration, nodeId }) => this._onDelay(duration, nodeId),
         onAction: ({ subject, inputs, node, nodeId, type }) => {
           if (type === 'trigger') {
             return this._onTrigger(subject, inputs, node, nodeId);
@@ -417,7 +426,9 @@ export class DialogPlayer {
     this._destroyDemoMode();
     this._playingState = null;
     this._triggerResolve = null;
+    this._chanceResolve = null;
     this._scriptEnded = false;
+    this.resolveTimer();
     this._player = null;
     for (const loadedScript of this._loadedScripts.values()) {
       loadedScript.release();
@@ -441,6 +452,10 @@ export class DialogPlayer {
       resolve({
         outputs,
       });
+    } else if (this._chanceResolve) {
+      const resolve = this._chanceResolve;
+      this._chanceResolve = null;
+      resolve(choice ?? this.chanceDefaultOptionIndex);
     } else if (this._player) {
       this._player.continue(choice ?? undefined, true);
     }
@@ -525,15 +540,70 @@ export class DialogPlayer {
     }
   }
 
-  private _onChance(defaultOptionIndex: number) {
+  private _onChance(event: {
+    randomValue: number;
+    options: { chance: number | null; nextNodeId: string | null }[];
+    nodeId: string;
+    defaultOptionIndex: number;
+  }): number | Promise<number> | void {
     if (!this._playingState) return;
     if (!this._player) return;
+
+    this.chanceRandomValue = event.randomValue;
+    this.chanceOptions = event.options;
+    this.chanceDefaultOptionIndex = event.defaultOptionIndex;
 
     const isDebug = this._playingState.debug;
 
     if (!isDebug) {
-      this._player.continue(defaultOptionIndex);
+      return event.defaultOptionIndex;
     }
+
+    return new Promise<number>((resolve) => {
+      this._chanceResolve = resolve;
+    });
+  }
+
+  private _onDelay(duration: number, nodeId: string): Promise<void> | void {
+    if (!this._playingState) return;
+
+    const isDebug = this._playingState.debug;
+
+    if (isDebug) {
+      this.timerDuration = duration;
+      this.timerRemaining = duration;
+      this._timerResolve = null;
+
+      if (this._timerInterval) {
+        clearInterval(this._timerInterval);
+      }
+      const startTime = Date.now();
+      this._timerInterval = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        this.timerRemaining = Math.max(0, duration - elapsed);
+        if (this.timerRemaining <= 0) {
+          this.resolveTimer();
+        }
+      }, 100);
+
+      return new Promise<void>((resolve) => {
+        this._timerResolve = resolve;
+      });
+    }
+
+    return new Promise((resolve) => setTimeout(resolve, duration * 1000));
+  }
+
+  public resolveTimer() {
+    if (this._timerInterval) {
+      clearInterval(this._timerInterval);
+      this._timerInterval = null;
+    }
+    if (this._timerResolve) {
+      this._timerResolve();
+      this._timerResolve = null;
+    }
+    this.timerRemaining = 0;
   }
 
   private _onTrigger(

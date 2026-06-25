@@ -25,7 +25,12 @@
             v-for="(option, option_index) of options"
             :key="option_index"
             class="DialogChanceNode-option"
-            :class="{ 'type-default': isDefaultOption(option_index) }"
+            :class="{
+              'type-default': isDefaultOption(option_index),
+              'state-default-computed':
+                isPlaying &&
+                option_index === dialogPlayer.chanceDefaultOptionIndex,
+            }"
           >
             <template v-if="isDefaultOption(option_index)">
               <span
@@ -301,13 +306,18 @@ export default defineComponent({
   margin-right: 8px;
 }
 .DialogChanceNode-option-select {
-  --button-border-color: var(--imsde-node-playing-color);
+  --button-border-color: var(--imsde-node-playing-color) !important;
   &:not(:hover) {
     --button-text-color: var(--imsde-node-playing-color);
   }
   &:hover {
     --button-bg-color: var(--imsde-node-playing-color);
   }
+}
+.DialogChanceNode-option.state-default-computed {
+  outline: 2px solid var(--imsde-node-playing-color);
+  outline-offset: -2px;
+  border-radius: var(--panel-border-radius);
 }
 .DialogChanceNode-addOption {
   font-weight: bold;

@@ -23,6 +23,17 @@
           :readonly="readonly"
         ></DataField>
         <div class="DialogTimerNode-unit">s</div>
+        <template v-if="isPlaying">
+          <div class="DialogTimerNode-countdown">
+            {{ timerDisplay }}
+          </div>
+          <button
+            class="is-button DialogTimerNode-continue"
+            @click="dialogPlayer.resolveTimer()"
+          >
+            {{ $t('imsDialogEditor.play.continue') }}
+          </button>
+        </template>
       </div>
       <ExecHandle id="out" type="source" :position="Position.Right" />
     </div>
@@ -98,6 +109,18 @@ export default defineComponent({
         this.nodeDataController.setValue('value', val);
       },
     },
+    isPlaying() {
+      return (
+        this.dialogPlayer.currentPlayingNodeId === this.id &&
+        this.dialogPlayer.displayingFrameIndex === 0
+      );
+    },
+    timerDisplay() {
+      const remaining = this.dialogPlayer.timerRemaining;
+      const total = this.dialogPlayer.timerDuration;
+      const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
+      return `${remaining.toFixed(1)}s (${pct}%)`;
+    },
   },
 
   mounted() {
@@ -121,5 +144,20 @@ export default defineComponent({
 .DialogTimerNode-content {
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+.DialogTimerNode-countdown {
+  font-size: 12px;
+  color: var(--imsde-node-playing-color);
+  white-space: nowrap;
+}
+.DialogTimerNode-continue {
+  --button-border-color: var(--imsde-node-playing-color) !important;
+  &:not(:hover) {
+    --button-text-color: var(--imsde-node-playing-color);
+  }
+  &:hover {
+    --button-bg-color: var(--imsde-node-playing-color);
+  }
 }
 </style>
