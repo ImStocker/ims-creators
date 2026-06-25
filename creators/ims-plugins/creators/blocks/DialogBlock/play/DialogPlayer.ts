@@ -89,6 +89,7 @@ export class DialogPlayer {
       initialVariables: defaultVariableValues,
       events: {
         onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
+        onChance: ({ defaultOptionIndex }) => this._onChance(defaultOptionIndex),
         onAction: ({ subject, inputs, node, nodeId, type }) => {
           if (type === 'trigger') {
             return this._onTrigger(subject, inputs, node, nodeId);
@@ -521,6 +522,17 @@ export class DialogPlayer {
 
     if (isDebug && (!node.options || node.options.length === 0)) {
       this._player.continue();
+    }
+  }
+
+  private _onChance(defaultOptionIndex: number) {
+    if (!this._playingState) return;
+    if (!this._player) return;
+
+    const isDebug = this._playingState.debug;
+
+    if (!isDebug) {
+      this._player.continue(defaultOptionIndex);
     }
   }
 

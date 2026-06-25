@@ -37,10 +37,16 @@
               <span v-else class="DialogChanceNode-option-else">
                 {{ $t('imsDialogEditor.nodes.chance.else') }}
                 <span v-if="elseChance > 0">
-                  ({{ formatFraction(elseChance) }},
-                  {{ computePercent(elseChance) }}%)
+                  ({{ computePercent(elseChance) }}%)
                 </span>
               </span>
+              <button
+                v-if="isPlaying"
+                class="is-button DialogChanceNode-option-select"
+                @click="dialogPlayer.playChoose(option_index)"
+              >
+                {{ $t('imsDialogEditor.play.select') }}
+              </button>
             </template>
             <template v-else>
               <DataField
@@ -66,6 +72,13 @@
                 @click="deleteOption(option_index)"
               >
                 <i class="ri-close-line"></i>
+              </button>
+              <button
+                v-if="isPlaying"
+                class="is-button DialogChanceNode-option-select"
+                @click="dialogPlayer.playChoose(option_index)"
+              >
+                {{ $t('imsDialogEditor.play.select') }}
               </button>
             </template>
             <ExecHandle
@@ -168,6 +181,12 @@ export default defineComponent({
     elseChance() {
       const remaining = 1 - this.totalChance;
       return remaining > 0 ? remaining : 0;
+    },
+    isPlaying() {
+      return (
+        this.dialogPlayer.currentPlayingNodeId === this.id &&
+        this.dialogPlayer.displayingFrameIndex === 0
+      );
     },
   },
   mounted() {
@@ -280,6 +299,15 @@ export default defineComponent({
   transition: opacity 0.2s;
   margin-left: 4px;
   margin-right: 8px;
+}
+.DialogChanceNode-option-select {
+  --button-border-color: var(--imsde-node-playing-color);
+  &:not(:hover) {
+    --button-text-color: var(--imsde-node-playing-color);
+  }
+  &:hover {
+    --button-bg-color: var(--imsde-node-playing-color);
+  }
 }
 .DialogChanceNode-addOption {
   font-weight: bold;
