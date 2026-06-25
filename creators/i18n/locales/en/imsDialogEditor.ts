@@ -19,6 +19,7 @@ export default {
         exit: 'Exit',
         else: 'Else',
         sumExceeds: 'Sum of chances exceeds 100%',
+        option: 'Option {index}',
       },
       timer: {
         title: 'Timer',

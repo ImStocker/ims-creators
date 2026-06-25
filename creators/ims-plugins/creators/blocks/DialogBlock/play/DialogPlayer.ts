@@ -553,12 +553,6 @@ export class DialogPlayer {
     this.chanceOptions = event.options;
     this.chanceDefaultOptionIndex = event.defaultOptionIndex;
 
-    const isDebug = this._playingState.debug;
-
-    if (!isDebug) {
-      return event.defaultOptionIndex;
-    }
-
     return new Promise<number>((resolve) => {
       this._chanceResolve = resolve;
     });
@@ -567,31 +561,26 @@ export class DialogPlayer {
   private _onDelay(duration: number, nodeId: string): Promise<void> | void {
     if (!this._playingState) return;
 
-    const isDebug = this._playingState.debug;
+    this.timerDuration = duration;
+    this.timerRemaining = duration;
+    this._timerResolve = null;
 
-    if (isDebug) {
-      this.timerDuration = duration;
-      this.timerRemaining = duration;
-      this._timerResolve = null;
-
-      if (this._timerInterval) {
-        clearInterval(this._timerInterval);
-      }
-      const startTime = Date.now();
-      this._timerInterval = setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000;
-        this.timerRemaining = Math.max(0, duration - elapsed);
-        if (this.timerRemaining <= 0) {
-          this.resolveTimer();
-        }
-      }, 100);
-
-      return new Promise<void>((resolve) => {
-        this._timerResolve = resolve;
-      });
+    if (this._timerInterval) {
+      clearInterval(this._timerInterval);
     }
 
-    return new Promise((resolve) => setTimeout(resolve, duration * 1000));
+    const startTime = Date.now();
+    this._timerInterval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      this.timerRemaining = Math.max(0, duration - elapsed);
+      if (this.timerRemaining <= 0) {
+        this.resolveTimer();
+      }
+    }, 100);
+
+    return new Promise<void>((resolve) => {
+      this._timerResolve = resolve;
+    });
   }
 
   public resolveTimer() {

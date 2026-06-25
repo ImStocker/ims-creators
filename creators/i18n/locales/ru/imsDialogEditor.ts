@@ -19,6 +19,7 @@ export default {
         exit: 'Выход',
         else: 'Иначе',
         sumExceeds: 'Сумма шанса превышает 100%',
+        option: 'Вариант {index}',
       },
       timer: {
         title: 'Таймер',
