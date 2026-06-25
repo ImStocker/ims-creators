@@ -4,22 +4,23 @@
     :dialog-player="dialogPlayer"
     class="DialogCommentNode DialogEditorNode"
   >
-    <div
-      class="DialogCommentNode-header DialogNode-header DialogEditorNode-header"
-      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-    >
-      <i :class="nodeDescriptor.icon"></i>
-      {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-    </div>
-    <div class="DialogCommentNode-body DialogEditorNode-body">
-      <div class="DialogCommentNode-content">
-        <DataFieldInput
-          v-model="value"
-          class="DialogCommentNode-input"
-          :data-type="dataType"
-          :readonly="readonly"
-          :autofocus="true"
-        ></DataFieldInput>
+    <div class="DialogCommentNode-innerWrap">
+      <div
+        class="DialogCommentNode-header DialogNode-header DialogEditorNode-header"
+        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+      >
+        <i :class="nodeDescriptor.icon"></i>
+      </div>
+      <div class="DialogCommentNode-body DialogEditorNode-body">
+        <div class="DialogCommentNode-content">
+          <DataFieldInput
+            v-model="value"
+            class="DialogCommentNode-input"
+            :data-type="dataType"
+            :readonly="readonly"
+            :autofocus="true"
+          ></DataFieldInput>
+        </div>
       </div>
     </div>
   </DialogBaseNode>
@@ -67,16 +68,17 @@ export default defineComponent({
       type: Boolean,
       required: false,
     },
-    dataType: {
-      type: Object as PropType<AssetPropValueType>,
-      required: true,
-    },
     nodeDataController: {
       type: Object as PropType<NodeDataController>,
       required: true,
     },
   },
   computed: {
+    dataType() {
+      return {
+        Type: AssetPropType.TEXT,
+      };
+    },
     AssetPropType() {
       return AssetPropType;
     },
@@ -137,5 +139,8 @@ export default defineComponent({
 .DialogCommentNode-content {
   display: flex;
   align-items: center;
+}
+.DialogCommentNode-innerWrap {
+  display: flex;
 }
 </style>

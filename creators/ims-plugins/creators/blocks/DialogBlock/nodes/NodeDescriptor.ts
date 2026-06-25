@@ -14,6 +14,7 @@ export enum NodeType {
   EXEC = 'exec',
   DATA = 'data',
   DATA_START = 'data-start',
+  META = 'meta',
 }
 
 export type NodeDescriptorTemplate = {

@@ -76,9 +76,6 @@ export default defineComponent({
         ? new Set(this.needDataOut.map((t) => t.Type))
         : null;
       return getNodeDescriptors().filter((option) => {
-        if (option.name === 'comment') {
-          return true;
-        }
         if (
           need_data_in_set?.size === 1 &&
           need_data_in_set.has(AssetPropType.BOOLEAN) &&

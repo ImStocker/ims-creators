@@ -116,7 +116,13 @@
     <div v-if="nodePicker.active" class="DialogEditor-pickerHint">
       <div class="DialogEditor-pickerHint-inner">
         {{ $t('imsDialogEditor.nodes.jump.pickNodeHint') }}
-        <button class="is-button is-button-small" @click="nodePicker.active = false; nodePicker.callback = null">
+        <button
+          class="is-button is-button-small"
+          @click="
+            nodePicker.active = false;
+            nodePicker.callback = null;
+          "
+        >
           {{ $t('common.dialogs.cancel') }}
         </button>
       </div>
@@ -360,7 +366,10 @@ export default defineComponent({
       isFocused: false,
       clickOutside: null as SetClickOutsideCancel | null,
       mouseDownTime: 0,
-      nodePicker: { active: false, callback: null as ((nodeId: string) => void) | null },
+      nodePicker: {
+        active: false,
+        callback: null as ((nodeId: string) => void) | null,
+      },
     };
   },
   computed: {
@@ -812,6 +821,7 @@ export default defineComponent({
       }
       if (edge === null && type === null) {
         allowed_types.push(NodeType.DATA_START);
+        allowed_types.push(NodeType.META);
       }
       return allowed_types;
     },

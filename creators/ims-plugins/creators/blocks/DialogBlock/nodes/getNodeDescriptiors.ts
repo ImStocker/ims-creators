@@ -301,18 +301,6 @@ export function getNodeDescriptors(): NodeDescriptor[] {
       },
     },
     {
-      name: 'comment',
-      icon: 'ri-chat-4-line',
-      node: DialogCommentNode,
-      color: '#b5d8d4',
-      type: NodeType.DATA,
-      params: {
-        dataType: {
-          Type: AssetPropType.TEXT,
-        },
-      },
-    },
-    {
       name: 'setVar',
       icon: 'ri-edit-fill',
       node: DialogSetVarNode,
@@ -539,6 +527,13 @@ export function getNodeDescriptors(): NodeDescriptor[] {
           Type: AssetPropType.ASSET,
         },
       ],
+    },
+    {
+      name: 'comment',
+      icon: 'ri-chat-4-line',
+      node: DialogCommentNode,
+      color: '#d1e7e5',
+      type: NodeType.META,
     },
   ];
 }

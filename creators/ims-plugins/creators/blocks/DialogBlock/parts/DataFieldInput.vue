@@ -138,11 +138,6 @@ export default defineComponent({
       elementInFocus: false,
     };
   },
-  mounted() {
-    if (this.autofocus) {
-      nextTick(() => this.focus());
-    }
-  },
   computed: {
     AssetPropType() {
       return AssetPropType;
@@ -183,6 +178,11 @@ export default defineComponent({
       }
       return castAssetPropValueToString(this.modeValueComp).length;
     },
+  },
+  mounted() {
+    if (this.autofocus) {
+      nextTick(() => this.focus());
+    }
   },
   methods: {
     focus() {
@@ -231,5 +231,8 @@ export default defineComponent({
   &.hidden {
     display: none;
   }
+}
+.DataFieldInput-text {
+  cursor: text;
 }
 </style>
