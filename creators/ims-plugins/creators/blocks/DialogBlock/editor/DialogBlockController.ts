@@ -1397,6 +1397,8 @@ export class DialogBlockController extends BlockEditorController {
       let title_val: AssetPropValue = null;
       if (node.type === 'speech') {
         title_val = node.data?.values?.text ?? null;
+      } else if (node.type === 'comment') {
+        title_val = node.data?.values?.value ?? null;
       } else if (node.type === 'trigger') {
         title_val = node.data?.subject ?? null;
       } else if (node.type === 'getVar' || node.type === 'setVar') {
@@ -1556,41 +1558,47 @@ export class DialogBlockController extends BlockEditorController {
     const items: MenuListItem[] = [];
 
     if (count === 1 && dialogPlayer) {
-      items.push(
-        {
-          name: 'run',
-          title: this.appManager.$t('imsDialogEditor.runFromNode'),
-          icon: 'ri-play-fill',
-          action: async () => {
-            await this.appManager.get(UiManager).doTask(async () => {
-              dialogPlayer.startRunWithNode(false, nodeIds[0]);
-            });
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type !== 'comment') {
+        items.push(
+          {
+            name: 'run',
+            title: this.appManager.$t('imsDialogEditor.runFromNode'),
+            icon: 'ri-play-fill',
+            action: async () => {
+              await this.appManager.get(UiManager).doTask(async () => {
+                dialogPlayer.startRunWithNode(false, nodeIds[0]);
+              });
+            },
           },
-        },
-        {
-          name: 'debug',
-          title: this.appManager.$t('imsDialogEditor.debugFromNode'),
-          icon: 'ri-bug-fill',
-          action: async () => {
-            await this.appManager.get(UiManager).doTask(async () => {
-              dialogPlayer.startRunWithNode(true, nodeIds[0]);
-            });
+          {
+            name: 'debug',
+            title: this.appManager.$t('imsDialogEditor.debugFromNode'),
+            icon: 'ri-bug-fill',
+            action: async () => {
+              await this.appManager.get(UiManager).doTask(async () => {
+                dialogPlayer.startRunWithNode(true, nodeIds[0]);
+              });
+            },
           },
-        },
-        { type: 'separator', name: 'sep-run' },
-      );
+          { type: 'separator', name: 'sep-run' },
+        );
+      }
     }
 
     if (count === 1) {
-      items.push(
-        {
-          name: 'set-service-name',
-          title: this.appManager.$t('imsDialogEditor.setServiceName'),
-          icon: 'ri-price-tag-3-fill',
-          action: () => this.setNodeServiceName(nodeIds[0]),
-        },
-        { type: 'separator', name: 'sep-service-name' },
-      );
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type !== 'comment') {
+        items.push(
+          {
+            name: 'set-service-name',
+            title: this.appManager.$t('imsDialogEditor.setServiceName'),
+            icon: 'ri-price-tag-3-fill',
+            action: () => this.setNodeServiceName(nodeIds[0]),
+          },
+          { type: 'separator', name: 'sep-service-name' },
+        );
+      }
     }
 
     if (count === 1) {

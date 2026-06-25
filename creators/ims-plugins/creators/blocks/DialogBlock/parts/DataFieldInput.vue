@@ -84,7 +84,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent, type PropType, nextTick } from 'vue';
 import {
   type AssetPropValueType,
   type AssetPropValue,
@@ -130,12 +130,18 @@ export default defineComponent({
       required: true,
     },
     placeholder: { type: String, default: '' },
+    autofocus: { type: Boolean, default: false },
   },
   emits: ['update:modelValue'],
   data() {
     return {
       elementInFocus: false,
     };
+  },
+  mounted() {
+    if (this.autofocus) {
+      nextTick(() => this.focus());
+    }
   },
   computed: {
     AssetPropType() {

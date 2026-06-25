@@ -7,7 +7,12 @@
       @click.stop="goToNode"
     >
       <i :class="targetIcon"></i>
-      <span class="NodeSelector-name">{{ targetTitle }}</span>
+      <div class="NodeSelector-value-text">
+        <span class="NodeSelector-name">{{ targetTitle }}</span>
+        <span v-if="targetPreview" class="NodeSelector-preview">{{
+          targetPreview
+        }}</span>
+      </div>
     </div>
     <span v-else class="NodeSelector-empty">
       {{ $t('imsDialogEditor.common.noValue') }}
@@ -32,11 +37,11 @@ import { defineComponent, type PropType } from 'vue';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { NodeDataController } from '../editor/NodeDataController';
 import { getNodeDescriptorOfType } from '../nodes/getNodeDescriptiors';
-
-type NodePicker = {
-  active: boolean;
-  callback: ((nodeId: string) => void) | null;
-};
+import {
+  castAssetPropValueToText,
+  castAssetPropValueToString,
+  truncateAssetPropValueText,
+} from '~ims-app-base/logic/types/Props';
 
 export default defineComponent({
   name: 'NodeSelector',
@@ -93,6 +98,43 @@ export default defineComponent({
         `imsDialogEditor.nodes.${this.targetDescriptor.name}.title`,
       );
     },
+    targetPreview() {
+      if (!this.targetNode || !this.targetDescriptor) return '';
+      const values = (this.targetNode as any).data?.values ?? {};
+      const subject = (this.targetNode as any).data?.subject ?? '';
+      const type = this.targetDescriptor.name;
+      let preview: string | null = null;
+      if (type === 'speech' || type === 'comment' || type === 'jump') {
+        const val = values['text'] ?? values['value'] ?? null;
+        if (val) {
+          const text = truncateAssetPropValueText(
+            castAssetPropValueToText(val),
+            60,
+          );
+          preview = text
+            ? castAssetPropValueToString(text.result) +
+              (text.truncated ? '...' : '')
+            : null;
+        }
+      } else if (
+        type === 'trigger' ||
+        type === 'function' ||
+        type === 'callScript'
+      ) {
+        preview = subject ? castAssetPropValueToString(subject) : null;
+      } else if (type === 'setVar' || type === 'getVar') {
+        const varName = values['variable'] ?? null;
+        if (varName) {
+          preview = castAssetPropValueToString(varName);
+        }
+      } else if (type === 'timer') {
+        const val = values['value'] ?? null;
+        if (val != null) {
+          preview = String(val) + 's';
+        }
+      }
+      return preview ? castAssetPropValueToString(preview) : '';
+    },
   },
   unmounted() {
     if (this.isPicking) this.cancelPicker();
@@ -113,6 +155,10 @@ export default defineComponent({
       this.$nextTick(() => {
         this.nodePicker!.callback = (nodeId: string) => {
           if (nodeId === this.excludeId) return;
+          const node = this.dialogController.state.nodes.find(
+            (n) => n.id === nodeId,
+          );
+          if (node?.type === 'comment') return;
           this.$emit('update:modelValue', nodeId);
           this.isPicking = false;
           this.nodePicker!.active = false;
@@ -166,6 +212,20 @@ export default defineComponent({
   font-size: 12px;
   opacity: 0.5;
   font-style: italic;
+}
+.NodeSelector-value-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.NodeSelector-preview {
+  font-size: 10px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
 }
 .NodeSelector-btn {
   font-size: 11px;

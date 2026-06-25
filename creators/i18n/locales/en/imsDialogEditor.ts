@@ -38,8 +38,8 @@ export default {
         create: 'Create function',
       },
       jump: {
-        title: 'Jump',
-        description: 'Unconditional jump to another node',
+        title: 'Jump to',
+        description: 'Unconditional jump to other node',
         selectNode: 'Select node',
         changeNode: 'Change',
         goToTarget: 'Go to target node',

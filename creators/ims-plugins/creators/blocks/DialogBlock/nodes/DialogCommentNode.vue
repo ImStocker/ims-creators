@@ -18,6 +18,7 @@
           class="DialogCommentNode-input"
           :data-type="dataType"
           :readonly="readonly"
+          :autofocus="true"
         ></DataFieldInput>
       </div>
     </div>

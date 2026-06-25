@@ -38,8 +38,8 @@ export default {
         create: 'Создать функцию',
       },
       jump: {
-        title: 'Прыжок',
-        description: 'Безусловный прыжок к другому узлу',
+        title: 'Переход к',
+        description: 'Безусловный переход к другому узлу',
         selectNode: 'Выбрать узел',
         changeNode: 'Сменить',
         goToTarget: 'Перейти к целевому узлу',

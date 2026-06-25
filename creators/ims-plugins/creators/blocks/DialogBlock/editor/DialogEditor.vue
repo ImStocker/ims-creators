@@ -1063,10 +1063,12 @@ export default defineComponent({
     },
     onNodeClick({ node }: NodeMouseEvent) {
       if (this.nodePicker.active && this.nodePicker.callback) {
-        this.nodePicker.callback(node.id);
-      } else {
-        this.blockControllerMut.revealBlockContentItem('node-' + node.id);
+        if (node.type !== 'comment') {
+          this.nodePicker.callback(node.id);
+        }
+        return;
       }
+      this.blockControllerMut.revealBlockContentItem('node-' + node.id);
     },
     async showNode(node_id: string): Promise<boolean> {
       const node = this.blockControllerMut.state.nodes.find(
