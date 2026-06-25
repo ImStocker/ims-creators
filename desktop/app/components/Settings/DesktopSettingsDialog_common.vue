@@ -58,6 +58,10 @@ export default defineComponent({
                         {
                             value: 'ru',
                             title: 'Русский - Russian'
+                        }, 
+                        {
+                            value: 'de',
+                            title: 'Deutsche - German'
                         }
                     ]
                 }
