@@ -187,6 +187,10 @@ import { getPreferenceKeyForBlock } from '~ims-app-base/logic/utils/assets';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+import {
+  setImsClickOutside,
+  type SetClickOutsideCancel,
+} from '~ims-app-base/components/utils/ui';
 
 export default defineComponent({
   name: 'GraphEditor',
@@ -236,6 +240,8 @@ export default defineComponent({
       lastCreatePosition: { x: 0, y: 0 },
       viewportHelper,
       _keyDownHandler: null as ((e: KeyboardEvent) => void) | null,
+      isFocused: false,
+      clickOutsideCancel: null as SetClickOutsideCancel | null,
     };
   },
   computed: {
@@ -340,6 +346,16 @@ export default defineComponent({
       },
     },
   },
+  watch: {
+    isFocused() {
+      if (this.isFocused) {
+        this.$emit('focus');
+      } else {
+        this.$emit('blur');
+      }
+      this.resetFocusedListeners(this.isFocused);
+    },
+  },
   mounted() {
     const flow = this.$refs['flow'] as VueFlowStore;
     assert(flow);
@@ -347,46 +363,64 @@ export default defineComponent({
     if (this.flowViewportTransform) {
       flow.setViewport(this.flowViewportTransform);
     }
-    this._keyDownHandler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-      const flow = this.$refs['flow'] as VueFlowStore | undefined;
-      if (!flow) return;
-      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') {
-        const selectedNodeIds = (flow.getSelectedNodes as any).map(
-          (n: any) => n.id,
-        );
-        if (!selectedNodeIds.length) return;
-        this.blockControllerMut.copyNodesToClipboard(
-          selectedNodeIds,
-          flow.getViewport(),
-        );
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') {
-        this.blockControllerMut.pasteNodesFromClipboard(flow.getViewport());
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX') {
-        const selectedNodeIds = (flow.getSelectedNodes as any).map(
-          (n: any) => n.id,
-        );
-        if (!selectedNodeIds.length) return;
-        this.blockControllerMut.cutNodes(selectedNodeIds, flow.getViewport());
-      }
-    };
-    window.addEventListener('keydown', this._keyDownHandler);
   },
   unmounted() {
-    if (this._keyDownHandler) {
-      window.removeEventListener('keydown', this._keyDownHandler);
-      this._keyDownHandler = null;
-    }
+    this.resetFocusedListeners(false);
   },
   methods: {
+    resetFocusedListeners(init: boolean) {
+      if (this._keyDownHandler) {
+        window.removeEventListener('keydown', this._keyDownHandler);
+        this._keyDownHandler = null;
+      }
+      if (this.clickOutsideCancel) {
+        this.clickOutsideCancel();
+        this.clickOutsideCancel = null;
+      }
+      if (init) {
+        this.clickOutsideCancel = setImsClickOutside(this.$el, () => {
+          this.isFocused = false;
+        });
+        this._keyDownHandler = (e: KeyboardEvent) => {
+          if (!this.isFocused) return;
+          const target = e.target as HTMLElement;
+          if (!target) return;
+          if (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable
+          ) {
+            return;
+          }
+          const flow = this.$refs['flow'] as VueFlowStore | undefined;
+          if (!flow) return;
+          if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') {
+            const selectedNodeIds = (flow.getSelectedNodes as any).map(
+              (n: any) => n.id,
+            );
+            if (!selectedNodeIds.length) return;
+            this.blockControllerMut.copyNodesToClipboard(
+              selectedNodeIds,
+              flow.getViewport(),
+            );
+          } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') {
+            this.blockControllerMut.pasteNodesFromClipboard(
+              flow.getViewport(),
+            );
+          } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX') {
+            const selectedNodeIds = (flow.getSelectedNodes as any).map(
+              (n: any) => n.id,
+            );
+            if (!selectedNodeIds.length) return;
+            this.blockControllerMut.cutNodes(
+              selectedNodeIds,
+              flow.getViewport(),
+            );
+          }
+        };
+        window.addEventListener('keydown', this._keyDownHandler);
+      }
+    },
     onContextMenu(ev: MouseEvent) {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
@@ -477,6 +511,7 @@ export default defineComponent({
     },
     onMouseDown() {
       if (this.readonlyComp) return;
+      this.isFocused = true;
       this.createNodeContext = null;
       this.selectionContextMenu = null;
       this.connectStartParams = null;
