@@ -17,9 +17,20 @@
         <DataField
           :out-id="randomPinId"
           class="DialogChanceNode-random"
-          :caption="randomCaption"
           :node-data-controller="nodeDataController"
-        />
+        >
+          <template #caption>
+            <div class="DialogChanceNode-random-caption">
+              {{ $t('imsDialogEditor.dataFields.random')
+              }}{{ randomValue !== null ? ':' : '' }}
+              <span
+                v-if="randomValue !== null"
+                class="DialogChanceNode-random-caption-value"
+                >{{ randomValue }}</span
+              >
+            </div>
+          </template>
+        </DataField>
         <div class="DialogChanceNode-options">
           <div
             class="DialogChanceNode-option"
@@ -175,17 +186,16 @@ export default defineComponent({
     randomPinId() {
       return generateDataPinId(true, 'random');
     },
-    randomCaption() {
+    randomValue() {
       const outRandom = this.dialogPlayer.getNodePlayOutputs(this.id)['random'];
       if (this.isPlaying && this.dialogPlayer.chanceRandomValue != null) {
-        return 'Random: ' + this.dialogPlayer.chanceRandomValue.toFixed(2);
+        return this.dialogPlayer.chanceRandomValue.toFixed(2);
       } else if (outRandom) {
-        return (
-          'Random: ' +
-          castAssetPropValueToFloat(outRandom as AssetPropValue)?.toFixed(2)
+        return castAssetPropValueToFloat(outRandom as AssetPropValue)?.toFixed(
+          2,
         );
       }
-      return 'Random';
+      return null;
     },
     options() {
       return this.nodeDataController.options;
@@ -254,21 +264,19 @@ export default defineComponent({
       return this.hasOptionChanceValue(index);
     },
     getOptionPercentageText(index: number) {
-      if (this.isPlaying) {
-        return this.getPlayOptionChancePercent(index);
-      }
       return this.computePercent(this.getOptionChance(index));
     },
-    getPlayOptionChancePercent(index: number) {
-      const options = this.dialogPlayer.chanceOptions;
-      if (!options || !options[index]) return '0';
-      const chance = options[index].chance;
-      if (chance == null) return '0';
-      return (chance * 100).toFixed(0);
-    },
     getOptionChance(index: number): number | null {
+      if (this.isPlaying) {
+        const options = this.dialogPlayer.chanceOptions;
+        if (options && options[index]) {
+          return options[index].chance ?? 0;
+        }
+      }
+
       const val =
         this.nodeDataController.getOptionValue(index, 'chance') ?? null;
+      if (val === null) return 0;
       if (val && (val as ScriptBlockPlainPropValueBind).get) {
         return null;
       }
@@ -385,5 +393,11 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.DialogChanceNode-random-caption {
+  padding-right: 10px;
+}
+.DialogChanceNode-random-caption-value {
+  color: var(--imsde-node-playing-color);
 }
 </style>

@@ -29,7 +29,10 @@
       type="source"
       :position="Position.Right"
     />
-    <template v-if="caption || (!outId && isInConnected)">
+    <slot
+      v-if="caption || (!outId && isInConnected) || $slots.caption"
+      name="caption"
+    >
       <span class="DataField-caption">
         <caption-string :value="caption"></caption-string
         >{{
@@ -39,7 +42,7 @@
             : ''
         }}
       </span>
-    </template>
+    </slot>
     <DataFieldInput
       v-if="!isInConnected && (preferInputType || dataType) && inId"
       ref="input"

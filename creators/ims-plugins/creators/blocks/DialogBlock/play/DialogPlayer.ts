@@ -65,7 +65,7 @@ export class DialogPlayer {
   private _timerResolve: (() => void) | null = null;
   private _timerInterval: ReturnType<typeof setInterval> | null = null;
   public displayingFrameIndex = 0;
-  public chanceDefaultOptionIndex = 0;
+  public chanceDefaultOptionIndex: number | null = null;
   public chanceOptions: { chance: number | null; nextNodeId: string | null }[] =
     [];
   public chanceRandomValue: number | null = null;
@@ -431,6 +431,8 @@ export class DialogPlayer {
     this._chanceResolve = null;
     this._pendingChanceChoice = null;
     this._scriptEnded = false;
+    this.chanceRandomValue = null;
+    this.chanceDefaultOptionIndex = null;
     this.resolveTimer();
     this._player = null;
     for (const loadedScript of this._loadedScripts.values()) {
@@ -463,8 +465,10 @@ export class DialogPlayer {
       const resolve = this._chanceResolve;
       this._chanceResolve = null;
       const chanceRandomValue = this.chanceRandomValue;
+      const chanceDefaultOptionIndex = this.chanceDefaultOptionIndex;
       this.chanceRandomValue = null;
-      if (choice == null || choice === this.chanceDefaultOptionIndex) {
+      this.chanceDefaultOptionIndex = null;
+      if (choice == null || choice === chanceDefaultOptionIndex) {
         resolve(chanceRandomValue ?? 0);
       } else {
         if (choice === -1) {
@@ -581,12 +585,17 @@ export class DialogPlayer {
   private _onChance(event: {
     options: { chance: number | null; nextNodeId: string | null }[];
     nodeId: string;
-  }): number | Promise<number> | void {
-    if (!this._playingState) return;
-    if (!this._player) return;
+  }): number | Promise<number> {
+    if (!this._playingState) return 0;
+    if (!this._player) return 0;
 
     const options = event.options;
     const randomValue = Math.random();
+
+    const isDebug = this._playingState.debug;
+    if (!isDebug) {
+      return randomValue;
+    }
 
     let cumulative = 0;
     let defaultOptionIndex = -1;
@@ -612,7 +621,7 @@ export class DialogPlayer {
     });
   }
 
-  private _onDelay(duration: number, nodeId: string): Promise<void> | void {
+  private _onDelay(duration: number, _nodeId: string): Promise<void> | void {
     if (!this._playingState) return;
 
     this.timerDuration = duration;

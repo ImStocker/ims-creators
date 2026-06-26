@@ -179,7 +179,7 @@ export default {
       value: 'Значение',
       yes: 'Да',
       no: 'Нет',
-      random: 'Случайно',
+      random: 'Случайное значение',
       else: 'Иначе',
       targetNode: 'Целевой узел',
     },

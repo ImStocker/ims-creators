@@ -33,11 +33,6 @@
           :playing-node-data="currentPlayingNode"
           :dialog-controller="dialogController"
         ></dialog-trigger-demo-play>
-        <dialog-chance-demo-play
-          v-else-if="currentPlayingNode.node.type === 'chance'"
-          :dialog-player="dialogPlayer"
-          :playing-node-data="currentPlayingNode"
-        ></dialog-chance-demo-play>
         <dialog-timer-demo-play
           v-else-if="currentPlayingNode.node.type === 'timer'"
           :dialog-player="dialogPlayer"
@@ -80,7 +75,6 @@ import DialogSpeechDemoPlay from './DialogSpeechDemoPlay.vue';
 import DialogTriggerDemoPlay from './DialogTriggerDemoPlay.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import DialogCallScriptDemoPlay from './DialogCallScriptDemoPlay.vue';
-import DialogChanceDemoPlay from './DialogChanceDemoPlay.vue';
 import DialogTimerDemoPlay from './DialogTimerDemoPlay.vue';
 
 type DialogProps = {
@@ -98,7 +92,6 @@ export default defineComponent({
     DialogSpeechDemoPlay,
     DialogTriggerDemoPlay,
     DialogCallScriptDemoPlay,
-    DialogChanceDemoPlay,
     DialogTimerDemoPlay,
   },
   provide() {
