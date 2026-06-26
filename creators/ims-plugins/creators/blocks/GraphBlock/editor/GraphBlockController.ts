@@ -311,6 +311,10 @@ export class GraphBlockController extends BlockEditorController {
       centerX /= nodes.length;
       centerY /= nodes.length;
 
+      for (const n of this.state.nodes) {
+        (n as any).selected = false;
+      }
+
       for (const node of nodes) {
         const newId = idMap.get(node.id);
         const maxIndex = this.state.nodes.reduce(
@@ -346,6 +350,7 @@ export class GraphBlockController extends BlockEditorController {
           id: newId,
           type: 'graph-node',
           position: { x: newX, y: newY },
+          selected: true,
           data: {
             value: node.value ?? null,
             width: node.width ?? 200,
