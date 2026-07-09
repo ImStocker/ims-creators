@@ -1,5 +1,11 @@
 <template>
   <div class="MarkdownBlock">
+    <MarkdownFrontMatter
+      v-if="hasFrontMatter && showFrontMatter"
+      :entries="frontMatterEntries"
+      :readonly="readonly"
+      @update:entries="onFrontMatterEntriesUpdate"
+    />
     <div
       v-if="markdownEditorComponentLoading"
       class="MarkdownBlock-loading loaderSpinner"
@@ -15,9 +21,9 @@
       v-else-if="markdownEditorComponent"
       ref="editor"
       :readonly="readonly"
-      :model-value="currentValue"
+      :model-value="body"
       class="MarkdownBlock-editor"
-      @update:model-value="emitValue($event)"
+      @update:model-value="onBodyChange($event)"
       @focus="enterEditMode()"
       @blur="save()"
     ></component>
@@ -44,9 +50,49 @@ import {
 } from '~ims-app-base/components/utils/ui';
 import { makeBlockRef } from '~ims-app-base/logic/types/Props';
 import type MarkdownEditor from './editor/MarkdownEditor.vue';
+import MarkdownFrontMatter from './MarkdownFrontMatter.vue';
+
+function parseFrontMatter(input: string): {
+  data: Record<string, string>;
+  body: string;
+} {
+  const data: Record<string, string> = {};
+  const trimmed = input.trim();
+  if (!trimmed.startsWith('---')) return { data, body: input };
+
+  const endIdx = trimmed.indexOf('---', 3);
+  if (endIdx === -1) return { data, body: input };
+
+  const raw = trimmed.slice(3, endIdx).trim();
+  const body = trimmed.slice(endIdx + 3).trim();
+
+  for (const line of raw.split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    let value = line.slice(colonIdx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key) data[key] = value;
+  }
+
+  return { data, body };
+}
+
+interface FrontMatterEntry {
+  key: string;
+  value: string;
+}
 
 export default defineComponent({
   name: 'MarkdownBlock',
+  components: {
+    MarkdownFrontMatter,
+  },
   props: {
     readonly: {
       type: Boolean,
@@ -92,14 +138,34 @@ export default defineComponent({
       clickOutside: null as SetClickOutsideCancel | null,
       mountPromise,
       mountResolve,
+      frontMatterEntries: [] as FrontMatterEntry[],
+      body: '',
+      showFrontMatter: false,
+      _parsing: false,
     };
   },
   computed: {
-    currentValue() {
-      return this.resolvedBlock.computed['value'];
+    hasFrontMatter(): boolean {
+      return this.frontMatterEntries.length > 0;
+    },
+    rawValue(): string {
+      return this.resolvedBlock.computed['value'] ?? '';
     },
   },
-
+  watch: {
+    rawValue: {
+      immediate: true,
+      handler(val: string) {
+        if (this._parsing) return;
+        const parsed = parseFrontMatter(val ?? '');
+        this.frontMatterEntries = Object.entries(parsed.data).map(([k, v]) => ({
+          key: k,
+          value: typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''),
+        }));
+        this.body = parsed.body;
+      },
+    },
+  },
   async mounted() {
     const component_loaded = await this.reloadComponent();
     await new Promise((res) => setTimeout(res, 100));
@@ -116,9 +182,55 @@ export default defineComponent({
         text,
       );
     },
+    buildFullValue(): string {
+      if (this.frontMatterEntries.length === 0) return this.body;
+      const lines = ['---'];
+      for (const entry of this.frontMatterEntries) {
+        if (entry.key) {
+          const val = entry.value.includes(' ')
+            ? `"${entry.value}"`
+            : entry.value;
+          lines.push(`${entry.key}: ${val}`);
+        }
+      }
+      lines.push('---');
+      if (this.body) lines.push('', this.body);
+      return lines.join('\n');
+    },
+    commitValue() {
+      const full = this.buildFullValue();
+      if (full === this.rawValue) return;
+      this._parsing = true;
+      this.emitValue(full);
+      this.$nextTick(() => {
+        this._parsing = false;
+      });
+    },
+    onBodyChange(newBody: string) {
+      if (!this.hasFrontMatter) {
+        const parsed = parseFrontMatter(newBody);
+        if (Object.keys(parsed.data).length > 0) {
+          this.frontMatterEntries = Object.entries(parsed.data).map(([k, v]) => ({
+            key: k,
+            value: typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''),
+          }));
+          this.body = parsed.body;
+          this.showFrontMatter = true;
+          this.commitValue();
+          return;
+        }
+      }
+      this.body = newBody;
+      this.commitValue();
+    },
+    onFrontMatterEntriesUpdate(entries: FrontMatterEntry[]) {
+      this.frontMatterEntries = entries;
+      this.commitValue();
+    },
     async enterEditMode() {
       if (this.readonly) return;
       await this.mountPromise;
+      this.showFrontMatter = true;
 
       const editor = this.$refs['editor'] as InstanceType<
         typeof MarkdownEditor
@@ -126,8 +238,6 @@ export default defineComponent({
       if (editor) {
         editor.focus();
       }
-
-      // if (this.editMode) return;
 
       this.assetBlockEditor.enterEditMode(this.resolvedBlock.id);
       this.resetGlobalClickOutside(true);

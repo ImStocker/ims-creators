@@ -4,8 +4,17 @@ import type { BlockContentItem } from '~ims-app-base/logic/types/BlockTypeDefini
 import { parser } from '@lezer/markdown';
 import { generateTextHeaderAnchor } from '~ims-app-base/logic/utils/assets';
 
+function stripFrontMatter(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed.startsWith('---')) return input;
+  const endIdx = trimmed.indexOf('---', 3);
+  if (endIdx === -1) return input;
+  return trimmed.slice(endIdx + 3).trim();
+}
+
 function extractHeaderAnchorsFromMarkdown(input: string) {
-  const tree = parser.parse(input);
+  const input_body = stripFrontMatter(input);
+  const tree = parser.parse(input_body);
   const headers: { title: string; level: number; anchor: string }[] = [];
   const used_anchors = new Set<string>();
 
@@ -24,12 +33,12 @@ function extractHeaderAnchorsFromMarkdown(input: string) {
         const cursor_to = cursor.to;
         cursor.next();
         const cursor_from = cursor.to;
-        header_text = input.substring(cursor_from, cursor_to);
+        header_text = input_body.substring(cursor_from, cursor_to);
       } else {
         const cursor_from = cursor.from;
         cursor.firstChild();
         const cursor_to = cursor.from;
-        header_text = input.substring(cursor_from, cursor_to);
+        header_text = input_body.substring(cursor_from, cursor_to);
       }
 
       header_text = header_text.trim();
@@ -52,26 +61,28 @@ function extractHeaderAnchorsFromMarkdown(input: string) {
 export class MarkdownBlockController extends BlockEditorController {
   override getContentItems(): BlockContentItem<any>[] {
     const anchors_list: BlockContentItem<void>[] = [];
-    if (this.resolvedBlock.title) {
-      anchors_list.push({
-        blockId: this.resolvedBlock.id,
-        itemId: 'header',
-        title: this.resolvedBlock.title,
-        level: 1,
-        anchor: '',
-        index: 1,
-      });
-    }
-
-    const value = this.resolvedBlock.computed['value'];
-    if (typeof value === 'string') {
-      const headers = extractHeaderAnchorsFromMarkdown(value);
-      for (const header of headers) {
+    if (this.resolvedBlock) {
+      if (this.resolvedBlock.title) {
         anchors_list.push({
-          ...header,
-          itemId: 'h-' + header.anchor,
           blockId: this.resolvedBlock.id,
+          itemId: 'header',
+          title: this.resolvedBlock.title,
+          level: 1,
+          anchor: '',
+          index: 1,
         });
+      }
+
+      const value = this.resolvedBlock.computed['value'];
+      if (typeof value === 'string') {
+        const headers = extractHeaderAnchorsFromMarkdown(value);
+        for (const header of headers) {
+          anchors_list.push({
+            ...header,
+            itemId: 'h-' + header.anchor,
+            blockId: this.resolvedBlock.id,
+          });
+        }
       }
     }
     return anchors_list;

@@ -6,6 +6,7 @@ import imsDialogEditor from "~ims-creators/../i18n/locales/ru/imsDialogEditor";
 import graphBlock from "~ims-creators/../i18n/locales/ru/graphBlock";
 import creatorsCommon from "~ims-creators/../i18n/locales/ru/creatorsCommon";
 import levelEditor from "~ims-creators/../i18n/locales/ru/levelEditor";
+import markdownBlock from "~ims-creators/../i18n/locales/ru/markdownBlock";
 
 export default {
   ...index,
@@ -15,5 +16,6 @@ export default {
   ...graphBlock,
   ...creatorsCommon,
   ...levelEditor,
+  ...markdownBlock,
   ...desktop
 };
