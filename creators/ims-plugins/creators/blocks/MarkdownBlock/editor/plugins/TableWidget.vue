@@ -14,7 +14,7 @@
           class="cm-table-cell cm-table-header TableWidget-cell"
           @mousedown.prevent="onCellMouseDown(ri, ci)"
         >
-          <div v-if="_activeCell?.row !== ri || _activeCell?.col !== ci" class="TableWidget-cell-presenter" v-text="headerRows[ri][ci]"></div>
+          <div v-if="_activeCell?.row !== ri || _activeCell?.col !== ci" class="TableWidget-cell-presenter" v-html="cellHtml(headerRows[ri][ci])"></div>
           <div v-else class="TableWidget-cell-editor"></div>
         </th>
       </tr>
@@ -32,7 +32,7 @@
           <div
             v-if="_activeCell?.row !== headerRowCount + ri || _activeCell?.col !== ci"
             class="TableWidget-cell-presenter"
-            v-text="rows[headerRowCount + ri][ci]"
+            v-html="cellHtml(rows[headerRowCount + ri][ci])"
           ></div>
           <div v-else class="TableWidget-cell-editor"></div>
         </td>
@@ -48,6 +48,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
 import type { KeyBinding } from '@codemirror/view';
 import { defineComponent, markRaw } from 'vue';
+import { marked } from 'marked';
 
 export default defineComponent({
   name: 'TableWidget',
@@ -82,6 +83,10 @@ export default defineComponent({
     this._cleanupNestedEditor();
   },
   methods: {
+    cellHtml(text: string): string {
+      return marked.parseInline(text) as string;
+    },
+
     _onBlur() {
       this.commitEdit();
     },
