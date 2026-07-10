@@ -44,6 +44,14 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    resolve: {
+      dedupe: [
+        '@codemirror/language',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@lezer/common',
+      ],
+    },
     plugins: [
       nodePolyfills({
         include: ['path'],

@@ -57,7 +57,6 @@ class TableWidgetType extends WidgetType {
 
 function decorate(state: EditorState): DecorationSet {
   const widgets: any[] = [];
-
   syntaxTree(state).iterate({
     enter: ({ type, from, to, node }) => {
       if (type.name !== 'Table') return;
@@ -118,7 +117,7 @@ const tableDecorations = StateField.define<DecorationSet>({
     return decorate(state);
   },
   update(decos, tr) {
-    if (tr.docChanged) {
+    if (tr.docChanged || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
       return decorate(tr.state);
     }
     return decos.map(tr.changes);
