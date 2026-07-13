@@ -40,7 +40,7 @@ export class DialogBlockDefinition extends BlockTypeDefinition {
     '  3) Condition ("if trust == 1"): getVar -> comparison op -> branch; branch.values.condition binds to op result.\n' +
     '  4) Player choice: speech node with next=null, options[] containing each choice text and its next.\n' +
     '  5) Edges (inferred from next/options/bindings): flow handles "in"/"out"/"out-N", data handles "data-in-param"/"data-out-param".\n' +
-    'For AssetPropValue format see the "AssetPropValue types" leaf value reference; for field type details see the "Field type controllers reference".\n' +
+    'For AssetPropValue format see the "AssetPropValue types" reference; for field type details see the "Field type controllers reference".\n' +
     'Example (player meets Evelyn in Act 3):\n' +
     '{\n' +
     '  "start": "1",\n' +
