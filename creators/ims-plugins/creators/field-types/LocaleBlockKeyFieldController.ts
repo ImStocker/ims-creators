@@ -8,6 +8,10 @@ export class LocaleBlockKeyController extends FieldTypeController {
   editor = async () => LocaleBlockKeyPropPresenter;
   presenter = async () => LocaleBlockKeyPropPresenter;
 
+  override aiSpec =
+    'Locale block key field (creators module). Value is stored as a string. ' +
+    'Represents the localization key for a translatable text block. ' +
+    'Used to identify and match corresponding translations across different language locales.';
   override dataTypes = [
     {
       Type: AssetPropType.STRING,
