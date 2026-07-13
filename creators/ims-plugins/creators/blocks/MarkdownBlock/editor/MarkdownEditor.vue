@@ -22,6 +22,7 @@ import { imcImages } from './plugins/imc-images';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import { blurHandler } from './plugins/blur-handler';
 import { headingId } from './plugins/heading-id';
+import { tables } from './plugins/tables';
 
 export default defineComponent({
   name: 'MarkdownBlockEditor',
@@ -112,6 +113,7 @@ export default defineComponent({
           this.$emit('blur');
         }),
         ...headingId(),
+        ...tables(this.$.appContext),
       ];
     },
   },
@@ -167,5 +169,14 @@ export default defineComponent({
 .MarkdownBlockEditor {
   @include imc-text-format.imc-text-format;
   position: relative;
+  &:deep(.ink-mde) {
+    --ink-internal-block-background-color: var(--local-box-color);
+    .cm-line.cm-codeblock {
+      font-size: 0.9em;
+    }
+    .cm-line .cm-code {
+      font-size: 0.9em;
+    }
+  }
 }
 </style>

@@ -147,7 +147,8 @@ export const replacements = (config: PluginConfig): Extension => {
       if (
         tr.docChanged ||
         tr.selection ||
-        tr.effects.some((e) => e.is(refreshDecorations))
+        tr.effects.some((e) => e.is(refreshDecorations)) ||
+        syntaxTree(tr.state) !== syntaxTree(tr.startState)
       ) {
         return decorate(tr.state);
       }

@@ -1,0 +1,291 @@
+<template>
+  <table
+    class="TableWidget cm-table-widget"
+    style="table-layout:fixed;width:100%;border-collapse:collapse;border:1px solid var(--local-border-color,#ccc)"
+    @mousedown.stop
+  >
+    <thead v-if="headerRows.length">
+      <tr v-for="(_row, ri) in headerRows" :key="'hr'+ri">
+        <th
+          v-for="(_cell, ci) in headerRows[ri]"
+          :key="'h'+ci"
+          :data-row="ri"
+          :data-col="ci"
+          class="cm-table-cell cm-table-header TableWidget-cell"
+          @mousedown.prevent="onCellMouseDown(ri, ci)"
+        >
+          <div v-if="_activeCell?.row !== ri || _activeCell?.col !== ci" class="TableWidget-cell-presenter" v-html="cellHtml(headerRows[ri][ci])"></div>
+          <div v-else class="TableWidget-cell-editor"></div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(_row, ri) in dataRows" :key="'r'+ri">
+        <td
+          v-for="(_cell, ci) in dataRows[ri]"
+          :key="'c'+ri+'-'+ci"
+          :data-row="headerRowCount + ri"
+          :data-col="ci"
+          class="cm-table-cell TableWidget-cell"
+          @mousedown.prevent="onCellMouseDown(headerRowCount + ri, ci)"
+        >
+          <div
+            v-if="_activeCell?.row !== headerRowCount + ri || _activeCell?.col !== ci"
+            class="TableWidget-cell-presenter"
+            v-html="cellHtml(rows[headerRowCount + ri][ci])"
+          ></div>
+          <div v-else class="TableWidget-cell-editor"></div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</template>
+
+<script lang="ts">
+import { EditorView, keymap } from '@codemirror/view';
+import { defaultKeymap, historyKeymap, history } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { syntaxTree } from '@codemirror/language';
+import type { KeyBinding } from '@codemirror/view';
+import { defineComponent, markRaw } from 'vue';
+import { marked } from 'marked';
+
+export default defineComponent({
+  name: 'TableWidget',
+  props: {
+    parentView: { type: Object as () => EditorView, required: true },
+    tableFrom: { type: Number, required: true },
+    initialRows: { type: Array as () => string[][], required: true },
+    hasHeader: { type: Boolean, default: false },
+    delimiterText: { type: String, default: '' },
+  },
+  data() {
+    return {
+      rows: (this.initialRows as string[][]).map((row) => [...row]),
+      _activeCell: null as { row: number; col: number } | null,
+      _nestedEditor: null as EditorView | null,
+      _commitGen: 0,
+      _committing: false,
+    };
+  },
+  computed: {
+    headerRows(): string[][] {
+      return this.hasHeader ? [this.rows[0]] : [];
+    },
+    dataRows(): string[][] {
+      return this.hasHeader ? this.rows.slice(1) : this.rows;
+    },
+    headerRowCount(): number {
+      return this.hasHeader ? 1 : 0;
+    },
+  },
+  beforeUnmount() {
+    this._cleanupNestedEditor();
+  },
+  methods: {
+    cellHtml(text: string): string {
+      return marked.parseInline(text) as string;
+    },
+
+    _onBlur() {
+      this.commitEdit();
+    },
+
+    _cleanupNestedEditor() {
+      if (!this._nestedEditor) return;
+      this._nestedEditor.dom.removeEventListener('blur', this._onBlur);
+      this._nestedEditor.destroy();
+      this._nestedEditor = null;
+    },
+
+    onCellMouseDown(row: number, col: number) {
+      if (
+        this._activeCell !== null &&
+        this._activeCell.row === row &&
+        this._activeCell.col === col
+      ) return;
+      this.commitEdit();
+      this.startEdit(row, col);
+    },
+
+    async startEdit(row: number, col: number) {
+      this._commitGen++;
+      const cell = this.findCellElement(row, col);
+      if (!cell) return;
+
+      this._activeCell = { row, col };
+
+      await this.$nextTick();
+
+      const editorHost = cell.querySelector('.TableWidget-cell-editor') as HTMLElement;
+      if (!editorHost) {
+        return
+      };
+
+      const commit = () => { this.commitEdit(); return true; };
+      const tabNext = () => {
+        if (!this._activeCell) return true;
+        let { row, col } = this._activeCell;
+        col++;
+        if (col >= (this.rows[row]?.length ?? 0)) {
+          row++;
+          if (row >= this.rows.length) return true;
+          col = 0;
+        }
+        this.commitEdit({ row, col });
+        return true;
+      };
+      const tabPrev = () => {
+        if (!this._activeCell) return true;
+        let { row, col } = this._activeCell;
+        col--;
+        if (col < 0) {
+          row--;
+          if (row < 0) return true;
+          col = (this.rows[row]?.length ?? 0) - 1;
+        }
+        this.commitEdit({ row, col });
+        return true;
+      };
+
+      this._nestedEditor = markRaw(new EditorView({
+        doc: this.rows[row][col],
+        extensions: [
+          markdown(),
+          EditorView.editable.of(true),
+          EditorView.theme({
+            '&': {
+              backgroundColor: 'transparent',
+              height: '100%',
+              outline: 'none',
+            },
+            '&.cm-focused': { outline: 'none' },
+            '.cm-scroller': {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              overflow: 'hidden',
+            },
+            '.cm-content': {
+              padding: '2px 4px',
+              caretColor: 'currentColor',
+              minHeight: '1.2em',
+            },
+            '.cm-line': { padding: 0 },
+          }),
+          keymap.of(<KeyBinding[]>[
+            ...defaultKeymap,
+            ...historyKeymap,
+            { key: 'Escape', run: commit },
+            { key: 'Tab', run: tabNext },
+            { key: 'Shift-Tab', run: tabPrev },
+          ]),
+          history(),
+        ],
+        parent: editorHost,
+      }));
+
+      this._nestedEditor.dom.addEventListener('blur', this._onBlur);
+
+      this._nestedEditor.focus();
+    },
+
+    commitEdit(navigateTo?: { row: number; col: number }) {
+      if (this._committing || !this._nestedEditor || !this._activeCell) return;
+      this._committing = true;
+      this._commitGen++;
+
+      const gen = this._commitGen;
+      const { row, col } = this._activeCell;
+      const newText = this._nestedEditor.state.doc.toString();
+
+      this._cleanupNestedEditor();
+
+      const range = this.findCurrentTableRange();
+
+      this._activeCell = null;
+
+      const newRows = this.rows.map((r) => [...r]);
+      newRows[row][col] = newText;
+      this.rows = newRows;
+
+      const doNav = () => {
+        if (navigateTo && this._commitGen === gen) {
+          this.startEdit(navigateTo.row, navigateTo.col);
+        }
+      };
+
+      if (range) {
+        const fullMarkdown = this.reconstructTable(newRows);
+        queueMicrotask(() => {
+          this.parentView.dispatch({
+            changes: { from: range.from, to: range.to, insert: fullMarkdown },
+          });
+          doNav();
+        });
+      } else {
+        if (navigateTo) queueMicrotask(doNav);
+      }
+
+      this._committing = false;
+    },
+
+    findCurrentTableRange(): { from: number; to: number } | null {
+      let range: { from: number; to: number } | null = null;
+      syntaxTree(this.parentView.state).iterate({
+        enter: (ref) => {
+          if (
+            ref.type.name === 'Table' &&
+            ref.from <= this.tableFrom &&
+            ref.to >= this.tableFrom
+          ) {
+            range = { from: ref.from, to: ref.to };
+            return false;
+          }
+          return true;
+        },
+      });
+      return range;
+    },
+
+    reconstructTable(newRows: string[][]): string {
+      const lines: string[] = [];
+      if (this.hasHeader) {
+        lines.push(`| ${newRows[0].join(' | ')} |`);
+        if (this.delimiterText) {
+          lines.push(this.delimiterText);
+        }
+        for (let r = 1; r < newRows.length; r++) {
+          lines.push(`| ${newRows[r].join(' | ')} |`);
+        }
+      } else {
+        for (const row of newRows) {
+          lines.push(`| ${row.join(' | ')} |`);
+        }
+      }
+      return lines.join('\n');
+    },
+
+    findCellElement(row: number, col: number): HTMLTableCellElement | null {
+      return this.parentView.dom.querySelector(
+        `td[data-row="${row}"][data-col="${col}"],` +
+          `th[data-row="${row}"][data-col="${col}"]`,
+      );
+    },
+  },
+});
+</script>
+
+<style>
+.cm-table-cell {
+  border: 1px solid var(--local-border-color, #ccc);
+  padding: 0 4px;
+  vertical-align: top;
+  font-weight: 400;
+  min-width: 3em;
+  min-height: 1.5em;
+}
+.cm-table-header {
+  font-weight: 600;
+  background: var(--local-hl-bg-color, #f5f5f5);
+}
+</style>

@@ -38,7 +38,6 @@ import {
 } from 'vue';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditorVM';
-import type { EditorBlockHandler } from '~ims-app-base/components/Asset/EditorBlock';
 import type {
   AssetDisplayMode,
   ResolvedAssetBlock,
@@ -48,9 +47,13 @@ import {
   setImsClickOutside,
   type SetClickOutsideCancel,
 } from '~ims-app-base/components/utils/ui';
-import { makeBlockRef } from '~ims-app-base/logic/types/Props';
+import {
+  castAssetPropValueToString,
+  makeBlockRef,
+} from '~ims-app-base/logic/types/Props';
 import type MarkdownEditor from './editor/MarkdownEditor.vue';
 import MarkdownFrontMatter from './MarkdownFrontMatter.vue';
+import type { EditorBlockHandler } from '~ims-app-base/components/Asset/Editor/EditorBlock';
 
 function parseFrontMatter(input: string): {
   data: Record<string, string>;
@@ -141,7 +144,7 @@ export default defineComponent({
       frontMatterEntries: [] as FrontMatterEntry[],
       body: '',
       showFrontMatter: false,
-      _parsing: false,
+      $parsing: false,
     };
   },
   computed: {
@@ -149,14 +152,14 @@ export default defineComponent({
       return this.frontMatterEntries.length > 0;
     },
     rawValue(): string {
-      return this.resolvedBlock.computed['value'] ?? '';
+      return castAssetPropValueToString(this.resolvedBlock.computed['value']);
     },
   },
   watch: {
     rawValue: {
       immediate: true,
       handler(val: string) {
-        if (this._parsing) return;
+        if (this.$parsing) return;
         const parsed = parseFrontMatter(val ?? '');
         this.frontMatterEntries = Object.entries(parsed.data).map(([k, v]) => ({
           key: k,
@@ -200,20 +203,23 @@ export default defineComponent({
     commitValue() {
       const full = this.buildFullValue();
       if (full === this.rawValue) return;
-      this._parsing = true;
+      this.$parsing = true;
       this.emitValue(full);
       this.$nextTick(() => {
-        this._parsing = false;
+        this.$parsing = false;
       });
     },
     onBodyChange(newBody: string) {
       if (!this.hasFrontMatter) {
         const parsed = parseFrontMatter(newBody);
         if (Object.keys(parsed.data).length > 0) {
-          this.frontMatterEntries = Object.entries(parsed.data).map(([k, v]) => ({
-            key: k,
-            value: typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''),
-          }));
+          this.frontMatterEntries = Object.entries(parsed.data).map(
+            ([k, v]) => ({
+              key: k,
+              value:
+                typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''),
+            }),
+          );
           this.body = parsed.body;
           this.showFrontMatter = true;
           this.commitValue();

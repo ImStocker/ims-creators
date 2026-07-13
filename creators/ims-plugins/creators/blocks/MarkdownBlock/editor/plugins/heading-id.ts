@@ -51,8 +51,7 @@ const headingIdPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      // обновляем только при изменении документа ИЛИ при смене языка/парсера
-      if (update.docChanged) {
+      if (update.docChanged || syntaxTree(update.state) !== syntaxTree(update.startState)) {
         this.decorations = this.buildDecorations();
       }
     }

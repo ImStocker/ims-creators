@@ -188,16 +188,15 @@ export default defineNuxtConfig({
       dedupe: [
         'vue',
         'vue-router',
-        
-        ...(
-           // Note: not working in dev 🤷‍♂️, that's why here is that condition
-           process.env.NODE_ENV === 'production' ? [
-            '@codemirror/language',
-            '@codemirror/state',
-            '@codemirror/view',
-           ] : [
-            '@codemirror/state',
-        ])
+        'ink-mde',
+        '@codemirror/language',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/lang-markdown',
+        '@codemirror/language-data',
+        '@lezer/common',
+        '@lezer/highlight',
+        '@lezer/markdown',
       ],
     },
     define: {

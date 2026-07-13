@@ -54,6 +54,19 @@ export default defineNuxtConfig({
         },
       }),
     ],
+    resolve: {
+      dedupe: [
+        'ink-mde',
+        '@codemirror/language',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/lang-markdown',
+        '@codemirror/language-data',
+        '@lezer/common',
+        '@lezer/highlight',
+        '@lezer/markdown',
+      ],
+    },
     optimizeDeps: {
       esbuildOptions: {
         target: 'es2022',

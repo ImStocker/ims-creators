@@ -87,9 +87,9 @@ export const imagesExtension = (config: PluginConfig): Extension => {
     if (!url.startsWith('http') && !url.startsWith('data')) {
       const file = parseImagePathToFile(url);
       if (file) {
-        url = config.appManager.get(FileManager).getFileUrl(
-          file as AssetPropValueFile,
-        );
+        url = config.appManager
+          .get(FileManager)
+          .getFileUrl(file as AssetPropValueFile);
       }
     }
     return Decoration.widget({
@@ -126,10 +126,12 @@ export const imagesExtension = (config: PluginConfig): Extension => {
     create(state) {
       return decorate(state);
     },
-    update(images, transaction) {
-      if (transaction.docChanged) return decorate(transaction.state);
+    update(images, tr) {
+      if (tr.docChanged || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
+        return decorate(tr.state);
+      }
 
-      return images.map(transaction.changes);
+      return images.map(tr.changes);
     },
     provide(field) {
       return EditorView.decorations.from(field);
