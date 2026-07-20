@@ -1,5 +1,5 @@
-import { LocaleBlockKeyController } from './LocaleBlockKeyFieldController';
-import { LocaleBlockStatusFieldController } from './LocaleBlockStatusFieldController';
+import { LocaleBlockKeyController } from './LocaleBlockKeyField/LocaleBlockKeyFieldController';
+import { LocaleBlockStatusFieldController } from './LocaleBlockStatusField/LocaleBlockStatusFieldController';
 
 export default function () {
   return [

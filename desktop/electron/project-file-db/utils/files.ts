@@ -161,3 +161,16 @@ export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db:
         throw err;
     }
   }
+
+  export function suggestUniqueFilename(
+    title: string | null,
+    ext: string,
+    checkIsAvail: (name: string) => boolean,
+  ): string {
+    return generateNextUniqueNameNumber(
+      prepareFileBasenameByEntityTitle(title ?? 'untitled'),
+      checkIsAvail,
+      ' - ',
+      ext,
+    );
+  }

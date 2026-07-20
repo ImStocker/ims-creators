@@ -5,6 +5,7 @@ import { initImsHostApi } from './imshost-api';
 import { installExtension } from 'electron-devtools-installer';
 import { pathToFileURL } from "node:url"
 import autoUpdateManager from './auto-update-manager';
+// startMcpServer imported lazily below
 
 const VUEDEVTOOLS_ID = 'nhdogjmejiglipccpnnnanhbledajbpd';
 
@@ -19,9 +20,9 @@ function getDefaultWindowArgs(): WindowArgs {
   };
 }
 
-async function initApp(){
+async function initApp() {
 
-  try{
+  try {
     log.transports.file.level = 'info';
     log.initialize({
       spyRendererConsole: true
@@ -33,31 +34,31 @@ async function initApp(){
       log.error(reason, 'Unhandled Rejection at Promise', p);
       dialog.showErrorBox("Error", 'Unhandled Rejection: ' + reason);
     })
-    process.on('uncaughtException',  (error) => {
+    process.on('uncaughtException', (error) => {
       log.error(error)
       dialog.showErrorBox("Error", error.message);
     });
-    
+
     protocol.registerSchemesAsPrivileged([
-      { 
-        scheme: 'localfile', 
-        privileges: { 
-          stream: true,    
-          bypassCSP: true, 
+      {
+        scheme: 'localfile',
+        privileges: {
+          stream: true,
+          bypassCSP: true,
           secure: true,
-          supportFetchAPI: true 
-        } 
+          supportFetchAPI: true
+        }
       }
     ]);
 
 
     let quitRequested = false;
     app.on('before-quit', async (event) => {
-      if (!quitRequested){
+      if (!quitRequested) {
         event.preventDefault();
-          
+
         await closeAllProjectDb()
-        
+
         quitRequested = true;
         app.quit();
       }
@@ -80,7 +81,7 @@ async function initApp(){
       protocol.handle('localfile', async (request) => {
         try {
           let file_path_match = request.url.match(/^localfile:\/\/(.*)$/);
-          if(!file_path_match) return new Response(`Error`, { status: 404 });
+          if (!file_path_match) return new Response(`Error`, { status: 404 });
           const file_path = decodeURIComponent(file_path_match[1]);
           const file_url = pathToFileURL(file_path).toString()
           return net.fetch(file_url);
@@ -100,11 +101,13 @@ async function initApp(){
         await installExtension({
           id: VUEDEVTOOLS_ID
         })
-        .then((ext) => console.log(`Added Extension:  ${ext.name}`))
-        .catch((err) => console.log('An error occurred: ', err))
+          .then((ext) => console.log(`Added Extension:  ${ext.name}`))
+          .catch((err) => console.log('An error occurred: ', err))
       }
 
       await createWindow(getDefaultWindowArgs());
+
+      import('./mcp-server/index').then(({ startMcpServer }) => startMcpServer()).catch((e) => log.error('MCP server failed to start:', e));
 
       if (!process.env.VITE_DEV_SERVER_URL) {
         autoUpdateManager.checkNewVersion(); // Do not await 
@@ -113,11 +116,11 @@ async function initApp(){
 
     log.log("App init done")
   }
-  catch (err: any){
-      console.error(err.message)
-      log.error(err);
-      dialog.showErrorBox("Error", err.message);
-      app.quit();
+  catch (err: any) {
+    console.error(err.message)
+    log.error(err);
+    dialog.showErrorBox("Error", err.message);
+    app.quit();
   }
 
 }

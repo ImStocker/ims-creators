@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetSearchFilter } from "../logic/AssetSearchFilter";
-import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById } from "../utils/files";
 import isUUID from 'validator/es/lib/isUUID';
 import { once } from "node:events";
 import type { Writable } from "node:stream";
@@ -26,6 +26,9 @@ import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import { ASSET_BASE_ORDERING } from "../project-db-constants";
 
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
+import { mergeBlocksToSave } from "../logic/asset-ops";
+import { serializeAssetToJSON } from "../logic/serialize";
+import { suggestUniqueFilename, prepareFileBasenameByEntityTitle } from "../utils/files";
 
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
 
@@ -503,156 +506,7 @@ export class AssetService implements IProjectDatabaseAsset {
         },
         undo?: AssetSetDTO
     ): ProjectFileDbAssetBlock[] {
-        const result: ProjectFileDbAssetBlock[] = [];
-        const changed_block_ids = new Set();
-        for (const [block_key, new_block] of Object.entries(new_blocks)) {
-            const { blockId, blockName } = parseAssetNewBlockRef(block_key);
-            const old_block = old_blocks.find(block => {
-                if (blockId) {
-                    return block.id === blockId;
-                }
-                else if (blockName) {
-                    return block.name === blockName;
-                }
-            });
-            let block_undo: AssetBlockParamsDTO | undefined;
-            if (undo) {
-                if (!undo.blocks) undo.blocks = {};
-                if (blockId) {
-                    undo.blocks[`@${blockId}`] = {};
-                    block_undo = undo.blocks[`@${blockId}`]
-                }
-                else if (blockName) {
-                    undo.blocks[blockName] = {};
-                    block_undo = undo.blocks[blockName]
-                }
-            }
-            const result_block = this._prepareBlockToSave(
-                block_key,
-                old_block ? old_block : null,
-                new_block,
-                block_undo
-            );
-            if (result_block) {
-                result.push(result_block);
-                changed_block_ids.add(result_block.id);
-            }
-            if (old_block) changed_block_ids.add(old_block.id);
-        }
-        for (const old_block of old_blocks) {
-            if (!changed_block_ids.has(old_block.id)) {
-                result.push(old_block);
-            }
-        }
-        return result.sort((a, b) => {
-            return a.index - b.index;
-        });
-    }
-
-    private _prepareBlockToSave(
-        block_key: string,
-        old_block: Partial<ProjectFileDbAssetBlock> | null,
-        new_block: AssetBlockParamsDTO,
-        block_undo?: AssetBlockParamsDTO
-    ): ProjectFileDbAssetBlock | null {
-        const { blockId, blockName } = parseAssetNewBlockRef(block_key);
-        if (!(old_block?.type || new_block.type)) {
-            throw new Error("Type is not set");
-        }
-        const old_block_props = assignPlainValueToAssetProps({}, old_block?.props ?? {});
-        const old_block_inherited = old_block?.inherited ? assignPlainValueToAssetProps({}, old_block.inherited ?? {}) : null;
-
-        let result_props = old_block_props;
-        let result_props_undo: AssetProps[] | undefined
-        if (new_block.props) {
-            const new_block_props_change = (Array.isArray(new_block.props) ? new_block.props : [new_block.props]);
-            const result_props_applied_change = applyPropsChange(old_block_props, old_block_inherited ?? {}, new_block_props_change)
-            result_props = result_props_applied_change.props
-            result_props_undo = result_props_applied_change.undo;
-        }
-
-        const { normalProps, remapParentProps } = extractRemapParentProps(result_props);
-        let computed_props: AssetProps = {};
-        if (old_block_inherited) {
-            if (remapParentProps) {
-                computed_props = remapAssetProps(old_block_inherited, remapParentProps);
-            }
-            else {
-                computed_props = old_block_inherited;
-            }
-        }
-        computed_props = { ...computed_props, ...normalProps };
-
-
-        const block_entity: ProjectFileDbAssetBlock = {
-            id: blockId ?? old_block?.id ?? uuidv4(),
-            name: new_block.name ?? old_block?.name ?? blockName,
-            index: new_block.index ?? old_block?.index ?? 0,
-            type: (new_block.type ?? old_block?.type) as string,
-            title: new_block.title ?? old_block?.title ?? null,
-            ownTitle: new_block.title ?? old_block?.ownTitle ?? null,
-            createdAt: old_block?.createdAt ?? (new Date()).toISOString(),
-            updatedAt: (new Date()).toISOString(),
-            own: old_block?.own ?? true,
-            inherited: old_block_inherited ? convertAssetPropsToPlainObject(old_block_inherited) : null,
-            computed: convertAssetPropsToPlainObject(computed_props),
-            props: convertAssetPropsToPlainObject(result_props),
-        };
-
-        if (block_undo) {
-
-            if (new_block.delete || new_block.reset) {
-                if (old_block) {
-                    block_undo = {
-                        index: old_block.index,
-                        name: old_block.name,
-                        title: old_block.title,
-                        props: assignPlainValueToAssetProps({}, old_block.props ?? {}),
-                        type: old_block.type,
-                    }
-                }
-            }
-            else {
-
-                if (old_block) {
-                    if (block_undo) {
-                        for (const [prop, val] of Object.entries(new_block) as [keyof AssetBlockParamsDTO, any][]) {
-                            switch (prop) {
-                                case 'delete':
-                                case 'props':
-                                case 'reset':
-                                    continue;
-                                default:
-                                    block_undo[prop] = old_block[prop] as any;
-                            }
-                        }
-                        if (result_props_undo) block_undo.props = result_props_undo;
-                    }
-                }
-                else {
-                    if (block_undo) {
-                        block_undo = {
-                            delete: true
-                        }
-                    }
-                }
-            }
-        }
-
-        if (new_block.delete) {
-            if (old_block?.inherited) {
-                block_entity.delete = true;
-                block_entity.props = {}
-                block_entity.computed = {}
-            }
-            else return null;
-        }
-        else if (new_block.reset) {
-            block_entity.props = {}
-            block_entity.computed = { ...block_entity.inherited }
-        }
-
-        return block_entity;
+        return mergeBlocksToSave(old_blocks as any, new_blocks, undo) as ProjectFileDbAssetBlock[];
     }
 
     async assetsCreate(params: AssetServiceAssetCreateDTO): Promise<AssetsChangeResult> {
@@ -757,8 +611,9 @@ export class AssetService implements IProjectDatabaseAsset {
     }
 
     private _checkIsMdFile(asset_full: ProjectFileDbAsset) {
-        const meta_block = asset_full.blocks.find(block => block.name === BLOCK_NAME_META && block.computed.format === 'md');
-        return !!meta_block;
+        return asset_full.blocks?.some(
+            (block) => block.name === BLOCK_NAME_META && (block.computed as any)?.format === 'md',
+        ) ?? false;
     }
 
     async saveAssetFile(asset_full: ProjectFileDbAsset) {
@@ -787,33 +642,7 @@ export class AssetService implements IProjectDatabaseAsset {
             return;
         }
 
-        // Save as ima.json
-        const ima_asset = {
-            ...asset_full,
-            localName: undefined,
-            rights: undefined,
-            lastViewedAt: undefined,
-            unread: undefined,
-            deletedAt: undefined,
-            hasImage: undefined,
-            createdAt: undefined,
-            updatedAt: undefined,
-            values: {} as { [key: string]: AssetPropsPlainObject }
-        }
-        const blocks_for_values = asset_full.blocks.filter((block) => block.name && !block.name.startsWith('__'));
-        for (const block of blocks_for_values) {
-            if (!block.name) {
-                continue;
-            }
-            const values_block_props = { ...block.props };
-            const block_props_keys = Object.keys(values_block_props);
-            for (const block_props_key of block_props_keys) {
-                if (/^(__|~).+/.test(block_props_key)) {
-                    delete values_block_props[block_props_key];
-                }
-            }
-            ima_asset.values[block.name] = values_block_props
-        }
+        const ima_asset = serializeAssetToJSON(asset_full as any);
         target.write(JSON.stringify(ima_asset, null, 1))
     }
 
@@ -822,12 +651,7 @@ export class AssetService implements IProjectDatabaseAsset {
         if (this._checkIsMdFile(asset_full)) {
             ext = '.md'
         }
-        return generateNextUniqueNameNumber(
-            prepareFileBasenameByEntityTitle(asset_full.title ?? 'untitled'),
-            check_avail,
-            ' - ',
-            ext
-        );
+        return suggestUniqueFilename(asset_full.title, ext, check_avail);
     }
 
     async assetsChange(params: AssetChangeDTO, options?: { pid?: string }): Promise<AssetsChangeResult> {

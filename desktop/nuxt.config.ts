@@ -34,6 +34,7 @@ else {
 }
 
 const viteElectronBuildConfig: ViteConfig = {
+  plugins: [],
   build: {
     minify: process.env.NODE_ENV === 'production',
     rollupOptions: {

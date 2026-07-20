@@ -9,7 +9,8 @@ import { ProjectFileDbCollection } from "../logic/ProjectFileDbCollection";
 import fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
-import { getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById } from "../utils/files";
+import { prepareFileBasenameByEntityTitle } from "../utils/files";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
 import JSZip from "jszip";
 import { once } from "node:events";
@@ -17,6 +18,7 @@ import { PassThrough, type Writable } from "node:stream";
 import { WORKSPACE_BASE_ORDERING } from "../project-db-constants";
 import { WORKSPACE_EXT } from "./FileSystemService";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
+import { serializeWorkspaceToJSON } from "../logic/serialize";
    
 export type WorkspaceServiceChangeWorkspaceRequest = ChangeWorkspaceRequest & { localName?: string }
 
@@ -221,11 +223,8 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
     }
 
     saveWorkspaceFileToStream(workspace: ProjectFileDbWorkspace, stream: Writable){
-        stream.write(JSON.stringify({
-            ...workspace,
-            localName: undefined,
-            rights: undefined
-        }, null, 1))
+        const data = serializeWorkspaceToJSON(workspace);
+        stream.write(JSON.stringify(data, null, 1))
     }
 
     getNestedWorkspaces(workspace_id: string): ProjectFileDbWorkspace[] {

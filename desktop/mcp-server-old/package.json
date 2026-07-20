@@ -1,0 +1,28 @@
+{
+  "name": "ims-desktop-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for IMS Creators Desktop — lets AI agents work with project files",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "ims-desktop-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "tsc --watch --noEmit",
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["mcp", "ims", "game-design", "visual-novel"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "esbuild": "^0.25.4",
+    "typescript": "^5.8.3"
+  }
+}

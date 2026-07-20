@@ -76,7 +76,7 @@ export default function createDesktopAppManager(
   app_manager.register(TaskManager, new DesktopTaskManager(app_manager));
   app_manager.register(ProjectSettingsManager, new DesktopProjectSettingsManager(app_manager));
   app_manager.register(FileManager, new DesktopFileManager(app_manager));
-  
+
   const project_database = new ProjectDatabaseViaDesktopApi(desktopProjectManager);
 
   app_manager.addInitRoutine(async () => {
