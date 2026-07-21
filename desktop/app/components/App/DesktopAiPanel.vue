@@ -2,13 +2,7 @@
   <div v-show="isOpen" class="DesktopAiPanel" :style="{ width: panelWidth + 'px' }">
     <div class="DesktopAiPanel-resizer" @mousedown="startResize" />
     <div class="DesktopAiPanel-inner">
-      <AiPanel :title="t('desktop.aiAssistant.title')">
-        <template #header-actions>
-          <button class="is-button is-button-icon DesktopAiPanel-closeBtn" @click="$emit('close')">
-            <i class="ri-close-line"></i>
-          </button>
-        </template>
-      </AiPanel>
+      <AiPanel :title="t('desktop.aiAssistant.title')" @close="$emit('close')" />
     </div>
   </div>
 </template>
@@ -95,11 +89,6 @@ function startResize(e: MouseEvent) {
   flex-direction: column;
   min-width: 0;
   width: 0;
-}
-
-.DesktopAiPanel-closeBtn {
-  font-size: 18px;
-  color: var(--button-icon-color);
 }
 </style>
 
