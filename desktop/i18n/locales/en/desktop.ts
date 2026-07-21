@@ -182,6 +182,13 @@ export default {
       cloudOnlySectionHeader: "This section is only available in cloud projects",
       cloudOnlySectionBody: "Please open this section in web version of project."
     },
+    aiAssistant: {
+      title: 'AI Assistant',
+      startPrompt: 'Ask me anything about your project',
+      placeholder: 'Type a message...',
+      send: 'Send',
+      close: 'Close',
+    },
     confirmCloseUnsavedTitle: 'Unsaved changes',
     confirmCloseUnsaved: 'You have unsaved changes. Are you sure you want to close the window?',
     contextMenu: {

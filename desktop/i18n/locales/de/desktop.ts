@@ -182,6 +182,13 @@ export default {
       cloudOnlySectionHeader: "Dieser Bereich ist nur in Cloud-Projekten verfügbar",
       cloudOnlySectionBody: "Bitte öffnen Sie diesen Bereich über die Web-Version des Projekts."
     },
+    aiAssistant: {
+      title: 'KI-Assistent',
+      startPrompt: 'Fragen Sie mich zu Ihrem Projekt',
+      placeholder: 'Nachricht schreiben...',
+      send: 'Senden',
+      close: 'Schließen',
+    },
     confirmCloseUnsavedTitle: 'Ungespeicherte Änderungen',
     confirmCloseUnsaved: 'Sie haben ungespeicherte Änderungen. Sind Sie sicher, dass Sie das Fenster schließen möchten?',
     contextMenu: {

@@ -33,6 +33,14 @@
         <div class="DesktopApp-page-header-menuSpace">
           <new-version-box class="DesktopApp-page-header-menuSpace-item"></new-version-box>
         </div>
+        <button
+          class="is-button is-button-icon DesktopApp-aiToggle"
+          :class="{ 'is-active': aiPanelOpen }"
+          :title="$t('desktop.aiAssistant.title')"
+          @click="toggleAiPanel"
+        >
+          <i class="ri-bard-line"></i>
+        </button>
         <app-sync-menu></app-sync-menu>
         <app-user-info></app-user-info>
       </div>
@@ -66,6 +74,10 @@ import AppSyncMenu from '#components/Sync/AppSyncMenu.vue';
 
 export default defineComponent({
   name: 'ProjectLayout',
+  inject: {
+    aiPanelOpen: { from: 'aiPanelOpen', default: false },
+    toggleAiPanel: { from: 'toggleAiPanel', default: () => {} },
+  },
   components: {
     AppMenu,
     AppMenuToggle,
@@ -309,5 +321,15 @@ $header-height: 60px;
 }
 .DesktopApp-page-header-menuSpace-item{
   margin-right: 10px;
+}
+
+.DesktopApp-aiToggle {
+  margin-right: 4px;
+  font-size: 20px;
+  color: var(--button-icon-color);
+
+  &.is-active {
+    color: var(--color-accent);
+  }
 }
 </style>
