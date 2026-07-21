@@ -38,6 +38,10 @@ import DesktopProjectSettingsManager from './DesktopProjectSettingsManager';
 import DesktopSyncManager from './DesktopSyncManager';
 import DesktopLocalFsSyncManager from './DesktopLocalFsSyncManager';
 import { DesktopCreatorAssetManager } from './DesktopCreatorAssetManager';
+import AiManager from '~ims-app-base/logic/ai-core/AiManager';
+import { AiEditManager } from '~ims-app-base/logic/ai-core';
+import DesktopAiEditManager from './DesktopAiEditManager';
+import DesktopAiSessionStorage from './DesktopAiSessionStorage';
 
 export function createApiTokenStorage(
   context: AppManagerContext,
@@ -77,7 +81,18 @@ export default function createDesktopAppManager(
   app_manager.register(ProjectSettingsManager, new DesktopProjectSettingsManager(app_manager));
   app_manager.register(FileManager, new DesktopFileManager(app_manager));
 
+  const aiManager = new AiManager(app_manager);
+  app_manager.register(AiManager, aiManager);
+
+  const desktopAiEditManager = new DesktopAiEditManager(app_manager);
+  app_manager.register(DesktopAiEditManager, desktopAiEditManager);
+  app_manager.register(AiEditManager, desktopAiEditManager);
+
+  const desktopAiSessionStorage = new DesktopAiSessionStorage('');
+  desktopAiEditManager.setSessionStorage(desktopAiSessionStorage);
+
   const project_database = new ProjectDatabaseViaDesktopApi(desktopProjectManager);
+  desktopAiEditManager.setProjectDatabase(project_database);
 
   app_manager.addInitRoutine(async () => {
     await app_manager.get(ApiManager).init(createApiTokenStorage(context));
@@ -91,6 +106,13 @@ export default function createDesktopAppManager(
     await app_manager.get(ExportFormatManager).init();
     await app_manager.get(DesktopSyncManager).init();
     await app_manager.get(PluginManager).init();
+    await aiManager.initClient();
+
+    desktopProjectManager.changeProjectSubscriber.subscribe(({ newProjectId }) => {
+      if (newProjectId) {
+        desktopAiSessionStorage.setProjectId(newProjectId);
+      }
+    });
   });
 
 
