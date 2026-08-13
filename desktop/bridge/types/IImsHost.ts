@@ -8,6 +8,7 @@ import type { ImsHostApp } from '../api/ImsHostApp';
 import type { ImsHostSync } from '#bridge/api/ImsHostSync';
 import type ImsHostPlugin from '../api/ImsHostPlugin';
 import type { ImsHostSettings } from '#bridge/api/ImsHostSettings';
+import type { ImsHostMcp } from '#bridge/api/ImsHostMcp';
 
 export interface IImsHostApi  {
   fs: ImsHostFs;
@@ -20,6 +21,7 @@ export interface IImsHostApi  {
   app: ImsHostApp,
   plugin: ImsHostPlugin;
   settings: ImsHostSettings;
+  mcp: ImsHostMcp;
 }
 
 // Automatically exclude $ or _ prefixed methods in imshost apis

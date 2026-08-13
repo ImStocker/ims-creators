@@ -98,9 +98,6 @@ export default defineComponent({
 .AppUserInfo {
   margin: auto 5px;
 }
-.AppUserInfo-sign {
-  --button-font-size: 24px;
-}
 .AppUserInfo-notification-count {
   background-color: var(--color-danger);
   color: #e9e9e9;

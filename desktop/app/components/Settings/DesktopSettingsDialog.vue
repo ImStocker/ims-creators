@@ -49,6 +49,7 @@ import DesktopSettingsDialog_common from './DesktopSettingsDialog_common.vue';
 import DesktopSettingsDialog_other from './DesktopSettingsDialog_other.vue';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 import DesktopSettingsDialog_plugins from './DesktopSettingsDialog_plugins.vue';
+import DesktopSettingsDialog_mcp from './DesktopSettingsDialog_mcp.vue';
 
 type DialogProps = {
     tabOptions: any,
@@ -63,7 +64,8 @@ export default defineComponent({
     DialogContent,
     FormBuilder,
     DesktopSettingsDialog_common,
-    FormSearch
+    FormSearch,
+    DesktopSettingsDialog_mcp
   },
   props: {
     dialog: {
@@ -83,6 +85,7 @@ export default defineComponent({
           common: false,
           other: false,
           plugins: false,
+          mcp: false,
         },
         tabOptions
       }
@@ -111,6 +114,10 @@ export default defineComponent({
         {
             name: 'other',
             component: DesktopSettingsDialog_other
+        },
+        {
+            name: 'mcp',
+            component: DesktopSettingsDialog_mcp
         },
       ]
     }

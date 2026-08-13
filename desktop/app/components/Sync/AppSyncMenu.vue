@@ -1,30 +1,28 @@
 <template>
-    <div class="AppSyncMenu">       
-      <menu-button class="AboutGameConfigurePage-manage-languages">
-        <template #button="{ toggle }">
-          <button
-            class="is-button is-button-icon AppSyncMenu-button"
-            :title="$t('desktop.fsSync.synchronization')"
-            @click="toggle"
-          >
-              <i 
-                :class="{ 'spinning-icon': syncIsRunning && !onPause }"
-                class="ri-loop-right-line"
-              ></i>
-          </button>
-          <template v-if="isCloudProject">
-            <i v-if="hasSyncError && !inProcess" 
-              class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
-              :title="'Error: ' + hasSyncError"
-            ></i>
-            <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
-            <i v-else-if="projectInfo?.id && syncInfo && !inProcess && syncInfo.hasChanges" 
-              class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
-          </template>
-        </template>
-        <menu-list :menu-list="syncMenuList"></menu-list>
-      </menu-button>
-    </div>
+  <menu-button class="AppSyncMenu">
+    <template #button="{ toggle }">
+      <button
+        class="is-button is-button-icon AppSyncMenu-button"
+        :title="$t('desktop.fsSync.synchronization')"
+        @click="toggle"
+      >
+          <i 
+            :class="{ 'spinning-icon': syncIsRunning && !onPause }"
+            class="ri-loop-right-line"
+          ></i>
+      </button>
+      <template v-if="isCloudProject">
+        <i v-if="hasSyncError && !inProcess" 
+          class="ri-error-warning-line AppSyncMenu-additionalIcon AppSyncMenu-hasError"
+          :title="'Error: ' + hasSyncError"
+        ></i>
+        <i v-else-if="onPause" class="ri-pause-circle-line AppSyncMenu-additionalIcon"></i>
+        <i v-else-if="projectInfo?.id && syncInfo && !inProcess && syncInfo.hasChanges" 
+          class="AppSyncMenu-additionalIcon AppSyncMenu-hasNotSyncedFiles ri-circle-fill"></i>
+      </template>
+    </template>
+    <menu-list :menu-list="syncMenuList"></menu-list>
+  </menu-button>
 </template>
 
 <script lang="ts">
@@ -220,9 +218,6 @@ export default defineComponent({
 .AppSyncMenu {
   margin: auto 5px;
   position: relative;
-}
-.AppSyncMenu-button {
-  --button-font-size: 24px;
 }
 .AppSyncMenu-additionalIcon{
   position: absolute;

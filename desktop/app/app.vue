@@ -4,14 +4,20 @@
       color="var(--color-accent)"
       error-color="var(--color-danger)"
     ></NuxtLoadingIndicator>
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
-    <DialogHost :dialogs="openedDialogs"></DialogHost>
-    <div class="App-proTooltip"><i class="ri-arrow-up-double-fill"></i></div>
-    <div class="App-toasts">
-      <AppToasts></AppToasts>
+    <div class="DesktopApp-main" ref="mainEl">
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+      <DialogHost :dialogs="openedDialogs"></DialogHost>
+      <div class="App-proTooltip"><i class="ri-arrow-up-double-fill"></i></div>
+      <div class="App-toasts">
+        <AppToasts></AppToasts>
+      </div>
     </div>
+    <DesktopAiPanel
+      :is-open="aiPanelOpen"
+      @close="aiPanelOpen = false"
+    />
   </div>
 </template>
 <script setup lang="ts">
@@ -32,6 +38,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import AppToasts from '~ims-app-base/components/Common/AppToasts.vue';
 import DesktopUpdateManager from '#logic/managers/DesktopUpdateManager';
+import DesktopAiPanel from '#components/App/DesktopAiPanel.vue';
 
 const appManager = useAppManager();
 
@@ -85,14 +92,19 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
 });
 
+const aiPanelOpen = ref(false);
+provide('aiPanelOpen', aiPanelOpen);
+provide('toggleAiPanel', () => { aiPanelOpen.value = !aiPanelOpen.value; });
+
 const el = useTemplateRef('el');
+const mainEl = useTemplateRef('mainEl');
 let rightPanelDiv: HTMLDivElement | null = null;
 provide('getRightPanel', () => {
-  if (!el.value) return null;
+  if (!mainEl.value) return null;
   if (!rightPanelDiv){
     rightPanelDiv = document.createElement('DIV') as HTMLDivElement;
     rightPanelDiv.className = 'right-panel';
-    el.value.appendChild(rightPanelDiv);
+    mainEl.value.appendChild(rightPanelDiv);
   }
   return rightPanelDiv;
 })
@@ -124,6 +136,35 @@ provide('getDropdownHost', () => {
 .DesktopApp {
   height: 100vh;
   user-select: none;
+  display: flex;
+  --ProjectLayout-header-height: 51px;
+}
+
+.DesktopApp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.DesktopApp-main > .right-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.DesktopApp-main > .right-panel > .RightPanel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 400px;
+  pointer-events: auto;
 }
 
 .dropdown-host{

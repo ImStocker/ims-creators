@@ -101,7 +101,7 @@ export function registerResources(server: McpServer, projectDb: ProjectFileDb): 
     'ims://docs',
     {
       description:
-        'COMPLETE PROJECT DATA REFERENCE — project structure, asset inheritance, props format, all 16 AssetPropValue types, ' +
+        'COMPLETE PROJECT DATA REFERENCE — project structure, asset inheritance, props format, all AssetPropValue types, ' +
         'all block types with full specifications, and all field type controllers. ' +
         'READ THIS before creating or modifying any block to understand the correct data format.',
       mimeType: 'text/markdown',
@@ -169,7 +169,7 @@ export function registerResources(server: McpServer, projectDb: ProjectFileDb): 
     {
       description:
         'All assets in the project with full details including blocks, props, and inheritance data. ' +
-        'For a lighter list, use the list_assets or search_assets tools instead.',
+        'For a lighter list, use the listAssets or searchAssets tools instead.',
       mimeType: 'application/json',
     },
     async () => {

@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { ProjectFullInfo, ProjectSettingsValue } from '~ims-app-base/logic/types/ProjectTypes'
+import type { AiSession, AiTurn } from '~ims-app-base/logic/ai-core/AiTypes'
 import type { ProjectFileDb } from "../ProjectFileDb"
 import fs from "node:fs";
 import type { Readable } from "node:stream";
@@ -8,7 +9,7 @@ import JSZip from "jszip";
 import * as node_path from 'path';
 import path from 'node:path';
 import log from 'electron-log/main';
-import { PROJECT_META_SETTINGS } from '../project-db-constants';
+import { PROJECT_META_AI_CHAT, PROJECT_META_SETTINGS } from '../project-db-constants';
 
 function saveStreamToTempFile(stream: Readable,){
     return new Promise<{
@@ -105,6 +106,30 @@ export class ProjectService {
       } catch (err: any) {
         log.error(err);
       }
+    }
+
+    async loadAiChat(): Promise<{ sessions: AiSession[]; turns: AiTurn[] }> {
+      try {
+        const text = await fs.promises.readFile(path.join(this.db.localPath, PROJECT_META_AI_CHAT), 'utf-8');
+        const data = JSON.parse(text);
+        return {
+          sessions: Array.isArray(data.sessions) ? data.sessions : [],
+          turns: Array.isArray(data.turns) ? data.turns : [],
+        };
+      }
+      catch (err: any) {
+        if (!/^ENOENT:/.test(err.message)){
+          log.error(err);
+        }
+        return {
+          sessions: [],
+          turns: [],
+        };
+      }
+    }
+
+    async saveAiChat(data: { sessions: AiSession[]; turns: AiTurn[] }): Promise<void> {
+      await fs.promises.writeFile(path.join(this.db.localPath, PROJECT_META_AI_CHAT), JSON.stringify(data), 'utf-8');
     }
 
     async loadProjectInfo(): Promise<ProjectFullInfo>{

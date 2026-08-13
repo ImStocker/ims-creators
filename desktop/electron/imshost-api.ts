@@ -11,6 +11,7 @@ import { ImsHostAutoUpdate } from '#bridge/api/ImsHostAutoUpdate';
 import { ImsHostSync } from '#bridge/api/ImsHostSync';
 import ImsHostPlugin from '../bridge/api/ImsHostPlugin';
 import { ImsHostSettings } from '#bridge/api/ImsHostSettings';
+import { ImsHostMcp } from '#bridge/api/ImsHostMcp';
 
 const registeredWindows = new Map<BrowserWindow, IImsHostApi>();
 
@@ -184,6 +185,7 @@ export function registerImsHostWindow(win: BrowserWindow): IImsHostApi {
     app: new ImsHostApp(win),
     plugin: new ImsHostPlugin(win),
     settings: new ImsHostSettings(win),
+    mcp: new ImsHostMcp(win),
   }
   registeredWindows.set(win, api);
   return api;

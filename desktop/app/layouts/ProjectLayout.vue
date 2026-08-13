@@ -33,8 +33,18 @@
         <div class="DesktopApp-page-header-menuSpace">
           <new-version-box class="DesktopApp-page-header-menuSpace-item"></new-version-box>
         </div>
-        <app-sync-menu></app-sync-menu>
-        <app-user-info></app-user-info>
+        <div class="DesktopApp-page-header-actions">
+          <button
+            class="is-button is-button-icon DesktopApp-aiToggle"
+            :class="{ 'is-active': aiPanelOpen }"
+            :title="$t('aiAssistant.title')"
+            @click="toggleAiPanel"
+          >
+            <i class="ri-bard-line"></i>
+          </button>
+          <app-sync-menu></app-sync-menu>
+          <app-user-info></app-user-info>
+        </div>
       </div>
       <div class="DesktopApp-page-content">
         <slot />
@@ -66,6 +76,10 @@ import AppSyncMenu from '#components/Sync/AppSyncMenu.vue';
 
 export default defineComponent({
   name: 'ProjectLayout',
+  inject: {
+    aiPanelOpen: { from: 'aiPanelOpen', default: false },
+    toggleAiPanel: { from: 'toggleAiPanel', default: () => {} },
+  },
   components: {
     AppMenu,
     AppMenuToggle,
@@ -170,7 +184,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" rel="stylesheet/scss">
+<style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/devices-mixins.scss';
 
 $header-height: 60px;
@@ -197,9 +211,6 @@ $header-height: 60px;
   .App-header {
     margin-bottom: 8px;
   }
-}
-.App-menu {
-  padding-top: var(--ProjectLayout-header-height);
 }
 .App-content {
   flex: 1;
@@ -309,5 +320,20 @@ $header-height: 60px;
 }
 .DesktopApp-page-header-menuSpace-item{
   margin-right: 10px;
+}
+
+.DesktopApp-page-header-actions{
+  display: flex;
+  align-items: center;
+  
+  &:deep(.is-button:not(.is-button-user)) {
+    --local-font-size: 24px;
+  }
+}
+
+.DesktopApp-aiToggle {
+  &.is-active {
+    color: var(--color-accent);
+  }
 }
 </style>

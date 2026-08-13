@@ -111,6 +111,7 @@ export default {
         common: 'Общие',
         plugins: 'Плагины',
         other: 'Другое',
+        mcp: 'MCP-сервер',
       },
       fields: {
         theme: 'Тема',
@@ -121,6 +122,15 @@ export default {
         openLogsFolder: 'Открыть папку с логами',
         autoUpdate: 'Проверять обновления при запуске приложения',
         syncWithCloud: 'Автосинхронизация с облаком',
+        mcp: {
+          port: 'Порт',
+          autoStart: 'Запуск MCP-сервера при открытии проекта',
+          statusRunning: 'MCP-сервер запущен на порту {port}',
+          statusStopped: 'MCP-сервер остановлен',
+          start: 'Запустить сервер',
+          stop: 'Остановить сервер',
+          restart: 'Перезапустить сервер',
+        },
         syncWithCloudTime: {
           every30: 'Каждые 30 секунд',
           every60: 'Каждую минуту',
