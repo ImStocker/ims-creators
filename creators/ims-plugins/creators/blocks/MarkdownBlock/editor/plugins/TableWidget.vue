@@ -46,11 +46,26 @@ import { EditorView, keymap } from '@codemirror/view';
 import type { KeyBinding } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import type { MarkdownConfig } from '@lezer/markdown';
-import { defaultKeymap, historyKeymap, history } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  insertNewlineAndIndent,
+} from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
-import { defineComponent, markRaw } from 'vue';
+import { defineComponent, markRaw, reactive } from 'vue';
 import { marked } from 'marked';
+
+// Shared across widget instances. When a cell commit changes the row count the
+// whole widget is re-created by CodeMirror (its `eq` is false), so the "next
+// cell to keep editing" has to be handed over to the new widget instance
+// through this reactive object.
+const pendingEditTarget = reactive({
+  tableFrom: -1,
+  row: -1,
+  col: -1,
+});
 
 export default defineComponent({
   name: 'TableWidget',
@@ -66,9 +81,9 @@ export default defineComponent({
   data() {
     return {
       rows: (this.initialRows as string[][]).map((row) => [...row]),
+      _baseRowCount: (this.initialRows as string[][]).length,
       _activeCell: null as { row: number; col: number } | null,
       _nestedEditor: null as EditorView | null,
-      _commitGen: 0,
       _committing: false,
     };
   },
@@ -82,6 +97,20 @@ export default defineComponent({
     headerRowCount(): number {
       return this.hasHeader ? 1 : 0;
     },
+  },
+  mounted() {
+    // Take over an editing session that was started by a previous widget
+    // instance before the widget got re-created (row count changed).
+    if (
+      pendingEditTarget.tableFrom === this.tableFrom &&
+      pendingEditTarget.row >= 0
+    ) {
+      const { row, col } = pendingEditTarget;
+      pendingEditTarget.tableFrom = -1;
+      pendingEditTarget.row = -1;
+      pendingEditTarget.col = -1;
+      this.startEdit(row, col);
+    }
   },
   beforeUnmount() {
     this._cleanupNestedEditor();
@@ -113,9 +142,9 @@ export default defineComponent({
     },
 
     async startEdit(row: number, col: number) {
-      this._commitGen++;
       const cell = this.findCellElement(row, col);
       if (!cell) return;
+      if (cell.querySelector('.cm-editor')) return;
 
       this._activeCell = { row, col };
 
@@ -127,6 +156,17 @@ export default defineComponent({
       };
 
       const commit = () => { this.commitEdit(); return true; };
+      const enterNext = () => {
+        if (!this._activeCell) return true;
+        let { row, col } = this._activeCell;
+        row++;
+        if (row >= this.rows.length) {
+          const colCount = this.rows[row - 1]?.length ?? 1;
+          this.rows = [...this.rows, Array(colCount).fill('')];
+        }
+        this.commitEdit({ row, col });
+        return true;
+      };
       const tabNext = () => {
         if (!this._activeCell) return true;
         let { row, col } = this._activeCell;
@@ -153,7 +193,7 @@ export default defineComponent({
       };
 
       this._nestedEditor = markRaw(new EditorView({
-        doc: this.rows[row][col],
+        doc: this.rows[row][col].replace(/<br>/g, '\n'),
         extensions: [
           markdown(this.cellGrammar),
           ...this.cellExtensions,
@@ -179,6 +219,8 @@ export default defineComponent({
             '.cm-line': { padding: 0 },
           }),
           keymap.of(<KeyBinding[]>[
+            { key: 'Enter', run: enterNext },
+            { key: 'Shift-Enter', run: insertNewlineAndIndent },
             ...defaultKeymap,
             ...historyKeymap,
             { key: 'Escape', run: commit },
@@ -198,9 +240,7 @@ export default defineComponent({
     commitEdit(navigateTo?: { row: number; col: number }) {
       if (this._committing || !this._nestedEditor || !this._activeCell) return;
       this._committing = true;
-      this._commitGen++;
 
-      const gen = this._commitGen;
       const { row, col } = this._activeCell;
       const newText = this._nestedEditor.state.doc.toString();
 
@@ -211,11 +251,21 @@ export default defineComponent({
       this._activeCell = null;
 
       const newRows = this.rows.map((r) => [...r]);
-      newRows[row][col] = newText;
+      // Raw line breaks can't live inside a GFM table row, so store them as
+      // `<br>` (same as Obsidian does).
+      newRows[row][col] = newText.replace(/\n/g, '<br>');
+      const willRecreate = newRows.length !== this._baseRowCount;
       this.rows = newRows;
 
       const doNav = () => {
-        if (navigateTo && this._commitGen === gen) {
+        if (!navigateTo) return;
+        if (willRecreate) {
+          // The widget will be re-created (row count changed) — hand the
+          // editing session over to the new instance via `pendingEditTarget`.
+          pendingEditTarget.tableFrom = this.tableFrom;
+          pendingEditTarget.row = navigateTo.row;
+          pendingEditTarget.col = navigateTo.col;
+        } else {
           this.startEdit(navigateTo.row, navigateTo.col);
         }
       };
@@ -229,7 +279,7 @@ export default defineComponent({
           doNav();
         });
       } else {
-        if (navigateTo) queueMicrotask(doNav);
+        queueMicrotask(doNav);
       }
 
       this._committing = false;

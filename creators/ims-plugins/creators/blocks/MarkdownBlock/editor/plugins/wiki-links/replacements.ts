@@ -102,7 +102,7 @@ function getCachedAssetFromString(
 // Define a state effect to trigger a refresh of decorations
 export const refreshDecorations = StateEffect.define<null>();
 
-export const replacements = (config: PluginConfig): Extension => {
+export const replacements = (config: PluginConfig): Extension[] => {
   function decorate(state: EditorState) {
     const widgets: Range<Decoration>[] = [];
 
