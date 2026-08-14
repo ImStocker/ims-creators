@@ -45,6 +45,32 @@ const CellExtensionsFacet = Facet.define<
 // your text into (broken) table rows.
 // ---------------------------------------------------------------------------
 
+// Split a raw table line into its cells, keeping empty cells at their exact
+// positions. The grammar only emits `TableCell` nodes for non-empty cells, so
+// element walking can't tell an empty cell in the middle from a trailing one.
+function extractCells(line: string): string[] {
+  const cells: string[] = [];
+  let buf = '';
+  let esc = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    const code = line.charCodeAt(i);
+    if (code == 124 /* | */ && !esc) {
+      cells.push(buf.trim());
+      buf = '';
+    } else {
+      buf += ch;
+    }
+    esc = !esc && code == 92 /* \ */;
+  }
+  cells.push(buf.trim());
+  // A leading pipe yields a leading empty segment, a trailing pipe a trailing
+  // one; drop those (mirrors how `parseRow` counts cells).
+  if (cells.length && cells[0] === '') cells.shift();
+  if (cells.length && cells[cells.length - 1] === '') cells.pop();
+  return cells;
+}
+
 function hasPipe(str: string, start: number): boolean {
   for (let i = start; i < str.length; i++) {
     const next = str.charCodeAt(i);
@@ -241,7 +267,7 @@ class TableWidgetType extends WidgetType {
   }
 
   override ignoreEvent(event: Event) {
-    return event.type === 'mousedown';
+    return event.type === 'mousedown' || event.type === 'contextmenu';
   }
 
   override destroy(dom: HTMLElement) {
@@ -263,32 +289,29 @@ function decorate(state: EditorState): DecorationSet {
       while (child) {
         if (child.type.name === 'TableHeader') {
           hasHeader = true;
-          const row: string[] = [];
-          let cell = child.firstChild;
-          while (cell) {
-            if (cell.type.name === 'TableCell') {
-              row.push(state.doc.sliceString(cell.from, cell.to));
-            }
-            cell = cell.nextSibling;
-          }
-          rows.push(row);
+          rows.push(extractCells(state.doc.sliceString(child.from, child.to)));
         } else if (child.type.name === 'TableDelimiter') {
           delimiterText = state.doc.sliceString(child.from, child.to);
         } else if (child.type.name === 'TableRow') {
-          const row: string[] = [];
-          let cell = child.firstChild;
-          while (cell) {
-            if (cell.type.name === 'TableCell') {
-              row.push(state.doc.sliceString(cell.from, cell.to));
-            }
-            cell = cell.nextSibling;
-          }
-          rows.push(row);
+          rows.push(extractCells(state.doc.sliceString(child.from, child.to)));
         }
         child = child.nextSibling;
       }
 
       if (rows.length > 0) {
+        // Safety net: keep the grid rectangular even if a row's raw text
+        // parses shorter than the delimiter (should not happen with this
+        // grammar, but the delimiter row always has full-width cells).
+        const delimCount = delimiterText
+          ? extractCells(delimiterText).length
+          : 0;
+        const colCount = Math.max(
+          Math.max(...rows.map((r) => r.length)),
+          delimCount,
+        );
+        for (const row of rows) {
+          while (row.length < colCount) row.push('');
+        }
         widgets.push(
           Decoration.replace({
             widget: new TableWidgetType(rows, from, delimiterText, hasHeader),
