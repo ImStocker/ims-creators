@@ -163,7 +163,7 @@ export default defineComponent({
       const port = this.serverStatus?.port ?? this.parsePort(this.mcpPort);
       const localPath = this.projectInfo?.localPath;
       if (!port || !localPath) return null;
-      return `http://localhost:${port}/mcp?path=${localPath.replaceAll('\\', '/')}`;
+      return `http://localhost:${port}/mcp?path=${encodeURIComponent(localPath.replaceAll('\\', '/'))}`;
     },
     projectInfo() {
       return this.$getAppManager().get(ProjectManager).getProjectInfo();
