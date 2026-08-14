@@ -1,7 +1,7 @@
 {
   "name": "ims-creators-desktop",
   "productName": "ImscDesktop",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "type": "module",
   "author": "ImStocker <support@cr5.space>",
