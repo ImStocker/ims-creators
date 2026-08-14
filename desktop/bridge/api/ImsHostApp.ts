@@ -41,7 +41,7 @@ export class ImsHostApp extends ImsHostBase {
   }
 
   async getMcpAutoStart(): Promise<boolean> {
-    return (await storageGetKey<boolean>(MCP_AUTO_START_SETTING_KEY)) ?? true;
+    return (await storageGetKey<boolean>(MCP_AUTO_START_SETTING_KEY)) ?? false;
   }
 
   async setMcpAutoStart(value: boolean): Promise<void> {

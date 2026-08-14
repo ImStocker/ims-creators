@@ -66,7 +66,7 @@ export class ImsHostProject extends ImsHostBase {
 
     try {
       const mcp_auto_start =
-        (await storageGetKey<boolean>(MCP_AUTO_START_SETTING_KEY)) ?? true;
+        (await storageGetKey<boolean>(MCP_AUTO_START_SETTING_KEY)) ?? false;
       if (mcp_auto_start) {
         const mcp_port =
           (await storageGetKey<number>(MCP_PORT_SETTING_KEY)) ?? undefined;
