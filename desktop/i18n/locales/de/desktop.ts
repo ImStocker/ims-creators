@@ -130,6 +130,8 @@ export default {
           start: 'Server starten',
           stop: 'Server stoppen',
           restart: 'Server neu starten',
+          copyUrl: 'MCP-URL kopieren',
+          copied: 'MCP-URL kopiert',
         },
         syncWithCloudTime: {
           every30: 'Alle 30 Sekunden',

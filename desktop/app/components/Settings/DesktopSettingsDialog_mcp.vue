@@ -53,6 +53,14 @@
           <i class="ri-restart-line"></i>
           <span>{{ $t('desktop.settings.fields.mcp.restart') }}</span>
         </button>
+        <button
+          class="is-button is-button-action-outlined"
+          :disabled="serverBusy || !mcpUrl"
+          @click="copyMcpUrl"
+        >
+          <i class="ri-file-copy-line"></i>
+          <span>{{ $t('desktop.settings.fields.mcp.copyUrl') }}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -65,6 +73,9 @@ import FormBuilder from '~ims-app-base/components/Form/FormBuilder.vue';
 import FormBuilderModelBindObject from '~ims-app-base/components/Form/FormBuilderModelBindObject';
 import FormInput from '~ims-app-base/components/Form/FormInput.vue';
 import FormCheckBox from '~ims-app-base/components/Form/FormCheckBox.vue';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import { clipboardCopyPlainText } from '~ims-app-base/logic/utils/clipboard';
 
 export default defineComponent({
   name: 'DesktopSettingsDialogMcp',
@@ -120,6 +131,7 @@ export default defineComponent({
         this.$t('desktop.settings.fields.mcp.start'),
         this.$t('desktop.settings.fields.mcp.stop'),
         this.$t('desktop.settings.fields.mcp.restart'),
+        this.$t('desktop.settings.fields.mcp.copyUrl'),
       ];
     },
     formSchemaFiltered() {
@@ -146,6 +158,15 @@ export default defineComponent({
       return (
         !!this.serverStatus?.running && this.serverStatus.port !== saved_port
       );
+    },
+    mcpUrl(): string | null {
+      const port = this.serverStatus?.port ?? this.parsePort(this.mcpPort);
+      const localPath = this.projectInfo?.localPath;
+      if (!port || !localPath) return null;
+      return `http://localhost:${port}/mcp?path=${localPath.replaceAll('\\', '/')}`;
+    },
+    projectInfo() {
+      return this.$getAppManager().get(ProjectManager).getProjectInfo();
     },
   },
   watch: {
@@ -212,6 +233,14 @@ export default defineComponent({
         this.serverBusy = false;
         await this.refreshStatus();
       }
+    },
+    async copyMcpUrl() {
+      const url = this.mcpUrl;
+      if (!url) return;
+      await clipboardCopyPlainText(url);
+      this.$getAppManager()
+        .get(UiManager)
+        .showSuccess(this.$t('desktop.settings.fields.mcp.copied'));
     },
   },
 });
