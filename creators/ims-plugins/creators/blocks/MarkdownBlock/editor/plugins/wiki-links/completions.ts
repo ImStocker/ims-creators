@@ -40,11 +40,11 @@ export const completions = (config: PluginConfig): CompletionSource => {
       from: match.from + 2,
       options: options.list.map((asset) => {
         return {
-          apply: castAssetPropValueToString({
+          apply: `${castAssetPropValueToString({
             AssetId: asset.id,
             Name: asset.name ?? undefined,
             Title: asset.title ?? undefined,
-          } as AssetPropValueAsset),
+          } as AssetPropValueAsset)}]]`,
           label: asset.title ?? asset.id,
           type: 'text',
         };

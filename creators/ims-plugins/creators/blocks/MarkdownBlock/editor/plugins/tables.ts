@@ -1,7 +1,8 @@
 import { Table } from '@lezer/markdown';
+import type { MarkdownConfig } from '@lezer/markdown';
 import { syntaxTree } from '@codemirror/language';
 import { Facet, RangeSet, StateField } from '@codemirror/state';
-import type { EditorState } from '@codemirror/state';
+import type { EditorState, Extension } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, keymap } from '@codemirror/view';
 import type { DecorationSet, KeyBinding } from '@codemirror/view';
 import { h, render } from 'vue';
@@ -13,6 +14,21 @@ const AppContextFacet = Facet.define<
   (vnode: VNode) => void
 >({
   combine: (values) => values[0] || (() => {}),
+});
+
+export type TableCellExtensions = {
+  grammar?: MarkdownConfig;
+  extensions?: Extension[];
+};
+
+const CellExtensionsFacet = Facet.define<
+  TableCellExtensions,
+  TableCellExtensions
+>({
+  combine: (values) => ({
+    grammar: values.find((v) => v.grammar)?.grammar,
+    extensions: values.flatMap((v) => v.extensions ?? []),
+  }),
 });
 
 class TableWidgetType extends WidgetType {
@@ -33,12 +49,16 @@ class TableWidgetType extends WidgetType {
     const container = document.createElement('div');
     container.className = 'cm-table-container';
 
+    const cellExtensions = view.state.facet(CellExtensionsFacet);
+
     const vnode = h(TableComponent, {
       parentView: view,
       tableFrom: this.tableFrom,
       initialRows: this.rows,
       hasHeader: this.hasHeader,
       delimiterText: this.delimiterText,
+      cellGrammar: cellExtensions.grammar,
+      cellExtensions: cellExtensions.extensions,
     });
     view.state.facet(AppContextFacet)(vnode);
     render(vnode, container);
@@ -149,7 +169,10 @@ const tableKeyBinding: KeyBinding = {
   },
 };
 
-export function tables(appContext?: AppContext) {
+export function tables(
+  appContext?: AppContext,
+  cellExtensions: TableCellExtensions = {},
+) {
   return [
     { type: 'grammar' as const, value: Table },
     {
@@ -157,6 +180,10 @@ export function tables(appContext?: AppContext) {
       value: AppContextFacet.of((vnode) => {
         vnode.appContext = appContext ?? null;
       }),
+    },
+    {
+      type: 'default' as const,
+      value: CellExtensionsFacet.of(cellExtensions),
     },
     { type: 'default' as const, value: tableDecorations },
     { type: 'default' as const, value: keymap.of([tableKeyBinding]) },

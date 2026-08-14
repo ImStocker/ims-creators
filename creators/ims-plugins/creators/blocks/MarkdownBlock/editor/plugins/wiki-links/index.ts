@@ -1,4 +1,6 @@
+import { autocompletion } from '@codemirror/autocomplete';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import type { Extension } from '@codemirror/state';
 import { Tag, tags as highlightTags } from '@lezer/highlight';
 import type { MarkdownConfig } from '@lezer/markdown';
 import { completions } from './completions';
@@ -104,5 +106,19 @@ export const wikiLinks = (config: PluginConfig) => {
     { type: 'default', value: theme },
     { type: 'default', value: replacements(config) },
     { type: 'grammar', value: grammar },
+  ];
+};
+
+export const wikiLinkGrammar: MarkdownConfig = grammar;
+
+export const wikiLinkCellExtensions = (config: PluginConfig): Extension[] => {
+  return [
+    autocompletion({
+      defaultKeymap: true,
+      icons: false,
+      override: [completions(config)],
+    }),
+    theme,
+    ...replacements(config),
   ];
 };

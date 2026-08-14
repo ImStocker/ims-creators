@@ -17,7 +17,11 @@ import type { Options as InkOptions, Instance as InkInstance } from 'ink-mde';
 import InkMde from 'ink-mde/vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import { wikiLinks } from './plugins/wiki-links';
+import {
+  wikiLinks,
+  wikiLinkCellExtensions,
+  wikiLinkGrammar,
+} from './plugins/wiki-links';
 import { imcImages } from './plugins/imc-images';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import { blurHandler } from './plugins/blur-handler';
@@ -113,7 +117,12 @@ export default defineComponent({
           this.$emit('blur');
         }),
         ...headingId(),
-        ...tables(this.$.appContext),
+        ...tables(this.$.appContext, {
+          grammar: wikiLinkGrammar,
+          extensions: wikiLinkCellExtensions({
+            appManager: this.$getAppManager(),
+          }),
+        }),
       ];
     },
   },

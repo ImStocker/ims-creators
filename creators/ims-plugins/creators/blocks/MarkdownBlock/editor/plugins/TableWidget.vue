@@ -43,10 +43,12 @@
 
 <script lang="ts">
 import { EditorView, keymap } from '@codemirror/view';
+import type { KeyBinding } from '@codemirror/view';
+import type { Extension } from '@codemirror/state';
+import type { MarkdownConfig } from '@lezer/markdown';
 import { defaultKeymap, historyKeymap, history } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
-import type { KeyBinding } from '@codemirror/view';
 import { defineComponent, markRaw } from 'vue';
 import { marked } from 'marked';
 
@@ -58,6 +60,8 @@ export default defineComponent({
     initialRows: { type: Array as () => string[][], required: true },
     hasHeader: { type: Boolean, default: false },
     delimiterText: { type: String, default: '' },
+    cellGrammar: { type: Object as () => MarkdownConfig, default: undefined },
+    cellExtensions: { type: Array as () => Extension[], default: () => [] },
   },
   data() {
     return {
@@ -151,7 +155,9 @@ export default defineComponent({
       this._nestedEditor = markRaw(new EditorView({
         doc: this.rows[row][col],
         extensions: [
-          markdown(),
+          markdown(this.cellGrammar),
+          ...this.cellExtensions,
+          EditorView.lineWrapping,
           EditorView.editable.of(true),
           EditorView.theme({
             '&': {
