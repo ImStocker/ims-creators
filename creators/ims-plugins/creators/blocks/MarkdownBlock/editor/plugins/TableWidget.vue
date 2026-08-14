@@ -100,17 +100,22 @@ export default defineComponent({
   },
   mounted() {
     // Take over an editing session that was started by a previous widget
-    // instance before the widget got re-created (row count changed).
-    if (
-      pendingEditTarget.tableFrom === this.tableFrom &&
-      pendingEditTarget.row >= 0
-    ) {
-      const { row, col } = pendingEditTarget;
-      pendingEditTarget.tableFrom = -1;
-      pendingEditTarget.row = -1;
-      pendingEditTarget.col = -1;
-      this.startEdit(row, col);
-    }
+    // instance before the widget got re-created (row count changed). Deferred
+    // one microtask because the committing widget records `pendingEditTarget`
+    // after its own `dispatch`, and this mount may happen synchronously inside
+    // that dispatch.
+    queueMicrotask(() => {
+      if (
+        pendingEditTarget.tableFrom === this.tableFrom &&
+        pendingEditTarget.row >= 0
+      ) {
+        const { row, col } = pendingEditTarget;
+        pendingEditTarget.tableFrom = -1;
+        pendingEditTarget.row = -1;
+        pendingEditTarget.col = -1;
+        this.startEdit(row, col);
+      }
+    });
   },
   beforeUnmount() {
     this._cleanupNestedEditor();
@@ -137,11 +142,18 @@ export default defineComponent({
         this._activeCell.row === row &&
         this._activeCell.col === col
       ) return;
-      this.commitEdit();
-      this.startEdit(row, col);
+      if (this._nestedEditor && this._activeCell) {
+        // Commit the current cell and navigate to the clicked one. The commit
+        // may re-create the whole widget (row count change); that hand-off is
+        // handled inside `commitEdit` via `pendingEditTarget`.
+        this.commitEdit({ row, col });
+      } else {
+        this.startEdit(row, col);
+      }
     },
 
     async startEdit(row: number, col: number) {
+      if (this._activeCell) return;
       const cell = this.findCellElement(row, col);
       if (!cell) return;
       if (cell.querySelector('.cm-editor')) return;
@@ -150,7 +162,11 @@ export default defineComponent({
 
       await this.$nextTick();
 
-      const editorHost = cell.querySelector('.TableWidget-cell-editor') as HTMLElement;
+      // Re-look the cell up after the re-render; the element captured above may
+      // belong to a widget instance that got destroyed by a commit dispatch.
+      const editorHost = this.findCellElement(row, col)?.querySelector(
+        '.TableWidget-cell-editor',
+      ) as HTMLElement;
       if (!editorHost) {
         return
       };
@@ -309,6 +325,9 @@ export default defineComponent({
         lines.push(`| ${newRows[0].join(' | ')} |`);
         if (this.delimiterText) {
           lines.push(this.delimiterText);
+        } else {
+          // The delimiter line must survive or the table won't parse back.
+          lines.push(`|${newRows[0].map(() => '---|').join('')}`);
         }
         for (let r = 1; r < newRows.length; r++) {
           lines.push(`| ${newRows[r].join(' | ')} |`);
@@ -322,7 +341,9 @@ export default defineComponent({
     },
 
     findCellElement(row: number, col: number): HTMLTableCellElement | null {
-      return this.parentView.dom.querySelector(
+      // Scope to this widget's own table so that tables placed earlier in the
+      // document don't steal the lookup.
+      return this.$el.querySelector(
         `td[data-row="${row}"][data-col="${col}"],` +
           `th[data-row="${row}"][data-col="${col}"]`,
       );

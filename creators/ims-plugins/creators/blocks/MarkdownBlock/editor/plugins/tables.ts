@@ -273,10 +273,7 @@ function decorate(state: EditorState): DecorationSet {
           }
           rows.push(row);
         } else if (child.type.name === 'TableDelimiter') {
-          const text = state.doc.sliceString(child.from, child.to);
-          if (text.includes('---')) {
-            delimiterText = text;
-          }
+          delimiterText = state.doc.sliceString(child.from, child.to);
         } else if (child.type.name === 'TableRow') {
           const row: string[] = [];
           let cell = child.firstChild;
