@@ -90,7 +90,10 @@ export default defineComponent({
                       img.Dir +
                       img.Title
                     ).includes(' ');
-                    let path = `@${img.Store}/${img.Dir}/${img.Title}`;
+                    let path = `@${img.Store}/${img.Dir ? img.Dir + '/' : ''}${img.Title}`;
+                    if (img.Store.startsWith('p-')) {
+                      path += '#' + img.FileId;
+                    }
                     if (need_brackets) {
                       path = `<${path}>`;
                     }

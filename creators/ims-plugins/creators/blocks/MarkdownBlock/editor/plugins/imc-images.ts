@@ -7,18 +7,28 @@ import FileManager from '~ims-app-base/logic/managers/FileManager';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import type { AssetPropValueFile } from '~ims-app-base/logic/types/Props';
 
-function parseImagePathToFile(path: string) {
+function parseImagePathToFile(path: string): {
+  FileId?: string;
+  Title: string;
+  Dir: string | null;
+  Store: string;
+} | null {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
 
-  const match = normalized.match(/@(.*?)\/(.*?)\/([^/]*)$/);
+  const match = normalized.match(
+    /@(.*?)(\/(.*?))?\/([^/#]*)(#([a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}))?$/,
+  );
 
   if (match) {
     return {
       Store: match[1],
-      Dir: match[2],
-      Title: match[3],
+      Dir: match[3],
+      Title: match[4],
+      FileId: match[6] ?? undefined,
     };
   }
+
+  return null;
 }
 
 interface ImageWidgetParams {
