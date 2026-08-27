@@ -224,6 +224,39 @@ export default defineComponent({
     color: var(--color-accent, #2f80ed);
     font-style: italic;
   }
+
+  .ink-mde .cm-line.cm-md-callout {
+    --callout-color: 204, 204, 204;
+    border-left: 4px solid rgb(var(--callout-color)) !important;
+    color: rgb(var(--callout-color)) !important;
+    padding-left: 16px !important;
+    background-color: rgba(var(--callout-color), 0.2) !important;
+
+    &.cm-md-callout-info {
+      --callout-color: 29, 153, 255;
+    }
+    &.cm-md-callout-error {
+      --callout-color: 255, 83, 83;
+    }
+    &.cm-md-callout-warning {
+      --callout-color: 255, 182, 26;
+    }
+    &.cm-md-callout-solution {
+      --callout-color: 85, 203, 81;
+    }
+  }
+}
+
+body[data-theme='ims-light'] {
+  .cm-md-callout-error {
+    --callout-color: 233, 49, 71 !important;
+  }
+  .cm-md-callout-warning {
+    --callout-color: 236, 117, 0 !important;
+  }
+  .cm-md-callout-solution {
+    --callout-color: 8, 185, 78 !important;
+  }
 }
 </style>
 <style lang="scss" scoped>

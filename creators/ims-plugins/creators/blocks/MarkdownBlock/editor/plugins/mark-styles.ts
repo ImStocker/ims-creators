@@ -8,28 +8,52 @@ const mathMark = Decoration.mark({ class: 'cm-md-math' });
 const highlightRegex = /==([^=\n]+)==/g;
 const mathRegex = /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g;
 
+const highlightMathPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildMarks(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged) {
+        this.decorations = buildMarks(update.view);
+      }
+    }
+  },
+  {
+    decorations: (inst) => inst.decorations,
+  },
+);
+
+const calloutStart = /^>\s*\[!(\w+)\]/;
+const calloutCont = /^>/;
+
+const calloutPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildCallouts(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildCallouts(update.view);
+      }
+    }
+  },
+  {
+    decorations: (inst) => inst.decorations,
+  },
+);
+
 export function markStyles() {
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet;
-
-      constructor(view: EditorView) {
-        this.decorations = build(view);
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged) {
-          this.decorations = build(update.view);
-        }
-      }
-    },
-    {
-      decorations: (inst) => inst.decorations,
-    },
-  );
+  return [highlightMathPlugin, calloutPlugin];
 }
 
-function build(view: EditorView): DecorationSet {
+function buildMarks(view: EditorView): DecorationSet {
   const text = view.state.doc.toString();
   const ranges: { from: number; to: number; deco: Decoration }[] = [];
 
@@ -60,5 +84,36 @@ function build(view: EditorView): DecorationSet {
     builder.add(r.from, r.to, r.deco);
     lastTo = r.to;
   }
+  return builder.finish();
+}
+
+function buildCallouts(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const doc = view.state.doc;
+  let inCallout = false;
+  let calloutType = '';
+
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const text = line.text;
+    const startMatch = text.match(calloutStart);
+    if (startMatch) {
+      inCallout = true;
+      calloutType = startMatch[1].toLowerCase();
+    } else if (inCallout && !calloutCont.test(text)) {
+      inCallout = false;
+    }
+
+    if (inCallout) {
+      builder.add(
+        line.from,
+        line.from,
+        Decoration.line({
+          class: `cm-md-callout cm-md-callout-${calloutType}`,
+        }),
+      );
+    }
+  }
+
   return builder.finish();
 }
