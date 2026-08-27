@@ -12,6 +12,7 @@
     <SelectionToolbar
       v-if="toolbarVisible && toolbarRect"
       :rect="toolbarRect"
+      :active="toolbarActive"
       @format="onToolbarFormat"
     ></SelectionToolbar>
   </div>
@@ -36,9 +37,12 @@ import { selectionToolbar } from './plugins/selection-toolbar';
 import type { SelectionInfo } from './plugins/selection-toolbar';
 import {
   applyFormat,
+  detectActive,
+  type ActiveFormats,
   type FormatType,
   type FormatPayload,
 } from './format-commands';
+import { markStyles } from './plugins/mark-styles';
 import SelectionToolbar from './SelectionToolbar.vue';
 
 export default defineComponent({
@@ -65,6 +69,7 @@ export default defineComponent({
       toolbarSelection: null as SelectionInfo | null,
       toolbarRect: null as SelectionInfo['rect'] | null,
       toolbarVisible: false,
+      toolbarActive: null as ActiveFormats | null,
     };
   },
   computed: {
@@ -151,12 +156,20 @@ export default defineComponent({
                 this.toolbarSelection = info;
                 this.toolbarRect = info.rect;
                 this.toolbarVisible = true;
+                this.toolbarActive = this.editor
+                  ? detectActive(this.editor, info)
+                  : null;
               } else {
                 this.toolbarVisible = false;
                 this.toolbarSelection = null;
+                this.toolbarActive = null;
               }
             },
           }),
+        },
+        {
+          type: 'default',
+          value: markStyles(),
         },
       ];
     },
@@ -200,6 +213,16 @@ export default defineComponent({
   }
   .cm-focused {
     outline: none;
+  }
+
+  .cm-md-highlight {
+    background-color: rgba(255, 221, 0, 0.35);
+    border-radius: 2px;
+  }
+
+  .cm-md-math {
+    color: var(--color-accent, #2f80ed);
+    font-style: italic;
   }
 }
 </style>
