@@ -46,6 +46,7 @@ import { headingId } from './plugins/heading-id';
 import { tables } from './plugins/tables';
 import { selectionToolbar } from './plugins/selection-toolbar';
 import type { SelectionInfo } from './plugins/selection-toolbar';
+import { shortcuts } from './plugins/shortcuts';
 import {
   applyFormat,
   detectActive,
@@ -194,6 +195,13 @@ export default defineComponent({
         {
           type: 'default',
           value: markStyles(),
+        },
+        {
+          type: 'default',
+          value: shortcuts(
+            () => this.editor,
+            () => this.readonly,
+          ),
         },
       ];
     },

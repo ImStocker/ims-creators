@@ -282,6 +282,8 @@ export function applyFormat(
       const [before, after] = INLINE_MARKS[type];
       if (reset) {
         unwrap(editor, info, before, after);
+      } else if (detectActive(editor, info)[type]) {
+        unwrap(editor, info, before, after);
       } else {
         editor.wrap({ before, after, selection });
       }
