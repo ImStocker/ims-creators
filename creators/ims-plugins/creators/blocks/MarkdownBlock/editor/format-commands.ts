@@ -25,6 +25,7 @@ export type FormatType =
 export type FormatPayload = {
   url?: string;
   internal?: string;
+  internalName?: string;
   calloutType?: string;
   reset?: boolean;
 };
@@ -47,6 +48,9 @@ export type ActiveFormats = {
   task: boolean;
   quote: boolean;
   callout: string | null;
+  link: string | null;
+  linkAsset: string | null;
+  linkTitle: string | null;
 };
 
 const INLINE_MARKS: Record<string, [string, string]> = {
@@ -81,6 +85,43 @@ function countLeading(s: string, ch: string): number {
   let n = 0;
   for (let i = 0; i < s.length && s[i] === ch; i++) n++;
   return n;
+}
+
+function detectLinkAt(
+  doc: string,
+  from: number,
+  to: number,
+): {
+  kind: 'url' | 'asset';
+  value: string;
+  title: string;
+  from: number;
+  to: number;
+} | null {
+  const lineStart = doc.lastIndexOf('\n', from - 1) + 1;
+  const lineEnd = doc.indexOf('\n', from);
+  const lineEndClamped = lineEnd === -1 ? doc.length : lineEnd;
+  const line = doc.slice(lineStart, lineEndClamped);
+
+  const assetRe = /\[\[\[(.+?)\]\(#asset:([0-9a-f-]+)\)\]\]/g;
+  for (const m of line.matchAll(assetRe)) {
+    const s = lineStart + (m.index ?? 0);
+    const e = s + m[0].length;
+    if (s <= to && e >= from) {
+      return { kind: 'asset', value: m[2], title: m[1], from: s, to: e };
+    }
+  }
+
+  const urlRe = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  for (const m of line.matchAll(urlRe)) {
+    const s = lineStart + (m.index ?? 0);
+    const e = s + m[0].length;
+    if (s <= to && e >= from) {
+      return { kind: 'url', value: m[2], title: m[1], from: s, to: e };
+    }
+  }
+
+  return null;
 }
 
 function applyHeading(editor: InkInstance, info: SelectionInfo, level: number) {
@@ -274,8 +315,18 @@ export function applyFormat(
       applyCallout(editor, info, payload.calloutType ?? 'note');
       break;
     case 'link':
-      if (payload.internal) {
-        editor.insert(`[[${payload.internal}]]`, selection);
+      if (payload.reset) {
+        const docText = editor.getDoc();
+        const link = detectLinkAt(docText, info.from, info.to);
+        if (link) {
+          editor.insert(link.title, { start: link.from, end: link.to });
+        }
+      } else if (payload.internal) {
+        const linkText = info.text || payload.internalName || 'link';
+        editor.insert(
+          `[[[${linkText}](#asset:${payload.internal})]]`,
+          selection,
+        );
       } else {
         const url = payload.url ?? '';
         editor.wrap({ before: '[', after: `](${url})`, selection });
@@ -352,6 +403,15 @@ export function detectActive(
     if (cm) active.callout = cm[1].toLowerCase();
     else active.quote = true;
   }
+
+  const link = detectLinkAt(doc, info.from, info.to);
+  active.link = link
+    ? link.kind === 'asset'
+      ? `#asset:${link.value}`
+      : link.value
+    : null;
+  active.linkAsset = link?.kind === 'asset' ? link.value : null;
+  active.linkTitle = link?.title ?? null;
 
   return active;
 }

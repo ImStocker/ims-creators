@@ -35,11 +35,12 @@
           </button>
           <button
             v-if="activeHeading"
-            class="SelectionToolbar-button is-button reset"
+            class="SelectionToolbar-button is-button"
             title="Reset"
             @mousedown.prevent="onFormat(activeHeading, { reset: true })"
           >
-            <i class="ri-close-fill"></i> Reset
+            <i class="ri-close-fill"></i>
+            <span class="SelectionToolbar-menuLabel">Reset</span>
           </button>
         </div>
 
@@ -102,11 +103,12 @@
           </button>
           <button
             v-if="activeListKind"
-            class="SelectionToolbar-button is-button reset"
+            class="SelectionToolbar-button is-button"
             title="Reset"
             @mousedown.prevent="onFormat(activeListKind, { reset: true })"
           >
-            <i class="ri-close-fill"></i> Reset
+            <i class="ri-close-fill"></i>
+            <span class="SelectionToolbar-menuLabel">Reset</span>
           </button>
         </div>
 
@@ -149,13 +151,14 @@
           </button>
           <button
             v-if="active && active.callout"
-            class="SelectionToolbar-button is-button reset"
+            class="SelectionToolbar-button is-button"
             title="Reset"
             @mousedown.prevent="
               onFormat('callout', { calloutType: active.callout!, reset: true })
             "
           >
-            <i class="ri-close-fill"></i> Reset
+            <i class="ri-close-fill"></i>
+            <span class="SelectionToolbar-menuLabel">Reset</span>
           </button>
         </div>
       </div>
@@ -178,11 +181,83 @@
       <div class="SelectionToolbar-section">
         <button
           class="SelectionToolbar-button is-button"
+          :class="{ 'has-dot': !!(active && active.link) }"
           title="Link"
-          @mousedown.prevent="toggleLink"
+          @mousedown.prevent="openMenu('link')"
         >
           <i class="ri-link"></i>
         </button>
+        <div
+          v-if="menu === 'link'"
+          class="SelectionToolbar-menu SelectionToolbar-linkMenu"
+          @mousedown.prevent
+        >
+          <div class="SelectionToolbar-linkSection">
+            <button
+              class="SelectionToolbar-button is-button"
+              title="Select element"
+              @mousedown.prevent="browseAsset"
+            >
+              <i class="ri-file-search-line"></i>
+            </button>
+          </div>
+          <template v-if="active && active.linkAsset">
+            <div class="SelectionToolbar-linkSection">
+              <span class="SelectionToolbar-linkTitle">{{
+                active.linkTitle
+              }}</span>
+            </div>
+            <div class="SelectionToolbar-linkSection">
+              <button
+                class="SelectionToolbar-button is-button danger"
+                title="Remove link"
+                @mousedown.prevent="removeLink"
+              >
+                <i class="ri-link-unlink"></i>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="SelectionToolbar-linkSection">
+              <input
+                ref="urlInput"
+                v-model="url"
+                class="SelectionToolbar-input"
+                placeholder="https://..."
+                @keyup.enter="applyLink"
+              />
+              <button
+                class="SelectionToolbar-button is-button"
+                :disabled="!url.trim()"
+                title="Apply link"
+                @mousedown.prevent="applyLink"
+              >
+                <i class="ri-check-fill"></i>
+              </button>
+            </div>
+            <div
+              v-if="url.trim() && active && active.link"
+              class="SelectionToolbar-linkSection"
+            >
+              <a
+                v-if="isHttp(url)"
+                class="SelectionToolbar-button is-button"
+                :href="url"
+                target="_blank"
+                title="Open link"
+              >
+                <i class="ri-external-link-fill"></i>
+              </a>
+              <button
+                class="SelectionToolbar-button is-button danger"
+                title="Remove link"
+                @mousedown.prevent="removeLink"
+              >
+                <i class="ri-link-unlink"></i>
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
 
       <!-- Section 4: last used + more -->
@@ -219,35 +294,6 @@
             <span class="SelectionToolbar-menuLabel">{{ t.title }}</span>
           </button>
         </div>
-      </div>
-
-      <!-- Link popover -->
-      <div
-        v-if="linkOpen"
-        class="SelectionToolbar-linkPopover"
-        @mousedown.prevent
-      >
-        <input
-          ref="urlInput"
-          v-model="url"
-          class="SelectionToolbar-input"
-          placeholder="https://..."
-          @keyup.enter="applyLink"
-        />
-        <button
-          class="is-button SelectionToolbar-apply"
-          :disabled="!url.trim()"
-          @click="applyLink"
-        >
-          <i class="ri-check-fill"></i>
-        </button>
-        <button
-          class="is-button SelectionToolbar-browse"
-          title="Select element"
-          @click="browseAsset"
-        >
-          <i class="ri-file-search-line"></i>
-        </button>
       </div>
     </div>
   </div>
@@ -376,21 +422,27 @@ export default defineComponent({
     },
     openMenu(name: string) {
       this.linkOpen = false;
-      this.menu = this.menu === name ? null : name;
-    },
-    toggleLink() {
-      this.menu = null;
-      this.linkOpen = !this.linkOpen;
-      if (this.linkOpen) {
+      if (name === 'link') {
+        this.url =
+          this.active && this.active.link && !this.active.linkAsset
+            ? this.active.link
+            : '';
         this.$nextTick(() =>
           (this.$refs['urlInput'] as HTMLInputElement | undefined)?.focus(),
         );
       }
+      this.menu = this.menu === name ? null : name;
     },
     onFormat(type: FormatType, payload: FormatPayload = {}) {
       this.$emit('format', { type, payload });
       this.menu = null;
       this.linkOpen = false;
+    },
+    isHttp(url: string): boolean {
+      return /^(https?|mailto|tel|sms):\/\//.test(url);
+    },
+    removeLink() {
+      this.onFormat('link', { reset: true });
     },
     onInline(type: FormatType) {
       const payload: FormatPayload = this.activeDot(type)
@@ -419,13 +471,10 @@ export default defineComponent({
         .get(DialogManager)
         .show(SelectAssetDialog, {}, this);
       const res = await dialog;
-      if (res) {
-        const ref =
-          (res as { id?: string; name?: string }).id ??
-          (res as { name?: string }).name;
-        if (ref) {
-          this.onFormat('link', { internal: String(ref) });
-        }
+      if (res && (res as { id?: string }).id) {
+        const id = (res as { id: string }).id;
+        const name = (res as { name?: string }).name ?? '';
+        this.onFormat('link', { internal: id, internalName: name });
       }
     },
     onWindowMouseDown(e: MouseEvent) {
@@ -517,7 +566,7 @@ export default defineComponent({
 
 .SelectionToolbar-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   left: 0;
   display: flex;
   flex-direction: column;
@@ -539,30 +588,36 @@ export default defineComponent({
     margin-left: 7px;
     white-space: nowrap;
   }
+}
 
-  .reset {
-    font-size: 12px;
-    color: var(--color-danger, #e05252);
+.SelectionToolbar-linkMenu {
+  flex-direction: row;
+  align-items: center;
 
-    i {
-      font-size: 13px;
-    }
+  .SelectionToolbar-button {
+    width: auto;
+    text-align: center;
   }
 }
 
-.SelectionToolbar-linkPopover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+.SelectionToolbar-linkSection {
+  border-right: 1px solid var(--local-border-color);
+  padding: 0 5px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
-  background-color: var(--dropdown-bg-color);
-  backdrop-filter: var(--dropdown-bg-filter);
-  box-shadow: var(--dropdown-box-shadow);
-  border-radius: var(--dropdown-border-radius);
-  pointer-events: auto;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.SelectionToolbar-linkTitle {
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.SelectionToolbar-menu .SelectionToolbar-button.danger {
+  color: var(--color-danger, #e05252);
 }
 
 .SelectionToolbar-input {
@@ -572,20 +627,5 @@ export default defineComponent({
   border: 1px solid var(--local-border-color);
   background-color: var(--local-box-color);
   color: var(--local-text-color);
-}
-
-.SelectionToolbar-apply,
-.SelectionToolbar-browse {
-  background: transparent;
-  border: none;
-  color: var(--color-accent, #2f80ed);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
 }
 </style>
