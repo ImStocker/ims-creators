@@ -9,6 +9,11 @@
         @focus="$emit('focus')"
       ></ink-mde>
     </div>
+    <SelectionToolbar
+      v-if="toolbarVisible && toolbarRect"
+      :rect="toolbarRect"
+      @format="onToolbarFormat"
+    ></SelectionToolbar>
   </div>
 </template>
 <script lang="ts">
@@ -27,11 +32,20 @@ import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import { blurHandler } from './plugins/blur-handler';
 import { headingId } from './plugins/heading-id';
 import { tables } from './plugins/tables';
+import { selectionToolbar } from './plugins/selection-toolbar';
+import type { SelectionInfo } from './plugins/selection-toolbar';
+import {
+  applyFormat,
+  type FormatType,
+  type FormatPayload,
+} from './format-commands';
+import SelectionToolbar from './SelectionToolbar.vue';
 
 export default defineComponent({
   name: 'MarkdownBlockEditor',
   components: {
     InkMde,
+    SelectionToolbar,
   },
   props: {
     readonly: {
@@ -48,6 +62,9 @@ export default defineComponent({
   data() {
     return {
       editor: null as InkInstance | null,
+      toolbarSelection: null as SelectionInfo | null,
+      toolbarRect: null as SelectionInfo['rect'] | null,
+      toolbarVisible: false,
     };
   },
   computed: {
@@ -126,6 +143,21 @@ export default defineComponent({
             appManager: this.$getAppManager(),
           }),
         }),
+        {
+          type: 'default',
+          value: selectionToolbar({
+            onSelection: (info: SelectionInfo | null) => {
+              if (info && !this.readonly) {
+                this.toolbarSelection = info;
+                this.toolbarRect = info.rect;
+                this.toolbarVisible = true;
+              } else {
+                this.toolbarVisible = false;
+                this.toolbarSelection = null;
+              }
+            },
+          }),
+        },
       ];
     },
   },
@@ -138,6 +170,15 @@ export default defineComponent({
     focus() {
       if (!this.editor) return;
       this.editor.focus();
+    },
+    onToolbarFormat(payload: { type: FormatType; payload?: FormatPayload }) {
+      if (!this.editor || !this.toolbarSelection) return;
+      applyFormat(
+        this.editor,
+        this.toolbarSelection,
+        payload.type,
+        payload.payload ?? {},
+      );
     },
   },
 });
