@@ -9,12 +9,23 @@
         @focus="$emit('focus')"
       ></ink-mde>
     </div>
-    <SelectionToolbar
+    <div
       v-if="toolbarVisible && toolbarRect"
-      :rect="toolbarRect"
-      :active="toolbarActive"
-      @format="onToolbarFormat"
-    ></SelectionToolbar>
+      class="MarkdownBlockEditor-toolbar-target"
+      :style="toolbarTargetStyle"
+    >
+      <dropdown-container
+        attach-position="top"
+        align-position="center"
+        class="MarkdownBlockEditor-toolbar-container"
+      >
+        <SelectionToolbar
+          :rect="toolbarRect"
+          :active="toolbarActive"
+          @format="onToolbarFormat"
+        ></SelectionToolbar>
+      </dropdown-container>
+    </div>
   </div>
 </template>
 <script lang="ts">
@@ -44,12 +55,14 @@ import {
 } from './format-commands';
 import { markStyles } from './plugins/mark-styles';
 import SelectionToolbar from './SelectionToolbar.vue';
+import DropdownContainer from '~ims-app-base/components/Common/DropdownContainer.vue';
 
 export default defineComponent({
   name: 'MarkdownBlockEditor',
   components: {
     InkMde,
     SelectionToolbar,
+    DropdownContainer,
   },
   props: {
     readonly: {
@@ -73,6 +86,17 @@ export default defineComponent({
     };
   },
   computed: {
+    toolbarTargetStyle(): Record<string, string> {
+      const r = this.toolbarRect;
+      if (!r) return {};
+      const gap = 8;
+      return {
+        left: `${r.left}px`,
+        top: `${r.top - gap}px`,
+        width: `${Math.max(r.right - r.left, 1)}px`,
+        height: `${Math.max(r.bottom - r.top, 1)}px`,
+      };
+    },
     ownModelValue: {
       get() {
         return this.modelValue;
@@ -278,6 +302,12 @@ body[data-theme='ims-light'] {
 .MarkdownBlockEditor {
   @include imc-text-format.imc-text-format;
   position: relative;
+
+  .MarkdownBlockEditor-toolbar-target {
+    position: fixed;
+    pointer-events: none;
+  }
+
   &:deep(.ink-mde) {
     --ink-internal-block-background-color: var(--local-box-color);
     .cm-line.cm-codeblock {

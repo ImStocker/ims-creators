@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="SelectionToolbar" :style="positionStyle">
+  <div ref="root" class="SelectionToolbar">
     <div class="SelectionToolbar-bubble">
       <!-- Section 1: block formats -->
       <div class="SelectionToolbar-section">
@@ -356,16 +356,6 @@ export default defineComponent({
     };
   },
   computed: {
-    positionStyle(): Record<string, string> {
-      const above = this.rect.top > 60;
-      return {
-        left: `${this.rect.left}px`,
-        top: above ? `${this.rect.top}px` : `${this.rect.bottom}px`,
-        transform: above
-          ? 'translate(-50%, calc(-100% - 8px))'
-          : 'translate(-50%, 8px)',
-      };
-    },
     activeHeading(): 'h1' | 'h2' | 'h3' | 'h4' | null {
       const a = this.active;
       if (!a) return null;
@@ -489,12 +479,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-.SelectionToolbar {
-  position: fixed;
-  z-index: 1000;
-  pointer-events: none;
-}
-
 .SelectionToolbar-bubble {
   pointer-events: auto;
   position: relative;
