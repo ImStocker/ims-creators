@@ -1,14 +1,19 @@
 <template>
   <div class="MarkdownBlockEditor">
-    <div class="MarkdownBlockEditor-container">
+    <ContextMenuZone
+      class="MarkdownBlockEditor-container"
+      :get-menu-list="getContextMenu"
+      :disabled="readonly"
+    >
       <ink-mde
         ref="editor"
         v-model="ownModelValue"
         class="MarkdownBlockEditor-editor"
         :options="options"
         @focus="$emit('focus')"
+        @contextmenu="onEditorContextMenu"
       ></ink-mde>
-    </div>
+    </ContextMenuZone>
     <div
       v-if="toolbarVisible && toolbarRect"
       class="MarkdownBlockEditor-toolbar-target"
@@ -50,6 +55,8 @@ import { shortcuts } from './plugins/shortcuts';
 import {
   applyFormat,
   detectActive,
+  insertTable,
+  insertHorizontalRule,
   type ActiveFormats,
   type FormatType,
   type FormatPayload,
@@ -57,6 +64,10 @@ import {
 import { markStyles } from './plugins/mark-styles';
 import SelectionToolbar from './SelectionToolbar.vue';
 import DropdownContainer from '~ims-app-base/components/Common/DropdownContainer.vue';
+import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
+import SelectAssetDialog from '~ims-app-base/components/Asset/SelectAssetDialog.vue';
 
 export default defineComponent({
   name: 'MarkdownBlockEditor',
@@ -64,6 +75,7 @@ export default defineComponent({
     InkMde,
     SelectionToolbar,
     DropdownContainer,
+    ContextMenuZone,
   },
   props: {
     readonly: {
@@ -84,6 +96,7 @@ export default defineComponent({
       toolbarRect: null as SelectionInfo['rect'] | null,
       toolbarVisible: false,
       toolbarActive: null as ActiveFormats | null,
+      contextSelection: null as SelectionInfo | null,
     };
   },
   computed: {
@@ -224,6 +237,329 @@ export default defineComponent({
         payload.type,
         payload.payload ?? {},
       );
+      this.editor.focus();
+    },
+    onEditorContextMenu() {
+      this.contextSelection = this.currentSelectionInfo();
+    },
+    currentSelectionInfo(): SelectionInfo {
+      const ed = this.editor;
+      if (!ed) {
+        return {
+          from: 0,
+          to: 0,
+          text: '',
+          rect: { left: 0, top: 0, right: 0, bottom: 0 },
+        };
+      }
+      const sels = ed.selections();
+      const s = sels[0] ?? { start: 0, end: 0 };
+      const doc = ed.getDoc();
+      return {
+        from: s.start,
+        to: s.end,
+        text: doc.slice(s.start, s.end),
+        rect: { left: 0, top: 0, right: 0, bottom: 0 },
+      };
+    },
+    getContextMenu(): MenuListItem[] {
+      const sel = this.contextSelection;
+      const ed = this.editor;
+      if (!ed || !sel) return [];
+      const fmt = (type: FormatType) => () => {
+        if (this.editor) {
+          applyFormat(this.editor, sel, type);
+          this.editor.focus();
+        }
+      };
+      const block =
+        (type: FormatType, payload: FormatPayload = {}) =>
+        () => {
+          if (this.editor) {
+            applyFormat(this.editor, sel, type, payload);
+            this.editor.focus();
+          }
+        };
+      return [
+        {
+          title: 'Insert link',
+          name: 'ctx-insert-link',
+          icon: 'ri-link',
+          action: () => this.insertAssetLink(sel),
+        },
+        {
+          title: 'Insert external link',
+          name: 'ctx-insert-ext-link',
+          icon: 'ri-external-link-line',
+          action: () => this.insertExternalLink(sel),
+        },
+        { type: 'separator', name: 'ctx-sep-1' },
+        {
+          title: 'Format',
+          name: 'ctx-format',
+          icon: 'ri-text',
+          children: [
+            {
+              title: 'Bold',
+              name: 'ctx-bold',
+              icon: 'ri-bold',
+              action: fmt('bold'),
+            },
+            {
+              title: 'Italic',
+              name: 'ctx-italic',
+              icon: 'ri-italic',
+              action: fmt('italic'),
+            },
+            {
+              title: 'Strikethrough',
+              name: 'ctx-strike',
+              icon: 'ri-strikethrough',
+              action: fmt('strike'),
+            },
+            {
+              title: 'Highlight',
+              name: 'ctx-highlight',
+              icon: 'ri-mark-pen-fill',
+              action: fmt('highlight'),
+            },
+            {
+              title: 'Inline code',
+              name: 'ctx-code',
+              icon: 'ri-code-s-slash-fill',
+              action: fmt('code'),
+            },
+            {
+              title: 'Superscript',
+              name: 'ctx-sup',
+              icon: 'ri-superscript',
+              action: fmt('superscript'),
+            },
+            {
+              title: 'Subscript',
+              name: 'ctx-sub',
+              icon: 'ri-subscript',
+              action: fmt('subscript'),
+            },
+            {
+              title: 'Formula',
+              name: 'ctx-formula',
+              icon: 'ri-formula',
+              action: fmt('formula'),
+            },
+          ],
+        },
+        {
+          title: 'Paragraph',
+          name: 'ctx-paragraph',
+          icon: 'ri-paragraph',
+          children: [
+            {
+              title: 'Heading 1',
+              name: 'ctx-h1',
+              icon: 'ri-h-1',
+              action: block('h1'),
+            },
+            {
+              title: 'Heading 2',
+              name: 'ctx-h2',
+              icon: 'ri-h-2',
+              action: block('h2'),
+            },
+            {
+              title: 'Heading 3',
+              name: 'ctx-h3',
+              icon: 'ri-h-3',
+              action: block('h3'),
+            },
+            {
+              title: 'Heading 4',
+              name: 'ctx-h4',
+              icon: 'ri-h-4',
+              action: block('h4'),
+            },
+            { type: 'separator', name: 'ctx-sep-p1' },
+            {
+              title: 'Bullet list',
+              name: 'ctx-bullet',
+              icon: 'ri-list-unordered',
+              action: block('bullet_list'),
+            },
+            {
+              title: 'Numbered list',
+              name: 'ctx-ordered',
+              icon: 'ri-list-ordered',
+              action: block('ordered_list'),
+            },
+            {
+              title: 'Task list',
+              name: 'ctx-task',
+              icon: 'ri-list-check-2',
+              action: block('task_list'),
+            },
+            {
+              title: 'Quote',
+              name: 'ctx-quote',
+              icon: 'ri-double-quotes-r',
+              action: block('quote'),
+            },
+            { type: 'separator', name: 'ctx-sep-p2' },
+            {
+              title: 'Notice block',
+              name: 'ctx-notice',
+              icon: 'ri-text-block',
+              children: [
+                {
+                  title: 'Info',
+                  name: 'ctx-note-info',
+                  icon: 'ri-information-2-line',
+                  action: block('callout', { calloutType: 'info' }),
+                },
+                {
+                  title: 'Warning',
+                  name: 'ctx-note-warning',
+                  icon: 'ri-alert-line',
+                  action: block('callout', { calloutType: 'warning' }),
+                },
+                {
+                  title: 'Solution',
+                  name: 'ctx-note-solution',
+                  icon: 'ri-checkbox-circle-line',
+                  action: block('callout', { calloutType: 'solution' }),
+                },
+                {
+                  title: 'Error',
+                  name: 'ctx-note-error',
+                  icon: 'ri-error-warning-line',
+                  action: block('callout', { calloutType: 'error' }),
+                },
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Insert',
+          name: 'ctx-insert',
+          icon: 'ri-add-line',
+          children: [
+            {
+              title: 'Table',
+              name: 'ctx-table',
+              icon: 'ri-table-2',
+              action: () => {
+                if (this.editor) insertTable(this.editor, sel);
+              },
+            },
+            {
+              title: 'Horizontal rule',
+              name: 'ctx-hr',
+              icon: 'ri-separator',
+              action: () => {
+                if (this.editor) insertHorizontalRule(this.editor, sel);
+              },
+            },
+            {
+              title: 'Code block',
+              name: 'ctx-codeblock',
+              icon: 'ri-code-box-fill',
+              action: block('code_block'),
+            },
+          ],
+        },
+        { type: 'separator', name: 'ctx-sep-2' },
+        {
+          title: 'Cut',
+          name: 'ctx-cut',
+          icon: 'ri-scissors-cut-line',
+          disabled: sel.text.length === 0,
+          action: () => this.cutText(sel),
+        },
+        {
+          title: 'Copy',
+          name: 'ctx-copy',
+          icon: 'ri-file-copy-line',
+          disabled: sel.text.length === 0,
+          action: () => this.copyText(sel),
+        },
+        {
+          title: 'Paste',
+          name: 'ctx-paste',
+          icon: 'ri-clipboard-line',
+          action: () => this.pasteText(sel),
+        },
+        {
+          title: 'Select all',
+          name: 'ctx-select-all',
+          icon: 'ri-checkbox-multiple-line',
+          action: () => this.selectAllText(),
+        },
+      ];
+    },
+    insertAssetLink(sel: SelectionInfo) {
+      const ed = this.editor;
+      if (!ed) return;
+      const dialog = this.$getAppManager()
+        .get(DialogManager)
+        .show(SelectAssetDialog, {}, this);
+      dialog.then((res) => {
+        if (res && (res as { id?: string }).id) {
+          const id = (res as { id: string }).id;
+          const name = (res as { name?: string }).name ?? '';
+          applyFormat(ed, sel, 'link', { internal: id, internalName: name });
+          ed.focus();
+        }
+      });
+    },
+    insertExternalLink(sel: SelectionInfo) {
+      const ed = this.editor;
+      if (!ed) return;
+      const from = sel.from;
+      ed.insert('[]()', { start: sel.from, end: sel.to });
+      ed.select({ selection: { start: from + 1, end: from + 1 } });
+      ed.focus();
+    },
+    async copyText(sel: SelectionInfo) {
+      const text = sel.text;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        /* ignore */
+      }
+    },
+    async cutText(sel: SelectionInfo) {
+      const ed = this.editor;
+      const text = sel.text;
+      if (!ed || !text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        /* ignore */
+      }
+      ed.focus();
+      ed.insert('', { start: sel.from, end: sel.to });
+      ed.select({ selection: { start: sel.from, end: sel.from } });
+    },
+    async pasteText(sel: SelectionInfo) {
+      const ed = this.editor;
+      if (!ed) return;
+      let text = '';
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        return;
+      }
+      if (text) {
+        ed.focus();
+        ed.insert(text, { start: sel.from, end: sel.to });
+      }
+    },
+    selectAllText() {
+      const ed = this.editor;
+      if (!ed) return;
+      ed.focus();
+      const len = ed.getDoc().length;
+      ed.select({ selection: { start: 0, end: len } });
     },
   },
 });
@@ -255,6 +591,20 @@ export default defineComponent({
   .cm-md-math {
     color: var(--color-accent, #2f80ed);
     font-style: italic;
+  }
+
+  .cm-code {
+    background-color: rgba(135, 131, 120, 0.18);
+    font-family: var(--ink-internal-code-font-family, monospace);
+    border-radius: 3px;
+    padding: 0.1em 0.3em;
+  }
+
+  .cm-md-hr {
+    border: none;
+    border-top: 1px solid var(--ink-internal-color, currentColor);
+    width: 100%;
+    margin: 0.5em 0;
   }
 
   .ink-mde .cm-line.cm-md-callout {

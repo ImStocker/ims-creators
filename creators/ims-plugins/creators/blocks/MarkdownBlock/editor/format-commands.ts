@@ -240,6 +240,28 @@ function applyCallout(
   });
 }
 
+export function insertHorizontalRule(
+  editor: InkInstance,
+  info: SelectionInfo,
+): void {
+  const doc = editor.getDoc();
+  const { blockEnd } = lineBounds(doc, info.from, info.to);
+  const snippet = '\n---\n';
+  editor.update(doc.slice(0, blockEnd) + snippet + doc.slice(blockEnd));
+  const pos = blockEnd + snippet.length;
+  editor.select({ selection: { start: pos, end: pos } });
+}
+
+export function insertTable(editor: InkInstance, info: SelectionInfo): void {
+  const doc = editor.getDoc();
+  const { blockEnd } = lineBounds(doc, info.from, info.to);
+  const table =
+    '\n| Column 1 | Column 2 | Column 3 |\n| --- | --- | --- |\n| Cell 1 | Cell 2 | Cell 3 |';
+  editor.update(doc.slice(0, blockEnd) + table + doc.slice(blockEnd));
+  const pos = blockEnd + 1;
+  editor.select({ selection: { start: pos, end: pos } });
+}
+
 function unwrap(
   editor: InkInstance,
   info: SelectionInfo,
