@@ -50,6 +50,7 @@ const strikeDelim = /(~~)([^~\n]+?)~~/g;
 const LINE_BLOCKQUOTE = 'cm-md-line-blockquote';
 const LINE_LIST = 'cm-md-line-list';
 const LINE_HR = 'cm-md-line-hr';
+const GAP_LINE = 'cm-md-list-gap';
 
 class CodeLangWidget extends WidgetType {
   readonly lang: string;
@@ -100,6 +101,7 @@ function build(view: EditorView): DecorationSet {
   const markRanges: Range<Decoration>[] = [];
   const widgetRanges: Range<Decoration>[] = [];
   const lineClasses = new Map<number, Set<string>>();
+  const listItemLines = new Set<number>();
 
   const sel = view.state.selection.ranges;
 
@@ -134,6 +136,14 @@ function build(view: EditorView): DecorationSet {
       to: vr.to,
       enter: (ref) => {
         const name = ref.name;
+
+        // Track the lines covered by list items so we can draw the connecting
+        // guide line on the *empty* line between two items (Obsidian-style).
+        if (name === 'ListItem') {
+          const a = doc.lineAt(ref.from).number;
+          const b = doc.lineAt(ref.to).number;
+          for (let l = a; l <= b; l++) listItemLines.add(l);
+        }
 
         // ---- line-level chrome (always on in live preview) ----
         if (name === 'Blockquote') {
@@ -198,6 +208,18 @@ function build(view: EditorView): DecorationSet {
 
   hideRegexDelimiters(highlightDelim, view, overlaps, markRanges);
   hideRegexDelimiters(strikeDelim, view, overlaps, markRanges);
+
+  // Draw the connecting guide line on an empty line that sits between two list
+  // items (so it appears only in the gap, aligned under the bullet markers).
+  const docLines = doc.lines;
+  for (let l = 2; l < docLines; l++) {
+    if (listItemLines.has(l - 1) && listItemLines.has(l + 1)) {
+      const line = doc.line(l);
+      if (line.text.trim() === '') {
+        addLineClass(line.from, line.from, GAP_LINE);
+      }
+    }
+  }
 
   const ranges: Range<Decoration>[] = [...markRanges, ...widgetRanges];
   for (const [pos, set] of lineClasses) {

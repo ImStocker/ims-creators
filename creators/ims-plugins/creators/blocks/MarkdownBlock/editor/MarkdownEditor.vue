@@ -792,6 +792,18 @@ body[data-theme='ims-dark'] {
   .cm-md-line-list {
     padding-left: 1.25em;
   }
+  .cm-md-list-gap {
+    position: relative;
+  }
+  .cm-md-list-gap::before {
+    content: '';
+    position: absolute;
+    left: 1.1em;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--ink-internal-color, #cfcfcf);
+    opacity: 0.1;
+  }
   .cm-md-line-hr {
     padding-top: 0;
     margin-top: 0;
