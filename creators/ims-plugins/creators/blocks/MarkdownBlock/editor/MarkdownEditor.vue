@@ -82,6 +82,35 @@ import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import SelectAssetDialog from '~ims-app-base/components/Asset/SelectAssetDialog.vue';
+import katexCss from 'katex/dist/katex.min.css?inline';
+
+// KaTeX scoping: beat ink-mde's `.ink-mde .cm-line span { display: inline }` (0,2,1)
+// which otherwise overrides KaTeX's own lower-specificity rules and breaks formula
+// layout (e.g. superscripts render detached at the top of the line). ink-mde emits
+// its stylesheet as an inline <style> inside the editor body, so we re-scope every
+// KaTeX selector under `.ink-mde .cm-line .cm-md-math-render` to win on specificity.
+declare module '*.css?inline' {
+  const css: string;
+  export default css;
+}
+
+const katexCssScoped = katexCss.replace(
+  /(@?[^{}@]+)\{([^{}]*)\}/g,
+  function (_m, sel, body) {
+    if (sel.trim().charAt(0) === '@') return _m;
+    return (
+      sel
+        .split(',')
+        .map(function (s) {
+          return '.ink-mde .cm-line .cm-md-math-render ' + s.trim();
+        })
+        .join(',') +
+      '{' +
+      body +
+      '}'
+    );
+  },
+);
 
 export default defineComponent({
   name: 'MarkdownBlockEditor',
@@ -284,6 +313,15 @@ export default defineComponent({
     const editor = this.$refs['editor'] as InstanceType<typeof InkMde> | null;
     assert(editor?.instance);
     this.editor = editor.instance;
+
+    // Inject the re-scoped KaTeX stylesheet once, so formulas render with
+    // correct internal layout.
+    if (!document.querySelector('style[data-katex]')) {
+      const style = document.createElement('style');
+      style.setAttribute('data-katex', '');
+      style.textContent = katexCssScoped;
+      document.head.appendChild(style);
+    }
   },
   methods: {
     focus() {
@@ -662,6 +700,15 @@ export default defineComponent({
   .cm-md-math {
     color: var(--color-accent, #2f80ed);
     font-style: italic;
+  }
+
+  .cm-md-math-render {
+    display: inline-block;
+    vertical-align: middle;
+
+    .katex-display {
+      margin: 0;
+    }
   }
 
   .cm-md-bold {

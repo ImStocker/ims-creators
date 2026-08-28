@@ -8,6 +8,7 @@ import {
 } from '@codemirror/view';
 import type { Range } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
+import katex from 'katex';
 
 // Decorates a markdown marker (e.g. `**`, `#`, `>`, `-`, backticks, link
 // brackets) so it is visually hidden unless the cursor is inside the construct
@@ -69,6 +70,63 @@ class CodeLangWidget extends WidgetType {
     span.className = 'cm-md-code-lang';
     span.textContent = this.lang;
     return span;
+  }
+}
+
+// Renders a `$...$` / `$$...$$` formula with KaTeX in live preview.
+class MathWidget extends WidgetType {
+  constructor(
+    readonly tex: string,
+    readonly display: boolean,
+  ) {
+    super();
+  }
+
+  override eq(other: MathWidget): boolean {
+    return other.tex === this.tex && other.display === this.display;
+  }
+
+  override toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = 'cm-md-math-render';
+    try {
+      span.innerHTML = katex.renderToString(this.tex, {
+        displayMode: this.display,
+        throwOnError: false,
+        output: 'htmlAndMathml',
+      });
+    } catch {
+      span.textContent = this.tex;
+    }
+    return span;
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+// Renders `<sub>` / `<sup>` inline HTML as a real subscript / superscript.
+class SubSupWidget extends WidgetType {
+  constructor(
+    readonly tag: 'sub' | 'sup',
+    readonly content: string,
+  ) {
+    super();
+  }
+
+  override eq(other: SubSupWidget): boolean {
+    return other.tag === this.tag && other.content === this.content;
+  }
+
+  override toDOM(): HTMLElement {
+    const el = document.createElement(this.tag);
+    el.textContent = this.content;
+    return el;
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
   }
 }
 
@@ -221,6 +279,7 @@ function build(view: EditorView): DecorationSet {
 
   hideRegexDelimiters(highlightDelim, view, overlaps, markRanges);
   hideRegexDelimiters(strikeDelim, view, overlaps, markRanges);
+  buildRenderWidgets(view, overlaps, widgetRanges);
 
   // Draw the connecting guide line on an empty line that sits between two list
   // items (so it appears only in the gap, aligned under the bullet markers).
@@ -262,5 +321,62 @@ function hideRegexDelimiters(
     if (overlaps(openFrom, closeTo)) continue;
     ranges.push(hideMark.range(openFrom, openTo));
     ranges.push(hideMark.range(closeFrom, closeTo));
+  }
+}
+
+// Replaces `<sub>`/`<sup>` HTML and `$…$`/`$$…$$` formulas with rendered
+// widgets in live preview. Widgets are skipped while the caret is inside the
+// construct so the raw source can be edited (Obsidian-style reveal-on-edit).
+function buildRenderWidgets(
+  view: EditorView,
+  overlaps: (a: number, b: number) => boolean,
+  widgetRanges: Range<Decoration>[],
+): void {
+  const text = view.state.doc.toString();
+  const occupied: Array<[number, number]> = [];
+
+  const pushWidget = (from: number, to: number, widget: WidgetType) => {
+    if (from >= to) return;
+    if (overlaps(from, to)) return;
+    for (const [a, b] of occupied) {
+      if (from < b && to > a) return;
+    }
+    occupied.push([from, to]);
+    widgetRanges.push(Decoration.replace({ widget }).range(from, to));
+  };
+
+  for (const [re, tag] of [
+    [/<sub>([\s\S]*?)<\/sub>/g, 'sub'],
+    [/<sup>([\s\S]*?)<\/sup>/g, 'sup'],
+  ] as const) {
+    let m: RegExpExecArray | null;
+    re.lastIndex = 0;
+    while ((m = re.exec(text))) {
+      const from = m.index;
+      const to = from + m[0].length;
+      pushWidget(from, to, new SubSupWidget(tag, m[1]));
+    }
+  }
+
+  // Block math `$$…$$` first so inline math doesn't claim its contents.
+  {
+    const re = /\$\$([\s\S]+?)\$\$/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const from = m.index;
+      const to = from + m[0].length;
+      pushWidget(from, to, new MathWidget(m[1], true));
+    }
+  }
+
+  // Inline math `$…$`.
+  {
+    const re = /\$([^$\n]+?)\$/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const from = m.index;
+      const to = from + m[0].length;
+      pushWidget(from, to, new MathWidget(m[1], false));
+    }
   }
 }

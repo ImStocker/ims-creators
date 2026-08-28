@@ -3,14 +3,12 @@ import type { DecorationSet, EditorView, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
 const highlightMark = Decoration.mark({ class: 'cm-md-highlight' });
-const mathMark = Decoration.mark({ class: 'cm-md-math' });
 const codeMark = Decoration.mark({ class: 'cm-code' });
 const boldMark = Decoration.mark({ class: 'cm-md-bold' });
 const italicMark = Decoration.mark({ class: 'cm-md-italic' });
 const strikeMark = Decoration.mark({ class: 'cm-md-strike' });
 
 const highlightRegex = /==([^=\n]+)==/g;
-const mathRegex = /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g;
 // Inline code: a single backtick pair that is not adjacent to another backtick
 // (so ``` fenced blocks are excluded). Group 1/3 are the surrounding chars
 // used only to avoid matching fences; the decorated range is the `code` span.
@@ -77,15 +75,6 @@ function buildMarks(view: EditorView): DecorationSet {
       from: m.index,
       to: m.index + m[0].length,
       deco: highlightMark,
-    });
-  }
-
-  for (const m of text.matchAll(mathRegex)) {
-    if (m.index === undefined) continue;
-    ranges.push({
-      from: m.index,
-      to: m.index + m[0].length,
-      deco: mathMark,
     });
   }
 
