@@ -179,7 +179,13 @@ export default defineComponent({
     });
   },
   beforeUnmount() {
-    this._cleanupNestedEditor();
+    // If a cell is being edited, persist it before the widget is torn down
+    // (e.g. on a live-preview toggle rebuild) so no edits are lost.
+    if (this._nestedEditor && this._activeCell) {
+      this.commitEdit();
+    } else {
+      this._cleanupNestedEditor();
+    }
   },
   methods: {
     cellHtml(text: string): string {

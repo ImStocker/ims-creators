@@ -74,6 +74,7 @@ import {
 } from './format-commands';
 import { markStyles } from './plugins/mark-styles';
 import { livePreview } from './plugins/live-preview';
+import { linkWidgets } from './plugins/links';
 import { viewToInkLike } from './editor-adapter';
 import SelectionToolbar from './SelectionToolbar.vue';
 import DropdownContainer from '~ims-app-base/components/Common/DropdownContainer.vue';
@@ -192,6 +193,14 @@ export default defineComponent({
       return [
         ...wikiLinks({ appManager: this.$getAppManager() }),
         ...imcImages({ appManager: this.$getAppManager() }),
+        ...(this.livePreview
+          ? [
+              {
+                type: 'default',
+                value: linkWidgets({ appManager: this.$getAppManager() }),
+              },
+            ]
+          : []),
         ...blurHandler(() => {
           this.$emit('blur');
         }),
@@ -209,6 +218,9 @@ export default defineComponent({
             // mode so the cell editor shows raw markdown.
             ...(this.livePreview ? markStyles() : []),
             ...(this.livePreview ? [livePreview()] : []),
+            ...(this.livePreview
+              ? linkWidgets({ appManager: this.$getAppManager() })
+              : []),
             // Inside table cells the nested editor is a raw CodeMirror view, so
             // it needs its own selection toolbar + shortcuts. These route back
             // into the same Vue toolbar, but flag the context as a cell so only
@@ -671,11 +683,17 @@ export default defineComponent({
     padding: 0.1em 0.3em;
   }
 
-  .cm-md-hr {
-    border: none;
-    border-top: 1px solid var(--ink-internal-color, currentColor);
-    width: 100%;
-    margin: 0.5em 0;
+  .cm-md-line-hr {
+    padding-top: 0;
+    margin-top: 0;
+  }
+
+  .cm-md-line-hr::before {
+    content: '';
+    display: block;
+    box-sizing: border-box;
+    border-top: 1px solid var(--ink-internal-color, #cfcfcf);
+    margin: 0.6em 0;
   }
 
   .ink-mde .cm-line.cm-md-callout {
@@ -775,9 +793,27 @@ body[data-theme='ims-dark'] {
     padding-left: 1.25em;
   }
   .cm-md-line-hr {
-    border-top: 1px solid var(--ink-internal-color, #cfcfcf);
-    padding-top: 0.4em;
-    margin-top: 0.2em;
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .cm-md-link {
+    color: var(--local-link-color, #4a90d9) !important;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .cm-md-link * {
+    color: var(--local-link-color, #4a90d9) !important;
+  }
+  .cm-md-code-lang {
+    float: right;
+    font-size: 0.75em;
+    color: var(--ink-internal-syntax-comment-color, #8b949e);
+    background: var(
+      --ink-internal-block-background-color,
+      rgba(127, 127, 127, 0.12)
+    );
+    padding: 0 0.4em;
+    border-radius: 0.3em;
   }
 }
 </style>

@@ -232,6 +232,7 @@ class TableWidgetType extends WidgetType {
     private tableFrom: number,
     private delimiterText: string,
     private hasHeader: boolean,
+    private cellExtensions: TableCellExtensions,
   ) {
     super();
   }
@@ -241,7 +242,10 @@ class TableWidgetType extends WidgetType {
       this.tableFrom === other.tableFrom &&
       this.hasHeader === other.hasHeader &&
       this.delimiterText === other.delimiterText &&
-      this.rows.length === other.rows.length
+      this.rows.length === other.rows.length &&
+      // Changing the live-preview mode swaps the cell editor extensions, so the
+      // table widget must be recreated (and re-read its facet) to pick it up.
+      this.cellExtensions === other.cellExtensions
     );
   }
 
@@ -314,7 +318,13 @@ function decorate(state: EditorState): DecorationSet {
         }
         widgets.push(
           Decoration.replace({
-            widget: new TableWidgetType(rows, from, delimiterText, hasHeader),
+            widget: new TableWidgetType(
+              rows,
+              from,
+              delimiterText,
+              hasHeader,
+              state.facet(CellExtensionsFacet),
+            ),
           }).range(from, to),
         );
       }
@@ -331,7 +341,12 @@ const tableDecorations = StateField.define<DecorationSet>({
     return decorate(state);
   },
   update(decos, tr) {
-    if (tr.docChanged || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
+    if (
+      tr.docChanged ||
+      syntaxTree(tr.state) !== syntaxTree(tr.startState) ||
+      tr.state.facet(CellExtensionsFacet) !==
+        tr.startState.facet(CellExtensionsFacet)
+    ) {
       return decorate(tr.state);
     }
     return decos.map(tr.changes);

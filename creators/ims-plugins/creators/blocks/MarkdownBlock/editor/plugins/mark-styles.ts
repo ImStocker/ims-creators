@@ -1,4 +1,4 @@
-import { Decoration, ViewPlugin, WidgetType } from '@codemirror/view';
+import { Decoration, ViewPlugin } from '@codemirror/view';
 import type { DecorationSet, EditorView, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
@@ -64,53 +64,7 @@ const calloutPlugin = ViewPlugin.fromClass(
 );
 
 export function markStyles() {
-  return [highlightMathPlugin, calloutPlugin, hrPlugin];
-}
-
-// A thematic break (`---`, `***` or `___` on its own line) is rendered as a
-// real <hr> element. Block decorations/widgets can't be provided by a plugin,
-// so we use an *inline* widget replacement (allowed from plugins).
-const hrRegex = /^\s*([-*_])(?:\s*\1){2,}\s*$/;
-const hrWidget = new (class extends WidgetType {
-  toDOM() {
-    const hr = document.createElement('hr');
-    hr.className = 'cm-md-hr';
-    return hr;
-  }
-  ignoreEvent() {
-    return false;
-  }
-})();
-
-const hrPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-
-    constructor(view: EditorView) {
-      this.decorations = buildHr(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildHr(update.view);
-      }
-    }
-  },
-  {
-    decorations: (inst) => inst.decorations,
-  },
-);
-
-function buildHr(view: EditorView): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
-  const doc = view.state.doc;
-  for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i);
-    if (hrRegex.test(line.text)) {
-      builder.add(line.from, line.to, Decoration.replace({ widget: hrWidget }));
-    }
-  }
-  return builder.finish();
+  return [highlightMathPlugin, calloutPlugin];
 }
 
 function buildMarks(view: EditorView): DecorationSet {

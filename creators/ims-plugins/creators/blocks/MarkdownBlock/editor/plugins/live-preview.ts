@@ -1,6 +1,7 @@
 import {
   Decoration,
   ViewPlugin,
+  WidgetType,
   type DecorationSet,
   type EditorView,
   type ViewUpdate,
@@ -16,14 +17,24 @@ const hideMark = Decoration.mark({ class: 'cm-md-mark-hidden' });
 
 // Syntax-tree node names that represent pure *markup* (no semantic content).
 // For each we look at its owning construct and hide the marker when that
-// construct is not "active" (cursor inside, line- or block-level).
-const MARK_NODES = new Set([
+// construct is not "active".
+//
+// Block-level markers reveal whenever the cursor is on the (line of the)
+// construct: headings `#`, blockquote `>`, list `-`/`*`.
+const LINE_MARK_NODES = new Set([
   'HeaderMark', // `#`
   'QuoteMark', // `>`
   'ListMark', // `-`, `*`, `1.`
+]);
+
+// Inline markers reveal only when the cursor is *inside* the construct span
+// (Obsidian keeps `**bold**` rendered until you place the caret within it),
+// not merely anywhere on the same line:
+//   xx|x bold xxxx   ->  xx bold xxxx        (markers stay hidden)
+//   xx **b|old** xxxx -> xx **b|old** xxxx   (markers revealed)
+const INLINE_MARK_NODES = new Set([
   'EmphasisMark', // `*`, `_` (also the marks of `**`/`__`)
   'CodeMark', // backticks (inline + fenced)
-  'CodeInfo', // fenced code language, e.g. `js`
   'LinkMark', // `[`, `]`, `(`, `)`
   'URL', // link/image target
 ]);
@@ -32,13 +43,33 @@ const MARK_NODES = new Set([
 // grammar, so their delimiters are hidden via a regex fallback (the inner text
 // is already styled by mark-styles.ts). Lookarounds avoid matching `===`/`~~~`
 // (setext/horizontal-rule) and nested delimiters.
-const highlightDelim = /==([^=\n]+?)==/g;
-const strikeDelim = /~~([^~\n]+?)~~/g;
+const highlightDelim = /(==)([^=\n]+?)==/g;
+const strikeDelim = /(~~)([^~\n]+?)~~/g;
 
 // Line-level styling classes (Obsidian-style chrome for the rendered block).
 const LINE_BLOCKQUOTE = 'cm-md-line-blockquote';
 const LINE_LIST = 'cm-md-line-list';
 const LINE_HR = 'cm-md-line-hr';
+
+class CodeLangWidget extends WidgetType {
+  readonly lang: string;
+
+  constructor(lang: string) {
+    super();
+    this.lang = lang;
+  }
+
+  override eq(other: CodeLangWidget): boolean {
+    return other.lang === this.lang;
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = 'cm-md-code-lang';
+    span.textContent = this.lang;
+    return span;
+  }
+}
 
 export function livePreview() {
   return livePreviewPlugin;
@@ -67,6 +98,7 @@ function build(view: EditorView): DecorationSet {
   const doc = view.state.doc;
   const tree = syntaxTree(view.state);
   const markRanges: Range<Decoration>[] = [];
+  const widgetRanges: Range<Decoration>[] = [];
   const lineClasses = new Map<number, Set<string>>();
 
   const sel = view.state.selection.ranges;
@@ -122,22 +154,41 @@ function build(view: EditorView): DecorationSet {
             addLineClass(ref.from, ref.to, LINE_HR);
           }
           return;
+        } else if (name === 'CodeInfo') {
+          // Render the fenced-code language as a small label chip instead of
+          // hiding it (Obsidian shows `js`/`ts` at the top of the block).
+          const lang = view.state.doc.sliceString(ref.from, ref.to);
+          if (lang) {
+            widgetRanges.push(
+              Decoration.replace({
+                widget: new CodeLangWidget(lang),
+              }).range(ref.from, ref.to),
+            );
+          }
+          return;
         }
 
         // ---- marker hiding ----
-        if (!MARK_NODES.has(name)) return;
+        if (!LINE_MARK_NODES.has(name) && !INLINE_MARK_NODES.has(name)) return;
         const node = ref.node;
         if (!node) return;
         const owner = node.parent;
         if (!owner) return;
-        const startLine = doc.lineAt(owner.from).number;
-        const endLine = doc.lineAt(owner.to).number;
-        // Multi-line constructs (code block, blockquote, list) activate as a
-        // whole; single-line constructs activate per line.
-        const active =
-          startLine !== endLine
-            ? overlaps(owner.from, owner.to)
-            : activeLines.has(startLine);
+        let active: boolean;
+        if (LINE_MARK_NODES.has(name)) {
+          const startLine = doc.lineAt(owner.from).number;
+          const endLine = doc.lineAt(owner.to).number;
+          // Multi-line constructs (code block, blockquote, list) activate as a
+          // whole; single-line constructs activate per line.
+          active =
+            startLine !== endLine
+              ? overlaps(owner.from, owner.to)
+              : activeLines.has(startLine);
+        } else {
+          // Inline construct: reveal its markers only when the cursor is inside
+          // the span, not merely elsewhere on the same line.
+          active = overlaps(owner.from, owner.to);
+        }
         if (!active) {
           markRanges.push(hideMark.range(node.from, node.to));
         }
@@ -145,10 +196,10 @@ function build(view: EditorView): DecorationSet {
     });
   }
 
-  hideRegexDelimiters(highlightDelim, view, activeLines, markRanges);
-  hideRegexDelimiters(strikeDelim, view, activeLines, markRanges);
+  hideRegexDelimiters(highlightDelim, view, overlaps, markRanges);
+  hideRegexDelimiters(strikeDelim, view, overlaps, markRanges);
 
-  const ranges: Range<Decoration>[] = [...markRanges];
+  const ranges: Range<Decoration>[] = [...markRanges, ...widgetRanges];
   for (const [pos, set] of lineClasses) {
     ranges.push(Decoration.line({ class: [...set].join(' ') }).range(pos));
   }
@@ -159,7 +210,7 @@ function build(view: EditorView): DecorationSet {
 function hideRegexDelimiters(
   regex: RegExp,
   view: EditorView,
-  activeLines: Set<number>,
+  overlaps: (a: number, b: number) => boolean,
   ranges: Range<Decoration>[],
 ) {
   const doc = view.state.doc;
@@ -172,8 +223,8 @@ function hideRegexDelimiters(
     const openTo = openFrom + m[1].length;
     const closeTo = m.index + m[0].length;
     const closeFrom = closeTo - m[1].length;
-    const line = doc.lineAt(openFrom).number;
-    if (activeLines.has(line)) continue;
+    // Reveal the delimiters only when the caret is inside the construct span.
+    if (overlaps(openFrom, closeTo)) continue;
     ranges.push(hideMark.range(openFrom, openTo));
     ranges.push(hideMark.range(closeFrom, closeTo));
   }
