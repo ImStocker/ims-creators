@@ -1,5 +1,8 @@
 import type { Instance as InkInstance } from 'ink-mde';
 import type { SelectionInfo } from './plugins/selection-toolbar';
+import type { InkLike } from './editor-adapter';
+
+type EditorTarget = InkInstance | InkLike;
 
 export type FormatType =
   | 'bold'
@@ -26,6 +29,7 @@ export type FormatPayload = {
   url?: string;
   internal?: string;
   internalName?: string;
+  text?: string;
   calloutType?: string;
   reset?: boolean;
 };
@@ -124,7 +128,11 @@ function detectLinkAt(
   return null;
 }
 
-function applyHeading(editor: InkInstance, info: SelectionInfo, level: number) {
+function applyHeading(
+  editor: EditorTarget,
+  info: SelectionInfo,
+  level: number,
+) {
   const doc = editor.getDoc();
   const { lineStart, blockEnd } = lineBounds(doc, info.from, info.to);
   const prefix = '#'.repeat(level) + ' ';
@@ -146,7 +154,7 @@ function applyHeading(editor: InkInstance, info: SelectionInfo, level: number) {
 }
 
 function applyList(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
   kind: 'bullet' | 'ordered' | 'task',
 ) {
@@ -190,7 +198,7 @@ function applyList(
   });
 }
 
-function applyQuote(editor: InkInstance, info: SelectionInfo) {
+function applyQuote(editor: EditorTarget, info: SelectionInfo) {
   const doc = editor.getDoc();
   const { lineStart, blockEnd } = lineBounds(doc, info.from, info.to);
   const block = doc.slice(lineStart, blockEnd);
@@ -210,7 +218,7 @@ function applyQuote(editor: InkInstance, info: SelectionInfo) {
 }
 
 function applyCallout(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
   calloutType: string,
 ) {
@@ -241,7 +249,7 @@ function applyCallout(
 }
 
 export function insertHorizontalRule(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
 ): void {
   const doc = editor.getDoc();
@@ -252,7 +260,7 @@ export function insertHorizontalRule(
   editor.select({ selection: { start: pos, end: pos } });
 }
 
-export function insertTable(editor: InkInstance, info: SelectionInfo): void {
+export function insertTable(editor: EditorTarget, info: SelectionInfo): void {
   const doc = editor.getDoc();
   const { blockEnd } = lineBounds(doc, info.from, info.to);
   const table =
@@ -263,7 +271,7 @@ export function insertTable(editor: InkInstance, info: SelectionInfo): void {
 }
 
 function unwrap(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
   before: string,
   after: string,
@@ -284,7 +292,7 @@ function unwrap(
 }
 
 export function applyFormat(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
   type: FormatType,
   payload: FormatPayload = {},
@@ -346,7 +354,8 @@ export function applyFormat(
           editor.insert(link.title, { start: link.from, end: link.to });
         }
       } else if (payload.internal) {
-        const linkText = info.text || payload.internalName || 'link';
+        const linkText =
+          payload.text ?? info.text ?? payload.internalName ?? 'link';
         editor.insert(
           `[[[${linkText}](#asset:${payload.internal})]]`,
           selection,
@@ -363,7 +372,7 @@ export function applyFormat(
 }
 
 export function detectActive(
-  editor: InkInstance,
+  editor: EditorTarget,
   info: SelectionInfo,
 ): ActiveFormats {
   const doc = editor.getDoc();

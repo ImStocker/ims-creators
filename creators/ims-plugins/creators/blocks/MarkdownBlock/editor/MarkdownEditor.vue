@@ -27,6 +27,8 @@
         <SelectionToolbar
           :rect="toolbarRect"
           :active="toolbarActive"
+          :inline-only="toolbarInCell"
+          :text="toolbarSelection ? toolbarSelection.text : ''"
           @format="onToolbarFormat"
         ></SelectionToolbar>
       </dropdown-container>
@@ -36,6 +38,7 @@
 <script lang="ts">
 import { defineComponent, toRaw } from 'vue';
 import type { Options as InkOptions, Instance as InkInstance } from 'ink-mde';
+import type { EditorView } from '@codemirror/view';
 import InkMde from 'ink-mde/vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
@@ -62,6 +65,7 @@ import {
   type FormatPayload,
 } from './format-commands';
 import { markStyles } from './plugins/mark-styles';
+import { viewToInkLike } from './editor-adapter';
 import SelectionToolbar from './SelectionToolbar.vue';
 import DropdownContainer from '~ims-app-base/components/Common/DropdownContainer.vue';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
@@ -96,6 +100,8 @@ export default defineComponent({
       toolbarRect: null as SelectionInfo['rect'] | null,
       toolbarVisible: false,
       toolbarActive: null as ActiveFormats | null,
+      toolbarInCell: false,
+      toolbarTargetView: null as EditorView | null,
       contextSelection: null as SelectionInfo | null,
     };
   },
@@ -182,14 +188,45 @@ export default defineComponent({
         ...headingId(),
         ...tables(this.$.appContext, {
           grammar: wikiLinkGrammar,
-          extensions: wikiLinkCellExtensions({
-            appManager: this.$getAppManager(),
-          }),
+          extensions: [
+            ...wikiLinkCellExtensions({
+              appManager: this.$getAppManager(),
+            }),
+            // Inline-markup decorations (highlight, code, math, bold, italic,
+            // strikethrough, hr) so a table cell's nested editor renders text
+            // formatting the same way the main editor does.
+            ...markStyles(),
+            // Inside table cells the nested editor is a raw CodeMirror view, so
+            // it needs its own selection toolbar + shortcuts. These route back
+            // into the same Vue toolbar, but flag the context as a cell so only
+            // inline (text) formatting tools are offered.
+            selectionToolbar({
+              onSelection: (info: SelectionInfo | null, view: EditorView) => {
+                this.toolbarInCell = true;
+                this.toolbarTargetView = view;
+                if (info && !this.readonly) {
+                  this.toolbarSelection = info;
+                  this.toolbarRect = info.rect;
+                  this.toolbarVisible = true;
+                  this.toolbarActive = detectActive(viewToInkLike(view), info);
+                } else {
+                  this.toolbarVisible = false;
+                  this.toolbarSelection = null;
+                  this.toolbarActive = null;
+                  this.toolbarInCell = false;
+                  this.toolbarTargetView = null;
+                }
+              },
+            }),
+            shortcuts(() => this.readonly),
+          ],
         }),
         {
           type: 'default',
           value: selectionToolbar({
-            onSelection: (info: SelectionInfo | null) => {
+            onSelection: (info: SelectionInfo | null, view: EditorView) => {
+              this.toolbarInCell = false;
+              this.toolbarTargetView = view;
               if (info && !this.readonly) {
                 this.toolbarSelection = info;
                 this.toolbarRect = info.rect;
@@ -211,10 +248,7 @@ export default defineComponent({
         },
         {
           type: 'default',
-          value: shortcuts(
-            () => this.editor,
-            () => this.readonly,
-          ),
+          value: shortcuts(() => this.readonly),
         },
       ];
     },
@@ -230,14 +264,19 @@ export default defineComponent({
       this.editor.focus();
     },
     onToolbarFormat(payload: { type: FormatType; payload?: FormatPayload }) {
-      if (!this.editor || !this.toolbarSelection) return;
+      if (!this.toolbarSelection) return;
+      const target =
+        this.toolbarInCell && this.toolbarTargetView
+          ? viewToInkLike(this.toolbarTargetView)
+          : this.editor;
+      if (!target) return;
       applyFormat(
-        this.editor,
+        target,
         this.toolbarSelection,
         payload.type,
         payload.payload ?? {},
       );
-      this.editor.focus();
+      target.focus();
     },
     onEditorContextMenu() {
       this.contextSelection = this.currentSelectionInfo();
@@ -593,6 +632,18 @@ export default defineComponent({
     font-style: italic;
   }
 
+  .cm-md-bold {
+    font-weight: 700;
+  }
+
+  .cm-md-italic {
+    font-style: italic;
+  }
+
+  .cm-md-strike {
+    text-decoration: line-through;
+  }
+
   .cm-code {
     background-color: rgba(135, 131, 120, 0.18);
     font-family: var(--ink-internal-code-font-family, monospace);
@@ -639,6 +690,54 @@ body[data-theme='ims-light'] {
   .cm-md-callout-solution {
     --callout-color: 8, 185, 78 !important;
   }
+
+  .MarkdownBlockEditor-container .ink-mde {
+    --ink-syntax-keyword-color: #d73a49;
+    --ink-syntax-string-color: #032f62;
+    --ink-syntax-string-special-color: #032f62;
+    --ink-syntax-number-color: #005cc5;
+    --ink-syntax-atom-color: #005cc5;
+    --ink-syntax-meta-color: #005cc5;
+    --ink-syntax-operator-color: #005cc5;
+    --ink-syntax-name-variable-color: #005cc5;
+    --ink-syntax-name-property-color: #005cc5;
+    --ink-syntax-name-label-color: #6f42c1;
+    --ink-syntax-name-variable-definition-color: #6f42c1;
+    --ink-syntax-name-property-definition-color: #6f42c1;
+    --ink-syntax-name-variable-special-color: #e36209;
+    --ink-syntax-name-color: #22863a;
+    --ink-syntax-comment-color: #6a737d;
+    --ink-syntax-comment-font-style: italic;
+    --ink-syntax-processing-instruction-color: #6a737d;
+    --ink-syntax-punctuation-color: #24292e;
+    --ink-syntax-link-color: #24292e;
+    --ink-syntax-url-color: #24292e;
+  }
+}
+
+body[data-theme='ims-dark'] {
+  .MarkdownBlockEditor-container .ink-mde {
+    --ink-syntax-keyword-color: #ff7b72;
+    --ink-syntax-string-color: #a5d6ff;
+    --ink-syntax-string-special-color: #a5d6ff;
+    --ink-syntax-number-color: #79c0ff;
+    --ink-syntax-atom-color: #79c0ff;
+    --ink-syntax-meta-color: #79c0ff;
+    --ink-syntax-operator-color: #79c0ff;
+    --ink-syntax-name-variable-color: #79c0ff;
+    --ink-syntax-name-property-color: #79c0ff;
+    --ink-syntax-name-label-color: #d2a8ff;
+    --ink-syntax-name-variable-definition-color: #d2a8ff;
+    --ink-syntax-name-property-definition-color: #d2a8ff;
+    --ink-syntax-name-variable-special-color: #ffa657;
+    --ink-syntax-name-color: #7ee787;
+    --ink-syntax-comment-color: #8b949e;
+    --ink-syntax-comment-font-style: italic;
+    --ink-syntax-processing-instruction-color: #8b949e;
+    --ink-syntax-punctuation-color: #c9d1d9;
+    --ink-syntax-link-color: #c9d1d9;
+    --ink-syntax-url-color: #c9d1d9;
+  }
 }
 </style>
 <style lang="scss" scoped>
@@ -669,6 +768,7 @@ body[data-theme='ims-light'] {
   &:deep(.ink-mde) {
     --ink-internal-block-background-color: var(--local-box-color);
     .cm-line.cm-codeblock {
+      background-color: var(--ink-internal-block-background-color);
       font-size: 0.9em;
     }
     .cm-line .cm-code {

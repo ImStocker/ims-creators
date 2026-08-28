@@ -62,10 +62,35 @@ import {
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
 import { defineComponent, markRaw, reactive } from 'vue';
-import { marked } from 'marked';
+import { marked, type TokenizerAndRendererExtension } from 'marked';
 import { useI18n } from 'vue-i18n';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+
+// Teach `marked` to render Obsidian-style `==highlight==` as `<mark>`. This is
+// the same highlight syntax the editor decorates, so the read-only / cell
+// preview matches the live editor.
+const highlightExtension: TokenizerAndRendererExtension = {
+  name: 'highlight',
+  level: 'inline',
+  start(src: string) {
+    return src.indexOf('==');
+  },
+  tokenizer(src: string) {
+    const match = /^==([^=\n]+)==/.exec(src);
+    if (match) {
+      return {
+        type: 'highlight',
+        raw: match[0],
+        text: match[1],
+      };
+    }
+  },
+  renderer(token) {
+    return `<mark>${token.text}</mark>`;
+  },
+};
+marked.use({ extensions: [highlightExtension] });
 
 // Shared across widget instances. When a cell commit changes the row count the
 // whole widget is re-created by CodeMirror (its `eq` is false), so the "next
@@ -386,7 +411,7 @@ export default defineComponent({
             },
             '.cm-line': { padding: 0 },
           }),
-          keymap.of(<KeyBinding[]>[
+          keymap.of([
             { key: 'Enter', run: enterNext },
             { key: 'Shift-Enter', run: insertNewlineAndIndent },
             ...defaultKeymap,
@@ -394,7 +419,7 @@ export default defineComponent({
             { key: 'Escape', run: commit },
             { key: 'Tab', run: tabNext },
             { key: 'Shift-Tab', run: tabPrev },
-          ]),
+          ] as KeyBinding[]),
           history(),
         ],
         parent: editorHost,

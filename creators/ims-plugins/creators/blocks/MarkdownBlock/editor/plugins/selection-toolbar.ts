@@ -8,14 +8,16 @@ export type SelectionInfo = {
 };
 
 export type SelectionToolbarOptions = {
-  onSelection: (info: SelectionInfo | null) => void;
+  onSelection: (info: SelectionInfo | null, view: EditorView) => void;
 };
 
 class SelectionToolbar {
-  private onSelection: (info: SelectionInfo | null) => void;
+  private onSelection: (info: SelectionInfo | null, view: EditorView) => void;
+  private view: EditorView;
 
   constructor(view: EditorView, options: SelectionToolbarOptions) {
     this.onSelection = options.onSelection;
+    this.view = view;
     this.report(view);
   }
 
@@ -31,7 +33,7 @@ class SelectionToolbar {
     // Hide immediately when there is no selection; show is deferred to the
     // measure phase so we never read layout during an update.
     if (sel.empty) {
-      this.onSelection(null);
+      this.onSelection(null, view);
       return;
     }
 
@@ -59,13 +61,13 @@ class SelectionToolbar {
         } as SelectionInfo;
       },
       write: (info) => {
-        this.onSelection(info);
+        this.onSelection(info, view);
       },
     });
   }
 
   destroy() {
-    this.onSelection(null);
+    this.onSelection(null, this.view);
   }
 }
 

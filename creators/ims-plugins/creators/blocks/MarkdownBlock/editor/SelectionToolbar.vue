@@ -2,7 +2,7 @@
   <div ref="root" class="SelectionToolbar">
     <div class="SelectionToolbar-bubble">
       <!-- Section 1: block formats -->
-      <div class="SelectionToolbar-section">
+      <div v-if="!inlineOnly" class="SelectionToolbar-section">
         <button
           class="SelectionToolbar-button is-button"
           :class="{ 'has-dot': !!activeHeading }"
@@ -263,7 +263,7 @@
       <!-- Section 4: last used + more -->
       <div class="SelectionToolbar-section">
         <button
-          v-if="lastUsedTool"
+          v-if="lastUsedTool && !(inlineOnly && isBlock(lastUsedTool.type))"
           class="SelectionToolbar-button is-button"
           :class="{ 'has-dot': activeDot(lastUsedTool.type) }"
           :title="lastUsedTool.title"
@@ -284,7 +284,7 @@
           @mousedown.prevent
         >
           <button
-            v-for="t of otherTools"
+            v-for="t of inlineOnly ? inlineTools : otherTools"
             :key="t.type"
             class="SelectionToolbar-button is-button"
             :title="t.title"
@@ -310,6 +310,8 @@ import type {
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import SelectAssetDialog from '~ims-app-base/components/Asset/SelectAssetDialog.vue';
+import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
+import { getQueryAssetPropsSelection } from '~ims-app-base/logic/expression/filter/filterExpression';
 
 type ButtonDef = { type: FormatType; title: string; icon: string };
 type CalloutDef = { type: string; icon: string };
@@ -319,6 +321,8 @@ export default defineComponent({
   props: {
     rect: { type: Object as () => SelectionRect, required: true },
     active: { type: Object as () => ActiveFormats | null, default: null },
+    inlineOnly: { type: Boolean, default: false },
+    text: { type: String, default: '' },
   },
   emits: ['format'],
   data() {
@@ -398,6 +402,15 @@ export default defineComponent({
     lastUsedTool(): ButtonDef | null {
       return this.otherTools.find((t) => t.type === this.lastUsed) ?? null;
     },
+    inlineTools(): ButtonDef[] {
+      return this.otherTools.filter((t) => !this.isBlock(t.type));
+    },
+    assetLinkRootWorkspace() {
+      const gdd_workspace = this.$getAppManager()
+        .get(ProjectManager)
+        .getWorkspaceByName('gdd');
+      return gdd_workspace;
+    },
   },
   mounted() {
     window.addEventListener('mousedown', this.onWindowMouseDown);
@@ -409,6 +422,20 @@ export default defineComponent({
     activeDot(type: FormatType): boolean {
       const a = this.active as Record<string, unknown> | null;
       return !!(a && a[type]);
+    },
+    isBlock(type: FormatType): boolean {
+      return [
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'bullet_list',
+        'ordered_list',
+        'task_list',
+        'quote',
+        'callout',
+        'code_block',
+      ].includes(type);
     },
     openMenu(name: string) {
       this.linkOpen = false;
@@ -457,14 +484,29 @@ export default defineComponent({
       this.url = '';
     },
     async browseAsset() {
+      if (!this.assetLinkRootWorkspace) {
+        return;
+      }
       const dialog = this.$getAppManager()
         .get(DialogManager)
-        .show(SelectAssetDialog, {}, this);
+        .show(
+          SelectAssetDialog,
+          {
+            searchValue: getQueryAssetPropsSelection(
+              this.text ? this.text.trim() : '',
+            ),
+            where: {
+              workspaceids: this.assetLinkRootWorkspace.id,
+            },
+          },
+          this,
+        );
       const res = await dialog;
       if (res && (res as { id?: string }).id) {
         const id = (res as { id: string }).id;
         const name = (res as { name?: string }).name ?? '';
-        this.onFormat('link', { internal: id, internalName: name });
+        const text = this.text;
+        this.onFormat('link', { internal: id, internalName: name, text });
       }
     },
     onWindowMouseDown(e: MouseEvent) {

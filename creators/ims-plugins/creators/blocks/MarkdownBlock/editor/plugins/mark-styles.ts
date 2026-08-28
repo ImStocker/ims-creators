@@ -5,6 +5,9 @@ import { RangeSetBuilder } from '@codemirror/state';
 const highlightMark = Decoration.mark({ class: 'cm-md-highlight' });
 const mathMark = Decoration.mark({ class: 'cm-md-math' });
 const codeMark = Decoration.mark({ class: 'cm-code' });
+const boldMark = Decoration.mark({ class: 'cm-md-bold' });
+const italicMark = Decoration.mark({ class: 'cm-md-italic' });
+const strikeMark = Decoration.mark({ class: 'cm-md-strike' });
 
 const highlightRegex = /==([^=\n]+)==/g;
 const mathRegex = /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g;
@@ -12,6 +15,12 @@ const mathRegex = /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g;
 // (so ``` fenced blocks are excluded). Group 1/3 are the surrounding chars
 // used only to avoid matching fences; the decorated range is the `code` span.
 const inlineCodeRegex = /(^|[^`])`([^`\n]+)`([^`]|$)/g;
+// Inline emphasis. Markers are excluded from the decorated range so the
+// `**`/`*`/`~~` delimiters keep their default styling.
+const boldRegex = /\*\*([^*]+)\*\*/g;
+const boldUnderscoreRegex = /__([^_]+)__/g;
+const italicRegex = /\*([^\s*][^*]*)\*/g;
+const strikeRegex = /~~([^~]+)~~/g;
 
 const highlightMathPlugin = ViewPlugin.fromClass(
   class {
@@ -123,6 +132,42 @@ function buildMarks(view: EditorView): DecorationSet {
       from: m.index,
       to: m.index + m[0].length,
       deco: mathMark,
+    });
+  }
+
+  for (const m of text.matchAll(boldRegex)) {
+    if (m.index === undefined) continue;
+    ranges.push({
+      from: m.index + 2,
+      to: m.index + 2 + m[1].length,
+      deco: boldMark,
+    });
+  }
+
+  for (const m of text.matchAll(boldUnderscoreRegex)) {
+    if (m.index === undefined) continue;
+    ranges.push({
+      from: m.index + 2,
+      to: m.index + 2 + m[1].length,
+      deco: boldMark,
+    });
+  }
+
+  for (const m of text.matchAll(italicRegex)) {
+    if (m.index === undefined) continue;
+    ranges.push({
+      from: m.index + 1,
+      to: m.index + 1 + m[1].length,
+      deco: italicMark,
+    });
+  }
+
+  for (const m of text.matchAll(strikeRegex)) {
+    if (m.index === undefined) continue;
+    ranges.push({
+      from: m.index + 2,
+      to: m.index + 2 + m[1].length,
+      deco: strikeMark,
     });
   }
 
