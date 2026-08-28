@@ -200,7 +200,20 @@ function build(view: EditorView): DecorationSet {
           active = overlaps(owner.from, owner.to);
         }
         if (!active) {
-          markRanges.push(hideMark.range(node.from, node.to));
+          let to = node.to;
+          // Swallow the whitespace that follows a line-level marker (`# `, `> `,
+          // `- `) so live preview doesn't render a redundant leading space.
+          if (LINE_MARK_NODES.has(name)) {
+            const lineEnd = doc.lineAt(node.to).to;
+            let p = to;
+            while (p < lineEnd) {
+              const ch = doc.sliceString(p, p + 1);
+              if (ch === ' ' || ch === '\t') p++;
+              else break;
+            }
+            to = p;
+          }
+          markRanges.push(hideMark.range(node.from, to));
         }
       },
     });
