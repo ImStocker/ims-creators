@@ -129,6 +129,8 @@ export const imagesExtension = (config: PluginConfig): Extension => {
       },
     });
 
+    widgets.sort((a, b) => a.from - b.from);
+
     return widgets.length > 0 ? RangeSet.of(widgets) : Decoration.none;
   };
 

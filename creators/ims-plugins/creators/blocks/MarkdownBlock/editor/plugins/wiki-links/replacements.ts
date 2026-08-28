@@ -109,12 +109,15 @@ export const replacements = (config: PluginConfig): Extension[] => {
     syntaxTree(state).iterate({
       enter: ({ type, from, to }) => {
         if (type.name !== 'WikiLink') return;
-        // Do not run on empty WikiLinks
-        if (from + 2 === to - 2) return;
 
-        if (isCursorInRange(state, from + 2, to - 2)) return;
+        const rfrom = from + 2;
+        const rto = to - 2;
 
-        const asset_string = state.sliceDoc(from + 2, to - 2);
+        // Skip empty WikiLinks and those the cursor is inside.
+        if (rto <= rfrom) return;
+        if (isCursorInRange(state, rfrom, rto)) return;
+
+        const asset_string = state.sliceDoc(rfrom, rto);
 
         const cached_asset = getCachedAssetFromString(
           asset_string,
@@ -131,10 +134,12 @@ export const replacements = (config: PluginConfig): Extension[] => {
               config.appManager,
             ),
           });
-          widgets.push(decoration.range(from + 2, to - 2));
+          widgets.push(decoration.range(rfrom, rto));
         }
       },
     });
+
+    widgets.sort((a, b) => a.from - b.from);
 
     return widgets.length > 0 ? RangeSet.of(widgets) : Decoration.none;
   }
