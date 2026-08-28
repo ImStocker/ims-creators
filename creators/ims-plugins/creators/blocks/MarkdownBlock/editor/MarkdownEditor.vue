@@ -1,5 +1,5 @@
 <template>
-  <div class="MarkdownBlockEditor">
+  <div class="MarkdownBlockEditor" :class="{ 'cm-live-preview': livePreview }">
     <ContextMenuZone
       class="MarkdownBlockEditor-container"
       :get-menu-list="getContextMenu"
@@ -33,6 +33,14 @@
         ></SelectionToolbar>
       </dropdown-container>
     </div>
+    <button
+      type="button"
+      class="MarkdownBlockEditor-mode-toggle"
+      :title="livePreview ? 'Switch to source mode' : 'Switch to live preview'"
+      @click="toggleLivePreview"
+    >
+      <i :class="livePreview ? 'ri-eye-line' : 'ri-code-line'"></i>
+    </button>
   </div>
 </template>
 <script lang="ts">
@@ -65,6 +73,7 @@ import {
   type FormatPayload,
 } from './format-commands';
 import { markStyles } from './plugins/mark-styles';
+import { livePreview } from './plugins/live-preview';
 import { viewToInkLike } from './editor-adapter';
 import SelectionToolbar from './SelectionToolbar.vue';
 import DropdownContainer from '~ims-app-base/components/Common/DropdownContainer.vue';
@@ -96,6 +105,7 @@ export default defineComponent({
   data() {
     return {
       editor: null as InkInstance | null,
+      livePreview: true,
       toolbarSelection: null as SelectionInfo | null,
       toolbarRect: null as SelectionInfo['rect'] | null,
       toolbarVisible: false,
@@ -194,8 +204,11 @@ export default defineComponent({
             }),
             // Inline-markup decorations (highlight, code, math, bold, italic,
             // strikethrough, hr) so a table cell's nested editor renders text
-            // formatting the same way the main editor does.
-            ...markStyles(),
+            // formatting the same way the main editor does. Also the
+            // Live Preview marker-hiding extension. Both are dropped in Source
+            // mode so the cell editor shows raw markdown.
+            ...(this.livePreview ? markStyles() : []),
+            ...(this.livePreview ? [livePreview()] : []),
             // Inside table cells the nested editor is a raw CodeMirror view, so
             // it needs its own selection toolbar + shortcuts. These route back
             // into the same Vue toolbar, but flag the context as a cell so only
@@ -242,10 +255,12 @@ export default defineComponent({
             },
           }),
         },
-        {
-          type: 'default',
-          value: markStyles(),
-        },
+        ...(this.livePreview
+          ? [{ type: 'default' as const, value: markStyles() }]
+          : []),
+        ...(this.livePreview
+          ? [{ type: 'default' as const, value: livePreview() }]
+          : []),
         {
           type: 'default',
           value: shortcuts(() => this.readonly),
@@ -262,6 +277,11 @@ export default defineComponent({
     focus() {
       if (!this.editor) return;
       this.editor.focus();
+    },
+    toggleLivePreview() {
+      this.livePreview = !this.livePreview;
+      this.editor?.reconfigure({ plugins: toRaw(this.plugins) });
+      this.editor?.focus();
     },
     onToolbarFormat(payload: { type: FormatType; payload?: FormatPayload }) {
       if (!this.toolbarSelection) return;
@@ -739,7 +759,29 @@ body[data-theme='ims-dark'] {
     --ink-syntax-url-color: #c9d1d9;
   }
 }
+
+.MarkdownBlockEditor.cm-live-preview {
+  .cm-md-mark-hidden {
+    display: none;
+  }
+  .cm-line.cm-codeblock {
+    background-color: var(--ink-internal-block-background-color);
+  }
+  .cm-md-line-blockquote {
+    border-left: 2px solid var(--ink-internal-syntax-comment-color, #8b949e);
+    padding-left: 0.75em;
+  }
+  .cm-md-line-list {
+    padding-left: 1.25em;
+  }
+  .cm-md-line-hr {
+    border-top: 1px solid var(--ink-internal-color, #cfcfcf);
+    padding-top: 0.4em;
+    margin-top: 0.2em;
+  }
+}
 </style>
+
 <style lang="scss" scoped>
 @use '~ims-app-base/style/imc-text-format.scss';
 @use '~ims-app-base/style/scrollbars-mixins.scss';
@@ -768,11 +810,32 @@ body[data-theme='ims-dark'] {
   &:deep(.ink-mde) {
     --ink-internal-block-background-color: var(--local-box-color);
     .cm-line.cm-codeblock {
-      background-color: var(--ink-internal-block-background-color);
       font-size: 0.9em;
     }
     .cm-line .cm-code {
       font-size: 0.9em;
+    }
+
+    .MarkdownBlockEditor-mode-toggle {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      z-index: 5;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--local-sub-text-color, #888);
+      background: var(--local-box-color, rgba(0, 0, 0, 0.05));
+
+      &:hover {
+        color: var(--color-accent, #2f80ed);
+      }
     }
   }
 }
