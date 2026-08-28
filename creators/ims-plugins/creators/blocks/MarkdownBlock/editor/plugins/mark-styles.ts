@@ -53,7 +53,7 @@ const calloutPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
         this.decorations = buildCallouts(update.view);
       }
     }
@@ -146,8 +146,17 @@ function buildMarks(view: EditorView): DecorationSet {
 }
 
 function buildCallouts(view: EditorView): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
   const doc = view.state.doc;
+  const builder = new RangeSetBuilder<Decoration>();
+
+  // Reveal the marker while the caret is inside it so the callout type can be
+  // edited, consistent with the rest of live preview. The type icon itself is
+  // rendered via a CSS `::after` on the first callout line (no widget DOM, so
+  // it never interferes with CodeMirror's coordinate mapping).
+  const sel = view.state.selection.ranges;
+  const overlaps = (a: number, b: number) =>
+    sel.some((r) => r.from <= b && r.to >= a);
+
   let inCallout = false;
   let calloutType = '';
 
@@ -162,14 +171,24 @@ function buildCallouts(view: EditorView): DecorationSet {
       inCallout = false;
     }
 
-    if (inCallout) {
-      builder.add(
-        line.from,
-        line.from,
-        Decoration.line({
-          class: `cm-md-callout cm-md-callout-${calloutType}`,
-        }),
-      );
+    if (!inCallout) continue;
+
+    const classes = startMatch
+      ? `cm-md-callout cm-md-callout-${calloutType} cm-md-callout-first`
+      : `cm-md-callout cm-md-callout-${calloutType}`;
+    builder.add(line.from, line.from, Decoration.line({ class: classes }));
+
+    // On the callout's first line, hide the `> [!type]` marker text.
+    if (startMatch && startMatch.index !== undefined) {
+      const markerFrom = line.from + startMatch.index;
+      const markerTo = markerFrom + startMatch[0].length;
+      if (!overlaps(markerFrom, markerTo)) {
+        builder.add(
+          markerFrom,
+          markerTo,
+          Decoration.mark({ class: 'cm-md-mark-hidden' }),
+        );
+      }
     }
   }
 

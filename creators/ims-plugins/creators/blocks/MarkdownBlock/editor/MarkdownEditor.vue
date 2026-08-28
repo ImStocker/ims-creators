@@ -698,6 +698,7 @@ export default defineComponent({
 
   .ink-mde .cm-line.cm-md-callout {
     --callout-color: 204, 204, 204;
+    position: relative;
     border-left: 4px solid rgb(var(--callout-color)) !important;
     color: rgb(var(--callout-color)) !important;
     padding-left: 16px !important;
@@ -715,6 +716,40 @@ export default defineComponent({
     &.cm-md-callout-solution {
       --callout-color: 85, 203, 81;
     }
+  }
+
+  .ink-mde .cm-line.cm-md-callout-first {
+    min-height: calc(
+      var(--ink-internal-editor-line-height) + var(--ink-internal-block-padding)
+    );
+    line-height: var(--ink-internal-editor-line-height);
+  }
+
+  .ink-mde .cm-line.cm-md-callout-first::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: var(--ink-internal-block-padding);
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    font-family: 'remixicon' !important;
+    color: rgb(var(--callout-color));
+    pointer-events: none;
+    font-size: 20px;
+  }
+
+  .ink-mde .cm-line.cm-md-callout-first.cm-md-callout-info::after {
+    content: '\eca1';
+  }
+  .ink-mde .cm-line.cm-md-callout-first.cm-md-callout-warning::after {
+    content: '\ea21';
+  }
+  .ink-mde .cm-line.cm-md-callout-first.cm-md-callout-solution::after {
+    content: '\eb81';
+  }
+  .ink-mde .cm-line.cm-md-callout-first.cm-md-callout-error::after {
+    content: '\eb97';
   }
 }
 
