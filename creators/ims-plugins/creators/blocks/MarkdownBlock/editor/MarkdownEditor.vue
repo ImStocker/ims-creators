@@ -33,14 +33,6 @@
         ></SelectionToolbar>
       </dropdown-container>
     </div>
-    <button
-      type="button"
-      class="MarkdownBlockEditor-mode-toggle"
-      :title="livePreview ? 'Switch to source mode' : 'Switch to live preview'"
-      @click="toggleLivePreview"
-    >
-      <i :class="livePreview ? 'ri-eye-line' : 'ri-code-line'"></i>
-    </button>
   </div>
 </template>
 <script lang="ts">
@@ -74,6 +66,7 @@ import {
 } from './format-commands';
 import { markStyles } from './plugins/mark-styles';
 import { livePreview } from './plugins/live-preview';
+import { taskCheckbox } from './plugins/task-checkbox';
 import { linkWidgets } from './plugins/links';
 import { viewToInkLike } from './editor-adapter';
 import SelectionToolbar from './SelectionToolbar.vue';
@@ -304,6 +297,10 @@ export default defineComponent({
           : []),
         {
           type: 'default',
+          value: taskCheckbox(),
+        },
+        {
+          type: 'default',
           value: shortcuts(() => this.readonly),
         },
       ];
@@ -327,11 +324,6 @@ export default defineComponent({
     focus() {
       if (!this.editor) return;
       this.editor.focus();
-    },
-    toggleLivePreview() {
-      this.livePreview = !this.livePreview;
-      this.editor?.reconfigure({ plugins: toRaw(this.plugins) });
-      this.editor?.focus();
     },
     onToolbarFormat(payload: { type: FormatType; payload?: FormatPayload }) {
       if (!this.toolbarSelection) return;
@@ -711,6 +703,57 @@ export default defineComponent({
     }
   }
 
+  .ink-mde-list-marker.ink-mde-task {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+  }
+
+  .ink-mde-task-marker {
+    position: relative;
+    box-sizing: border-box !important;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 2px solid var(--local-sub-text-color, #8a8a8a);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.05s;
+
+    &::after {
+      content: '\eb7b';
+      font-family: 'remixicon';
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      transition: opacity 0.1s;
+      line-height: 13px;
+      font-size: 12px;
+      color: var(--local-text-color);
+    }
+
+    &:hover:not(:checked)::after {
+      opacity: 0.5;
+    }
+
+    &:checked {
+      background-color: var(--task-checkbox-color, #49e272);
+      border-color: var(--task-checkbox-color, #49e272);
+      box-shadow: 0 0 4px 0 var(--task-checkbox-color, #49e272);
+
+      &::after {
+        border-color: var(--local-text-color, #fff);
+        opacity: 1;
+      }
+    }
+  }
+
   .cm-md-bold {
     font-weight: 700;
   }
@@ -944,28 +987,6 @@ body[data-theme='ims-dark'] {
     }
     .cm-line .cm-code {
       font-size: 0.9em;
-    }
-
-    .MarkdownBlockEditor-mode-toggle {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      z-index: 5;
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      color: var(--local-sub-text-color, #888);
-      background: var(--local-box-color, rgba(0, 0, 0, 0.05));
-
-      &:hover {
-        color: var(--color-accent, #2f80ed);
-      }
     }
   }
 }
