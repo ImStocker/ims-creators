@@ -215,6 +215,7 @@ export default defineNuxtConfig({
       allowedHosts: true,
     },
     optimizeDeps: {
+      include: ['mermaid'],
       esbuildOptions: {
         target: 'es2022',
       },

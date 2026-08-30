@@ -68,6 +68,7 @@ export default defineNuxtConfig({
       ],
     },
     optimizeDeps: {
+      include: ['mermaid'],
       esbuildOptions: {
         target: 'es2022',
       },
