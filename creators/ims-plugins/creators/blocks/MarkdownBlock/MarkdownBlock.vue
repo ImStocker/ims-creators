@@ -51,7 +51,7 @@ import {
   castAssetPropValueToString,
   makeBlockRef,
 } from '~ims-app-base/logic/types/Props';
-import type MarkdownEditor from './editor/MarkdownEditor.vue';
+import type MarkdownEditor from '~ims-app-base/components/ImcMarkdownEditor/ImcMarkdownEditor.vue';
 import MarkdownFrontMatter from './MarkdownFrontMatter.vue';
 import type { EditorBlockHandler } from '~ims-app-base/components/Asset/Editor/EditorBlock';
 
@@ -271,7 +271,7 @@ export default defineComponent({
       this.markdownEditorComponentError = null;
       try {
         this.markdownEditorComponent = (
-          await import('./editor/MarkdownEditor.vue')
+          await import('~ims-app-base/components/ImcMarkdownEditor/ImcMarkdownEditor.vue')
         ).default;
         return true;
       } catch (err: any) {
