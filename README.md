@@ -11,31 +11,31 @@ Local application to develop and store your game ideas: **edit documents, add cr
 
 ### Write wiki docs
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/ea60bc2d-9845-4c9a-9d1b-a2a0aed280e1" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/5987e041-f24f-487a-acae-e3142c5c4227" />
 
 Use the block editor to maintain a wiki on the game, use cross-references, Markdown and more.
 
 ### Design dialogues and scripts
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/0dbd3f54-79ee-4ae9-a819-01b748ef478a" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/92453519-30a7-492d-bb20-6cc79d88d9de" />
 
 Use the built-in dialogue editor to easily create branching dialogues, write storylines, and integrate them into the game's overall structure.
 
 ### Create levels and maps
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/b63f3d29-468d-4279-afdd-369ecae8da9f" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/71049d86-7297-4dc3-b7f6-89921a1178c2" />
 
 Design locations, place objects and plan gameplay using visual diagrams and descriptions.
 
 ### Manage game data
 
-<img width="600" alt="screen1" src="https://github.com/user-attachments/assets/27335c99-6528-4394-a250-a94dcb5cae53" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/20b06cca-b1e3-4060-ab28-6736eb3ffd80" />
 
 Describe mechanics, characters, items, and other game elements using a user-friendly block editor. Build a database of game objects and integrate it with your engine.
 
 ### Synchronize with your game engine
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/3dd378ce-8710-4937-bc98-7e37b6492129" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/c83cc7da-4266-4b04-ac05-4c7b99c17325" />
 
 The created objects can be uploaded directly to the game engine in custom JSON or CSV formats and their changes can be tracked via Git.
 
