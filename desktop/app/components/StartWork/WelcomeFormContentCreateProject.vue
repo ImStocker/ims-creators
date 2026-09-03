@@ -9,25 +9,27 @@
       </button>
     </div>
     <div class="WelcomeFormContentCreateProject-Other">
-      <div class="WelcomeFormContentCreateProject-Action">
-        <div class="WelcomeFormContentStart-Action-left">
-          <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.type')}}</div>
-          <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.typeTooltip')}}</div> -->
+      <template v-if="step === 1">
+        <div class="WelcomeFormContentCreateProject-Action">
+          <div class="WelcomeFormContentStart-Action-left">
+            <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.type')}}</div>
+            <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.typeTooltip')}}</div> -->
+          </div>
+          <ValueSwitcher
+            v-model="params.projectType"
+            :options="projectTypes"
+            label-prop="title"
+            value-prop="id"
+          >
+            <template #option="{ option }">
+              <div class="WelcomeFormContentStart-TypeOption">
+                <i :class="option.icon"></i>
+                {{ option.title }}
+              </div>
+            </template>
+          </ValueSwitcher>
         </div>
-        <ValueSwitcher
-          v-model="params.projectType"
-          :options="projectTypes"
-          label-prop="title"
-          value-prop="id"
-        >
-          <template #option="{ option }">
-            <div class="WelcomeFormContentStart-TypeOption">
-              <i :class="option.icon"></i>
-              {{ option.title }}
-            </div>
-          </template>
-        </ValueSwitcher>
-      </div>
+      </template>
       <div v-if="needAuth || needLicense">
         <div class="WelcomeFormContentCreateProject-message">
           {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
@@ -51,53 +53,71 @@
         </div>
       </div>
       <template v-else>
-        <div class="WelcomeFormContentCreateProject-Action">
-          <div class="WelcomeFormContentStart-Action-left">
-            <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.name')}}</div>
-            <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.nameTooltip')}}</div> -->
+        <template v-if="step === 1">
+          <div class="WelcomeFormContentCreateProject-Action">
+            <div class="WelcomeFormContentStart-Action-left">
+              <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.name')}}</div>
+              <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.nameTooltip')}}</div> -->
+            </div>
+            <ims-input
+              ref="inputName"
+              v-model="params.projectName"
+              class="WelcomeFormContentStart-Action-right"
+              placeholder="Name"
+              type="text"
+            ></ims-input>
           </div>
-          <ims-input
-            ref="inputName"
-            v-model="params.projectName"
-            class="WelcomeFormContentStart-Action-right"
-            placeholder="Name"
-            type="text"
-          ></ims-input>
-        </div>
-        <div class="WelcomeFormContentCreateProject-Action">
-          <div class="WelcomeFormContentStart-Action-left">
-            <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.location')}}</div>
-            <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.locationTooltip')}}</div> -->
+          <div class="WelcomeFormContentCreateProject-Action">
+            <div class="WelcomeFormContentStart-Action-left">
+              <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.location')}}</div>
+              <!-- <div class="WelcomeFormContentStart-Action-subtext">{{$t('desktop.welcome.locationTooltip')}}</div> -->
+            </div>
+            <SelectFolderForm 
+              :value="params.projectLocation"
+              :placeholder="$t('desktop.welcome.location')"
+              @update="params.projectLocation = $event">
+            </SelectFolderForm>
           </div>
-          <SelectFolderForm 
-            :value="params.projectLocation"
-            :placeholder="$t('desktop.welcome.location')"
-            @update="params.projectLocation = $event">
-          </SelectFolderForm>
-        </div>
-        <div class="WelcomeFormContentCreateProject-Action">
-          <div class="WelcomeFormContentStart-Action-left">
-            <div class="WelcomeFormContentStart-Action-title">{{$t('desktop.welcome.template')}}</div>
+        </template>
+        <template v-else>
+          <div class="WelcomeFormContentCreateProject-Template">
+            <template-slider
+              v-model="currentProjectTemplateId"
+              :label="$t('desktop.welcome.template')"
+            ></template-slider>
           </div>
-          <select-template
-            :value="currentProjectTemplateId"
-            @update="currentProjectTemplateId = $event"
-            class="WelcomeFormContentStart-Action-right">
-          </select-template>
-        </div>
+        </template>
       </template>
     </div>
-    <div v-if="params.projectName && hasWarning" class="WelcomeFormContentCreateProject-warning">
+    <div v-if="step === 1 && params.projectName && hasWarning" class="WelcomeFormContentCreateProject-warning">
       <i class="ri-error-warning-fill"></i>
       {{ $t('desktop.welcome.sameProjectTitle') }}
     </div>
-    <AdvancedForm v-if="!needAuth && !needLicense" :project-folder-name="params.projectFolderName" @update:folder-name="params.projectFolderName = $event"></AdvancedForm>
+    <AdvancedForm v-if="step === 1 && !needAuth && !needLicense" :project-folder-name="params.projectFolderName" @update:folder-name="params.projectFolderName = $event"></AdvancedForm>
     <div class="WelcomeFormContentCreateProject-create" v-if="!needAuth && !needLicense">
-      <button class="is-button accent" 
-        :class="{ loading: loading && !hasWarning }" @click="createProject" 
-        :disabled="!canCreate || hasWarning">
-        {{$t('desktop.welcome.create')}}
-      </button>
+      <template v-if="step === 1">
+        <button
+          class="is-button accent"
+          @click="step = 2"
+          :disabled="!canCreate || hasWarning"
+        >
+          {{$t('desktop.welcome.next')}}
+        </button>
+      </template>
+      <template v-else>
+        <button class="is-button" @click="step = 1">
+          <i class="ri-arrow-left-line"></i>
+          {{$t('desktop.welcome.back')}}
+        </button>
+        <button
+          class="is-button accent"
+          :class="{ loading: loading }"
+          @click="createProject"
+          :disabled="!canCreate || hasWarning"
+        >
+          {{$t('desktop.welcome.create')}}
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -111,7 +131,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type { PropType } from 'vue';
 import * as node_path from 'path';
 import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
-import SelectTemplate from '~ims-creators/components/Project/SelectTemplate.vue';
+import TemplateSlider from '~ims-app-base/components/Common/TemplateSlider.vue';
 import DesktopProjectManager from '#logic/managers/DesktopProjectManager';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
 import AuthManager from '~ims-app-base/logic/managers/AuthManager';
@@ -138,7 +158,7 @@ export default defineComponent({
     SelectFolderForm,
     AdvancedForm,
     ImsSelect,
-    SelectTemplate,
+    TemplateSlider,
     LoginForm,
   },
   emits: ['back'],
@@ -157,6 +177,7 @@ export default defineComponent({
         projectFolderName: '',
       },
       currentProjectTemplateId: '',
+      step: 1,
       loading: false,
       hasWarning: false,
       checkPathDebounce: null as any,
@@ -376,7 +397,15 @@ export default defineComponent({
   }
 }
 .WelcomeFormContentCreateProject-create {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.WelcomeFormContentCreateProject-Template {
+  padding: 4px 0;
+  width: 100%;
 }
 .WelcomeFormContentCreateProject-warning{
   border: 1px solid var(--color-main-error);

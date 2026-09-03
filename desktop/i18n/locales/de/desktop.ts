@@ -10,6 +10,12 @@ export default {
     needLoginForAction: 'Für diese Aktion müssen Sie eingeloggt sein',
     newConfirmationCodeSent: 'Ein neuer Bestätigungscode wurde an die E-Mail Adresse gesendet',
   },
+  tryOnboarding: {
+    openTemplate: 'Vorlage in neuer Registerkarte öffnen',
+    blankTemplate: 'Ohne Vorlage',
+    blankTemplateDesc:
+      'Beginne mit einem leeren Blatt und baue die Projektstruktur selbst auf.',
+  },
   desktop: {
     fsSync: {
       menu: {
@@ -53,6 +59,7 @@ export default {
       signIn: 'Anmelden',
       select: 'Auswählen',
       back: 'Zurück',
+      next: 'Weiter',
       type: 'Typ',
       typeTooltip: 'Typ',
       local: 'Lokal',

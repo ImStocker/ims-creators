@@ -10,6 +10,12 @@ export default {
     newConfirmationCodeSent: 'Новый код подтверждения отправлен на почту',
     needLoginForAction: 'Пожалуйста, войдите, чтобы выполнить это действие',
   },
+  tryOnboarding: {
+    openTemplate: 'Открыть шаблон в новой вкладке',
+    blankTemplate: 'Без шаблона',
+    blankTemplateDesc:
+      'Начните с чистого листа и соберите структуру проекта сами.',
+  },
   desktop: {
     fsSync: {
       menu: {
@@ -53,6 +59,7 @@ export default {
       signIn: 'Войти',
       select: 'Выбрать',
       back: 'Назад',
+      next: 'Далее',
       type: 'Тип',
       typeTooltip: 'Тип',
       local: 'Локальный',
