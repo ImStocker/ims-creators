@@ -72,7 +72,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-05-15',
   srcDir: 'app/',  
   devtools: { enabled: false },
-  modules: ['@nuxt/eslint', 'nuxt-electron', '@nuxtjs/i18n', '@primevue/nuxt-module'],
+  modules: ['@nuxt/eslint', 'nuxt-electron', '@nuxtjs/i18n'],
   ssr: false,
   nitro: {
     output: {
@@ -96,51 +96,6 @@ export default defineNuxtConfig({
   },
   components: {
     dirs: [],
-  },
-
-  primevue: {
-    usePrimeVue: true,
-    autoImport: false,
-    components: {
-      prefix: 'Prime'
-    },
-    options: {
-      unstyled: true,
-      zIndex: {
-        modal: 3100,
-        overlay: 3000,
-        menu: 3000,
-        tooltip: 3100,
-      },
-      pt: {
-        button: {
-          root: 'p-button',
-          label: 'p-button-label',
-          icon: 'p-button-icon'
-        },
-        inputtext: {
-          root: 'p-inputtext'
-        },
-        select: {
-          root: 'p-select',
-          label: 'p-select-label',
-          dropdown: 'p-select-dropdown',
-          overlay: 'p-select-overlay',
-          list: 'p-select-list',
-          option: 'p-select-option',
-          optionLabel: 'p-select-option-label'
-        },
-        password: {
-          root: 'p-password',
-          pcInputText: 'p-password-input',
-          maskIcon: 'p-password-toggle-mask-icon',
-          unmaskIcon: 'p-password-toggle-mask-icon',
-          overlay: 'p-password-overlay',
-          meter: 'p-password-meter',
-          meterLabel: 'p-password-meter-label'
-        }
-      }
-    }
   },
 
   alias: {
