@@ -10,6 +10,12 @@ export default {
     needLoginForAction: 'Please, log in to perform this action',
     newConfirmationCodeSent: 'New confirmation code has been sent to the mail',
   },
+  tryOnboarding: {
+    openTemplate: 'Open template in a new tab',
+    blankTemplate: 'No template',
+    blankTemplateDesc:
+      'Start from a blank page and build your project structure yourself.',
+  },
   desktop: {
     fsSync: {
       menu: {
@@ -53,6 +59,7 @@ export default {
       signIn: 'Sign in',
       select: 'Select',
       back: 'Back',
+      next: 'Next',
       type: 'Type',
       typeTooltip: 'Type',
       local: 'Local',
