@@ -217,6 +217,9 @@ export class AssetSearchFilter {
             if (is_passed && this.where.name !== undefined) {
                 is_passed = asset.name === this.where.name;
             }
+            if (is_passed && this.where.title !== undefined) {
+                is_passed = asset.title === this.where.title;
+            }
             if (is_passed && this._filterQuery) {
                 is_passed = this._filterQuery.test(asset.title ?? '');
             }
