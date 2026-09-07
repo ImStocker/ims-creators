@@ -8,8 +8,8 @@ import { collectionBlockAiSpec } from '~ims-plugin-base/blocks/CollectionBlock/C
 import { checklistBlockAiSpec } from '~ims-plugin-base/blocks/ChecklistBlock/ChecklistBlockAiSpec';
 import { chatBlockAiSpec } from '~ims-plugin-base/blocks/ChatBlock/ChatBlockAiSpec';
 import { blockMirrorBlockAiSpec } from '~ims-plugin-base/blocks/BlockMirrorBlock/BlockMirrorBlockAiSpec';
+import { markdownBlockAiSpec } from '~ims-plugin-base/blocks/MarkdownBlock/MarkdownBlockAiSpec';
 import { textGridBlockAiSpec } from '~ims-plugin-creators/blocks/TextGridBlock/TextGridBlockAiSpec';
-import { markdownBlockAiSpec } from '~ims-plugin-creators/blocks/MarkdownBlock/MarkdownBlockAiSpec';
 import { localeBlockAiSpec } from '~ims-plugin-creators/blocks/LocaleBlock/LocaleBlockAiSpec';
 import { levelEditorBlockAiSpec } from '~ims-plugin-creators/blocks/LevelEditorBlock/LevelEditorBlockAiSpec';
 import { graphBlockAiSpec } from '~ims-plugin-creators/blocks/GraphBlock/GraphBlockAiSpec';
