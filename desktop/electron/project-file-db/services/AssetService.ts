@@ -3,10 +3,12 @@ import { getFieldDescriptor } from "../asset-fields";
 import { type ProjectFileDb, type ProjectFileDbAsset, type ProjectFileDbAssetBlock } from "../ProjectFileDb";
 import { ProjectFileDbCollection } from "../logic/ProjectFileDbCollection";
 import fs from 'node:fs';
+import fse from 'fs-extra';
 import * as node_path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetSearchFilter } from "../logic/AssetSearchFilter";
-import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById } from "../utils/files";
+import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getImsExtname, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById } from "../utils/files";
+import { ASSET_EXT } from "./FileSystemService";
 import isUUID from 'validator/es/lib/isUUID';
 import { once } from "node:events";
 import type { Writable } from "node:stream";
@@ -18,7 +20,7 @@ import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, 
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
 import type { IProjectDatabaseAsset, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore, ChangesStreamRequest, ChangesStreamResponse } from "~ims-app-base/logic/types/ProjectTypes";
-import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, extractRemapParentProps, type AssetProps, remapAssetProps, convertAssetPropsToPlainObject, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef, applyPropsChange, diffAssetPropObjects, stringifyAssetNewBlockRef, getAssetPropType } from "~ims-app-base/logic/types/Props";
+import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef } from "~ims-app-base/logic/types/Props";
 import type { AssetPropsSelectionField, AssetPropsSelectionOrder, AssetPropsSelection } from "~ims-app-base/logic/types/PropsSelection";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
@@ -26,7 +28,7 @@ import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import { ASSET_BASE_ORDERING } from "../project-db-constants";
 
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
-import { mergeBlocksToSave } from "../logic/asset-ops";
+import { mergeBlocksToSave, formBlockComputedToPlain } from "../logic/asset-ops";
 import { serializeAssetToJSON } from "../logic/serialize";
 import { suggestUniqueFilename, prepareFileBasenameByEntityTitle } from "../utils/files";
 
@@ -238,21 +240,9 @@ export class AssetService implements IProjectDatabaseAsset {
                 const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
                 const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
 
-                let block_computed = block_props;
-                if (block_inherited) {
-                    const { normalProps, remapParentProps } = extractRemapParentProps(block_props);
-                    if (remapParentProps) {
-                        block_computed = remapAssetProps(block_inherited, remapParentProps);
-                    }
-                    else {
-                        block_computed = block_inherited;
-                    }
-                    block_computed = { ...block_computed, ...normalProps };
-                }
-
                 existing_blocks.push({
                     ...block,
-                    computed: convertAssetPropsToPlainObject(block_computed)
+                    computed: formBlockComputedToPlain(block_props, block_inherited)
                 });
             }
         }
@@ -610,16 +600,49 @@ export class AssetService implements IProjectDatabaseAsset {
         }
     }
 
+    private _formComputedAsset(asset_full: ProjectFileDbAsset): ProjectFileDbAsset {
+        return {
+            ...asset_full,
+            blocks: asset_full.blocks.map(block => {
+                const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
+                const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
+                return {
+                    ...block,
+                    computed: formBlockComputedToPlain(block_props, block_inherited)
+                };
+            })
+        };
+    }
+
     private _checkIsMdFile(asset_full: ProjectFileDbAsset) {
-        return asset_full.blocks?.some(
+        const formed_asset = this._formComputedAsset(asset_full);
+        return formed_asset.blocks?.some(
             (block) => block.name === BLOCK_NAME_META && (block.computed as any)?.format === 'md',
         ) ?? false;
     }
 
     async saveAssetFile(asset_full: ProjectFileDbAsset) {
         assert(asset_full.localName)
-        const local_path = getAssetLocalPath(asset_full, this.db);
-        await this.saveAssetFileToFile(asset_full, local_path);
+        const formed_asset = this._formComputedAsset(asset_full);
+        let local_path = getAssetLocalPath(asset_full, this.db);
+        if (this._checkIsMdFile(formed_asset) && getImsExtname(asset_full.localName) === ASSET_EXT) {
+            const new_name = this.getAssetFileSavingFilename(
+                formed_asset,
+                (val) => !fs.existsSync(node_path.join(node_path.dirname(local_path), val)),
+            );
+            const new_local_path = node_path.join(node_path.dirname(local_path), new_name);
+            await this.db.fileSystem.expectFsChange([local_path, new_local_path], async () => {
+                try {
+                    await fse.move(local_path, new_local_path);
+                }
+                catch (err: any) {
+                    if (err.code !== 'ENOENT') throw err;
+                }
+            });
+            asset_full.localName = new_name;
+            local_path = new_local_path;
+        }
+        await this.saveAssetFileToFile(formed_asset, local_path);
     }
 
     async saveAssetFileToFile(asset_full: ProjectFileDbAsset, file_path: string) {
@@ -636,13 +659,14 @@ export class AssetService implements IProjectDatabaseAsset {
     }
 
     saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable) {
-        if (this._checkIsMdFile(asset_full)) {
-            const md_block = asset_full.blocks.find(block => block.type === 'markdown');
+        const formed_asset = this._formComputedAsset(asset_full);
+        if (this._checkIsMdFile(formed_asset)) {
+            const md_block = formed_asset.blocks.find(block => block.type === 'markdown');
             target.write(md_block ? (md_block.computed.value ?? '').toString() : '')
             return;
         }
 
-        const ima_asset = serializeAssetToJSON(asset_full as any);
+        const ima_asset = serializeAssetToJSON(formed_asset as any);
         target.write(JSON.stringify(ima_asset, null, 1))
     }
 

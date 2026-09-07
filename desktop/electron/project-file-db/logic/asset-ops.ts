@@ -58,6 +58,30 @@ export interface BuildAssetParams {
 // ── Block Operations ──────────────────────────────────────────────────────────
 
 /**
+ * Compute the `computed` props for a block from its own `props` (already in
+ * AssetProps assigned form) merged with its `inherited` props.
+ * This is the canonical derived-value algorithm used by both the desktop
+ * (AssetService._getAssetFullById) and the save/merge paths.
+ */
+export function formBlockComputedToPlain(
+  props: AssetProps | null | undefined,
+  inherited: AssetProps | null | undefined,
+): AssetPropsPlainObject {
+  const block_props = props ? { ...props } : {};
+  const { normalProps, remapParentProps } = extractRemapParentProps(block_props);
+  let block_computed: AssetProps = {};
+  if (inherited) {
+    if (remapParentProps) {
+      block_computed = remapAssetProps(inherited, remapParentProps);
+    } else {
+      block_computed = inherited;
+    }
+  }
+  block_computed = { ...block_computed, ...normalProps };
+  return convertAssetPropsToPlainObject(block_computed);
+}
+
+/**
  * Merge new block changes into existing blocks.
  * This is the canonical implementation from AssetService._mergeBlocksToSave.
  *
@@ -155,16 +179,7 @@ export function prepareBlockToSave(
     result_props_undo = result_props_applied_change.undo;
   }
 
-  const { normalProps, remapParentProps } = extractRemapParentProps(result_props);
-  let computed_props: AssetProps = {};
-  if (old_block_inherited) {
-    if (remapParentProps) {
-      computed_props = remapAssetProps(old_block_inherited, remapParentProps);
-    } else {
-      computed_props = old_block_inherited;
-    }
-  }
-  computed_props = { ...computed_props, ...normalProps };
+  const computed_plain = formBlockComputedToPlain(result_props, old_block_inherited);
 
   const now = new Date().toISOString();
   const block_entity: SharedAssetBlock = {
@@ -180,7 +195,7 @@ export function prepareBlockToSave(
     inherited: old_block_inherited
       ? convertAssetPropsToPlainObject(old_block_inherited)
       : null,
-    computed: convertAssetPropsToPlainObject(computed_props),
+    computed: computed_plain,
     props: convertAssetPropsToPlainObject(result_props),
   };
 
