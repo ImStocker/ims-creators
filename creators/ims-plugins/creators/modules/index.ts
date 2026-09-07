@@ -4,7 +4,6 @@ import {
   DIAGRAM_ASSET_ID,
   SCRIPT_ASSET_ID,
   GAME_OBJECT_ASSET_ID,
-  MARKDOWN_ASSET_ID,
   GRAPH_ASSET_ID,
 } from '~ims-app-base/logic/constants';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
@@ -26,18 +25,6 @@ export default function () {
               ),
               props: {
                 headerLocaleButton: true,
-              },
-            }),
-          );
-
-          cancel_callbacks.push(
-            appManager.get(EditorManager).registerAssetLayout({
-              name: 'markdown',
-              editorComponent: defineAsyncComponent(
-                () => import('./AssetEditors/MarkdownEditor.vue'),
-              ),
-              props: {
-                headerHideParent: true,
               },
             }),
           );
@@ -70,12 +57,6 @@ export default function () {
             appManager
               .get(EditorManager)
               .registerAssetLayoutBind(GAME_OBJECT_ASSET_ID, 'gameobject'),
-          );
-
-          cancel_callbacks.push(
-            appManager
-              .get(EditorManager)
-              .registerAssetLayoutBind(MARKDOWN_ASSET_ID, 'markdown'),
           );
 
           return async () => {
