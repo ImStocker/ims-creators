@@ -94,31 +94,33 @@
       {{ $t('desktop.welcome.sameProjectTitle') }}
     </div>
     <AdvancedForm v-if="step === 1 && !needAuth && !needLicense" :project-folder-name="params.projectFolderName" @update:folder-name="params.projectFolderName = $event"></AdvancedForm>
-    <div class="WelcomeFormContentCreateProject-create" v-if="!needAuth && !needLicense">
-      <template v-if="step === 1">
-        <button
-          class="is-button accent"
-          @click="step = 2"
-          :disabled="!canCreate || hasWarning"
-        >
-          {{$t('desktop.welcome.next')}}
-        </button>
-      </template>
-      <template v-else>
-        <button class="is-button" @click="step = 1">
-          <i class="ri-arrow-left-line"></i>
-          {{$t('desktop.welcome.back')}}
-        </button>
-        <button
-          class="is-button accent"
-          :class="{ loading: loading }"
-          @click="createProject"
-          :disabled="!canCreate || hasWarning"
-        >
-          {{$t('desktop.welcome.create')}}
-        </button>
-      </template>
-    </div>
+    <Teleport to="#WelcomeForm-Content-Actions-teleport">
+      <div class="WelcomeFormContentCreateProject-create use-buttons-action" v-if="!needAuth && !needLicense">
+        <template v-if="step === 1">
+          <button
+            class="is-button accent"
+            @click="step = 2"
+            :disabled="!canCreate || hasWarning"
+          >
+            {{$t('desktop.welcome.next')}}
+          </button>
+        </template>
+        <template v-else>
+          <button class="is-button" @click="step = 1">
+            <i class="ri-arrow-left-line"></i>
+            {{$t('desktop.welcome.back')}}
+          </button>
+          <button
+            class="is-button accent"
+            :class="{ loading: loading }"
+            @click="createProject"
+            :disabled="!canCreate || hasWarning"
+          >
+            {{$t('desktop.welcome.create')}}
+          </button>
+        </template>
+      </div>
+    </Teleport>
   </div>
 </template>
 <script lang="ts">
