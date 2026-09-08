@@ -104,6 +104,7 @@ export default defineComponent({
     },
   },
   mounted() {
+    (this as any)._viewportResizeTimer = null;
     this.initCanvas();
     this._updateListeners(true);
   },
@@ -222,6 +223,10 @@ export default defineComponent({
       event.preventDefault();
     },
     _updateListeners(reset: boolean) {
+      if ((this as any)._viewportResizeTimer) {
+        clearTimeout((this as any)._viewportResizeTimer);
+        (this as any)._viewportResizeTimer = null;
+      }
       if (this.containerTracker) {
         this.containerTracker.cancel();
         this.containerTracker = null;
@@ -245,10 +250,10 @@ export default defineComponent({
                   width: container_rect.width,
                   height: container_rect.height,
                 });
-                this.canvasController.canvas.renderAll();
+                this._scheduleViewportReCenter();
               }
             },
-            false,
+            true,
           );
         }
 
@@ -259,6 +264,40 @@ export default defineComponent({
         };
         window.addEventListener('keydown', (this as any)._keyDownHandler);
       }
+    },
+    _scheduleViewportReCenter() {
+      if ((this as any)._viewportResizeTimer) {
+        clearTimeout((this as any)._viewportResizeTimer);
+      }
+      (this as any)._viewportResizeTimer = setTimeout(() => {
+        (this as any)._viewportResizeTimer = null;
+        const c = this.canvasController;
+        if (!c) {
+          return;
+        }
+        const { canvas } = c;
+
+        if (!c._needsViewportInit || c.sortedCanvasObjects.length === 0) {
+          canvas.renderAll();
+          return;
+        }
+
+        if (canvas.width <= 0 || canvas.height <= 0) {
+          canvas.renderAll();
+          return;
+        }
+
+        c._needsViewportInit = false;
+
+        const vpt = canvas.viewportTransform;
+        const vptInit = c._viewportAtInit;
+        if (!vptInit || vpt[4] !== vptInit[4] || vpt[5] !== vptInit[5]) {
+          canvas.renderAll();
+          return;
+        }
+
+        c.showShapes(c.sortedCanvasObjects.map((el) => el.id));
+      }, 300);
     },
     initCanvas() {
       const canvasEl = this.$refs.canvas as HTMLCanvasElement;

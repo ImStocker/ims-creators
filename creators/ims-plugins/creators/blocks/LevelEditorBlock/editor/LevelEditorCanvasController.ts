@@ -64,6 +64,9 @@ export default class LevelEditorCanvasController {
 
   private _expectPropsChange = false;
 
+  public _needsViewportInit = false;
+  public _viewportAtInit: fabric.TMat2D | null = null;
+
   readonly canvas: fabric.Canvas;
   private _panState = {
     lastX: 0,
@@ -1059,11 +1062,12 @@ export default class LevelEditorCanvasController {
   init() {
     this.toolManager.triggerTool('select');
     window.addEventListener('keydown', this._onKeyDown);
+    this._viewportAtInit = [...this.canvas.viewportTransform] as fabric.TMat2D;
     const saved_viewport = this._getSavedViewportTransform();
     if (saved_viewport) {
       this.canvas.setViewportTransform(saved_viewport);
     } else {
-      this.toolManager.triggerTool('viewAll');
+      this._needsViewportInit = true;
     }
   }
 
