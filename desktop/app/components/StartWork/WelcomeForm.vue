@@ -76,6 +76,7 @@
           @create-project="openCreateProjectForm"
         />
       </div>
+      <div id="WelcomeForm-Content-Actions-teleport" class="WelcomeForm-Content-Actions-teleport"></div>
     </div>
   </div>
 </template>
@@ -170,6 +171,10 @@ export default defineComponent({
   position: relative;
   flex: 1;
   padding-bottom: 20px;
+}
+.WelcomeForm-Content-Actions-teleport {
+  display: flex;
+  flex-direction: column;
 }
 .WelcomeForm-Content-Actions-item-one,
 .WelcomeForm-Content-Actions-item-two {
