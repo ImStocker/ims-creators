@@ -214,6 +214,10 @@ export default defineComponent({
               title: 'RU',
               action: () => this.changeLang('ru'),
             },
+            {
+              title: 'DE',
+              action: () => this.changeLang('de'),
+            },
           ],
         },
         {
