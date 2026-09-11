@@ -499,6 +499,35 @@ export class AssetService implements IProjectDatabaseAsset {
         return mergeBlocksToSave(old_blocks as any, new_blocks, undo) as ProjectFileDbAssetBlock[];
     }
 
+    private _augmentMergeOldBlocks(
+        stored_blocks: ProjectFileDbAssetBlock[],
+        full_blocks: ProjectFileDbAssetBlock[] | null | undefined,
+        new_blocks: {
+            [blockKey: string]: AssetBlockParamsDTO;
+        },
+    ): ProjectFileDbAssetBlock[] {
+        if (!full_blocks) return [...stored_blocks];
+        const merge_old_blocks = [...stored_blocks];
+        for (const block_key of Object.keys(new_blocks)) {
+            const { blockId, blockName } = parseAssetNewBlockRef(block_key);
+            const found = merge_old_blocks.some(block => {
+                if (blockId) return block.id === blockId;
+                if (blockName) return block.name === blockName;
+                return false;
+            });
+            if (found) continue;
+            const inherited_block = full_blocks.find(block => {
+                if (blockId) return block.id === blockId;
+                if (blockName) return block.name === blockName;
+                return false;
+            });
+            if (inherited_block) {
+                merge_old_blocks.push({ ...inherited_block });
+            }
+        }
+        return merge_old_blocks;
+    }
+
     async assetsCreate(params: AssetServiceAssetCreateDTO): Promise<AssetsChangeResult> {
         const change = await this.assetsChangeBatch({
             ops: [
@@ -718,10 +747,17 @@ export class AssetService implements IProjectDatabaseAsset {
                     }
                 }
 
+                let merge_old_blocks = changing_asset.blocks
+                if (params.set.blocks){
+                    const full_asset = await this._getAssetFullById(changing_asset.id) 
+                    const aug_old_blocks = this._augmentMergeOldBlocks(changing_asset.blocks, full_asset?.blocks, params.set.blocks);
+                    merge_old_blocks = this._mergeBlocksToSave(aug_old_blocks, params.set.blocks, undo)
+                }
+                
                 const new_asset = {
                     ...changing_asset,
                     ...params.set,
-                    blocks: params.set.blocks ? this._mergeBlocksToSave(changing_asset.blocks, params.set.blocks, undo) : changing_asset.blocks,
+                    blocks: merge_old_blocks
                 }
 
                 tx.changeAsset(changing_asset, new_asset);
