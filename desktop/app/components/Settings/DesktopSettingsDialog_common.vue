@@ -33,12 +33,14 @@ export default defineComponent({
   data(){
     return {
         syncWithCloud: 60,
+        assetSaveFormat: 'json',
     }
   },
   async mounted(){
     const project_path = this.projectInfo?.localPath;
     assert(project_path, 'Need project path')
     this.syncWithCloud = await window.imshost.settings.getKey(project_path, 'syncWithCloud', 60)
+    this.assetSaveFormat = await window.imshost.settings.getKey(project_path, 'assetSaveFormat', 'json')
   },
   computed: {
     formSchema(): FormSchema {
@@ -113,6 +115,25 @@ export default defineComponent({
                 }
             })
         }
+        schema.push({
+            caption: this.$t('desktop.settings.fields.assetSaveFormat'),
+            prop: 'assetSaveFormat',
+            editor: ImsSelect,
+            editorProps: {
+                getOptionLabel: (opt: any) => opt.title,
+                reduce: (opt: any) => opt.value,
+                options: [
+                    {
+                        value: 'ima',
+                        title: this.$t('desktop.settings.fields.assetSaveFormatIma')
+                    },
+                    {
+                        value: 'json',
+                        title: this.$t('desktop.settings.fields.assetSaveFormatJson')
+                    }
+                ]
+            }
+        })
         return schema;
     },
     formSchemaFiltered(){
@@ -171,6 +192,11 @@ export default defineComponent({
     },
     async syncWithCloud(new_val: number){
         await this.$getAppManager().get(DesktopSyncManager).changeAutoSynchronization(new_val);
+    },
+    async assetSaveFormat(new_val: string){
+        const project_path = this.projectInfo?.localPath;
+        assert(project_path, 'Need project path')
+        await window.imshost.settings.setKey(project_path, 'assetSaveFormat', new_val);
     }
   }
 });

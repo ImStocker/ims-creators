@@ -25,11 +25,11 @@ import type { AssetPropsSelectionField, AssetPropsSelectionOrder, AssetPropsSele
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
-import { ASSET_BASE_ORDERING } from "../project-db-constants";
+import { ASSET_BASE_ORDERING, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT, type AssetSaveFormat } from "../project-db-constants";
 
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { mergeBlocksToSave, formBlockComputedToPlain } from "../logic/asset-ops";
-import { serializeAssetToJSON } from "../logic/serialize";
+import { serializeAssetToJSON, serializeAssetToNewFormatJSON } from "../logic/serialize";
 import { suggestUniqueFilename, prepareFileBasenameByEntityTitle } from "../utils/files";
 
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
@@ -654,8 +654,10 @@ export class AssetService implements IProjectDatabaseAsset {
         assert(asset_full.localName)
         const formed_asset = this._formComputedAsset(asset_full);
         let local_path = getAssetLocalPath(asset_full, this.db);
-        if (this._checkIsMdFile(formed_asset) && getImsExtname(asset_full.localName) === ASSET_EXT) {
-            const new_name = this.getAssetFileSavingFilename(
+        const format = await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
+        const is_md_file = this._checkIsMdFile(formed_asset);
+        if (is_md_file && getImsExtname(asset_full.localName) === ASSET_EXT) {
+            const new_name = await this.getAssetFileSavingFilename(
                 formed_asset,
                 (val) => !fs.existsSync(node_path.join(node_path.dirname(local_path), val)),
             );
@@ -671,13 +673,35 @@ export class AssetService implements IProjectDatabaseAsset {
             asset_full.localName = new_name;
             local_path = new_local_path;
         }
-        await this.saveAssetFileToFile(formed_asset, local_path);
+        else if (!is_md_file) {
+            // Migrate between .ima.json and .json when format setting differs from current extension
+            const current_ext = getImsExtname(asset_full.localName);
+            const desired_ext = format === 'json' ? '.json' : '.ima.json';
+            if (current_ext !== desired_ext) {
+                const new_name = await this.getAssetFileSavingFilename(
+                    formed_asset,
+                    (val) => !fs.existsSync(node_path.join(node_path.dirname(local_path), val)),
+                );
+                const new_local_path = node_path.join(node_path.dirname(local_path), new_name);
+                await this.db.fileSystem.expectFsChange([local_path, new_local_path], async () => {
+                    try {
+                        await fse.move(local_path, new_local_path);
+                    }
+                    catch (err: any) {
+                        if (err.code !== 'ENOENT') throw err;
+                    }
+                });
+                asset_full.localName = new_name;
+                local_path = new_local_path;
+            }
+        }
+        await this.saveAssetFileToFile(formed_asset, local_path, format);
     }
 
-    async saveAssetFileToFile(asset_full: ProjectFileDbAsset, file_path: string) {
+    async saveAssetFileToFile(asset_full: ProjectFileDbAsset, file_path: string, format?: AssetSaveFormat) {
         await this.db.fileSystem.expectFsChange([file_path], async () => {
             const writableStream = fs.createWriteStream(file_path);
-            this.saveAssetFileToStream(asset_full, writableStream);
+            await this.saveAssetFileToStream(asset_full, writableStream, format);
             writableStream.end();
             await once(writableStream, 'finish');
             await new Promise<void>((resolve, reject) => writableStream.close((err) => {
@@ -687,7 +711,7 @@ export class AssetService implements IProjectDatabaseAsset {
         })
     }
 
-    saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable) {
+    async saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable, format?: AssetSaveFormat) {
         const formed_asset = this._formComputedAsset(asset_full);
         if (this._checkIsMdFile(formed_asset)) {
             const md_block = formed_asset.blocks.find(block => block.type === 'markdown');
@@ -695,15 +719,22 @@ export class AssetService implements IProjectDatabaseAsset {
             return;
         }
 
-        const ima_asset = serializeAssetToJSON(formed_asset as any);
-        target.write(JSON.stringify(ima_asset, null, 1))
+        const actual_format = format ?? await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
+        if (actual_format === 'json') {
+            const new_json = serializeAssetToNewFormatJSON(formed_asset as any);
+            target.write(JSON.stringify(new_json, null, 1))
+        } else {
+            const ima_asset = serializeAssetToJSON(formed_asset as any);
+            target.write(JSON.stringify(ima_asset, null, 1))
+        }
     }
 
-    getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean) {
-        let ext = '.ima.json'
+    async getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean) {
         if (this._checkIsMdFile(asset_full)) {
-            ext = '.md'
+            return suggestUniqueFilename(asset_full.title, '.md', check_avail);
         }
+        const format = await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
+        const ext = format === 'json' ? '.json' : '.ima.json';
         return suggestUniqueFilename(asset_full.title, ext, check_avail);
     }
 

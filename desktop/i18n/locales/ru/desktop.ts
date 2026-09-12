@@ -129,6 +129,9 @@ export default {
         openLogsFolder: 'Открыть папку с логами',
         autoUpdate: 'Проверять обновления при запуске приложения',
         syncWithCloud: 'Автосинхронизация с облаком',
+        assetSaveFormat: 'Формат файла контента',
+        assetSaveFormatIma: 'Автономный (.ima.json)',
+        assetSaveFormatJson: 'Упрощенный (.json)',
         mcp: {
           port: 'Порт',
           autoStart: 'Запуск MCP-сервера при открытии проекта',

@@ -4,7 +4,7 @@ import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
 import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle } from "../utils/files";
-import { MARKDOWN_ASSET_ID, BLOCK_NAME_META } from "~ims-app-base/logic/constants";
+import { MARKDOWN_ASSET_ID, BLOCK_NAME_META, BLOCK_ID_META, BLOCK_TYPE_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
 import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
 import path from "node:path";
@@ -34,6 +34,14 @@ export const WORKSPACE_EXT = '.imw.json'
 export const WORKSPACE_EXT_TEST_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i
 
 export const ATTACHMENTS_FOLDER = 'attachments'
+
+const NEW_FORMAT_EXT_TEST_REGEXP = /(?: - \d+)?\.json$/i
+
+function isNewFormatJsonFile(localName: string): boolean {
+    return localName.endsWith('.json')
+        && !ASSET_EXT_TEST_REGEXP.test(localName)
+        && !WORKSPACE_EXT_TEST_REGEXP.test(localName);
+}
 
 function prepareEntityTitle(filename: string, title: string | null, ext_regexp: RegExp): string {
     const title_to_filename = title ? prepareFileBasenameByEntityTitle(title) : '';
@@ -126,6 +134,23 @@ export class FileSystemService{
                     workspace: workspace_info
                 };
             }
+            else if (isNewFormatJsonFile(local_name)) {
+                const parsed = JSON.parse(file);
+                if (parsed && typeof parsed === 'object') {
+                    let asset: ProjectFileDbAsset;
+                    if (parsed.__meta && typeof parsed.__meta.id === 'string') {
+                        asset = this._loadNewFormatAsset(parsed, local_name, local_path, parentWorkspaceId, created_at, updated_at);
+                    }
+                    else {
+                        asset = this._loadPlainJsonAsset(parsed, local_name, local_path, parentWorkspaceId, created_at, updated_at, absolutePath, rootPath);
+                    }
+                    return {
+                        type: 'asset',
+                        localPath: local_path,
+                        asset
+                    };
+                }
+            }
         }
         else if(extname === '.md'){
             const asset_full: ProjectFileDbAsset = {
@@ -196,6 +221,227 @@ export class FileSystemService{
             };
         }
         return null;
+    }
+
+    private _loadNewFormatAsset(
+        parsed: any,
+        local_name: string,
+        local_path: string,
+        parentWorkspaceId: string | null,
+        created_at: string,
+        updated_at: string,
+    ): ProjectFileDbAsset {
+        const meta = parsed.__meta;
+        const file_timestamps = { createdAt: created_at, updatedAt: updated_at };
+
+        // Build __meta block
+        const meta_values = (meta.values && typeof meta.values === 'object') ? meta.values : {};
+        const blocks: ProjectFileDbAsset['blocks'] = [{
+            id: BLOCK_ID_META,
+            type: BLOCK_TYPE_META,
+            name: BLOCK_NAME_META,
+            title: null,
+            index: 0,
+            ...file_timestamps,
+            ownTitle: null,
+            own: true,
+            props: { ...meta_values },
+            computed: { ...meta_values },
+            inherited: {},
+        }];
+
+        // Build blocks from __meta.blocks metadata
+        const blocks_meta = Array.isArray(meta.blocks) ? meta.blocks : [];
+        for (const bm of blocks_meta) {
+            if (!bm || typeof bm !== 'object' || !bm.id) continue;
+
+            if (bm.deleted) {
+                blocks.push({
+                    id: bm.id,
+                    type: 'props',
+                    name: bm.name ?? null,
+                    title: null,
+                    index: 0,
+                    ...file_timestamps,
+                    ownTitle: null,
+                    own: true,
+                    delete: true,
+                    props: {},
+                    computed: {},
+                    inherited: {},
+                });
+                continue;
+            }
+
+            // Look up value from top-level keys
+            const key = bm.name ? bm.name : `@${bm.id}`;
+            const raw_value = parsed[key];
+
+            if (raw_value === undefined) {
+                // Block referenced in metadata but no value at top-level — skip
+                continue;
+            }
+
+            const block_type = bm.type || 'props';
+            let block_props: Record<string, any>;
+            let block_computed: Record<string, any>;
+
+            if (block_type === 'markdown' && typeof raw_value === 'string') {
+                block_props = { value: raw_value };
+                block_computed = { value: raw_value };
+            } else if (typeof raw_value === 'object' && raw_value !== null && !Array.isArray(raw_value)) {
+                block_props = { ...raw_value };
+                block_computed = { ...raw_value };
+            } else {
+                // Primitive or array — wrap in value
+                block_props = { value: raw_value };
+                block_computed = { value: raw_value };
+            }
+
+            blocks.push({
+                id: bm.id,
+                type: block_type,
+                name: bm.name ?? null,
+                title: bm.title ?? null,
+                index: bm.index ?? 0,
+                createdAt: bm.createdAt ?? created_at,
+                updatedAt: bm.updatedAt ?? updated_at,
+                ownTitle: null,
+                own: true,
+                props: block_props,
+                computed: block_computed,
+                inherited: {},
+            });
+        }
+
+        // Compute typeIds from parent (system assets are already in collection)
+        let typeIds: string[] = [];
+        const parentIds = Array.isArray(meta.parentIds) ? meta.parentIds : [];
+        if (parentIds.length > 0) {
+            const parent = this.db.asset.assets.byId.get(parentIds[0]);
+            if (parent && parent.typeIds.length > 0) {
+                typeIds = [parent.id, ...parent.typeIds];
+            }
+        }
+
+        return {
+            id: meta.id,
+            projectId: meta.projectId ?? this.db.info.id ?? '',
+            workspaceId: parentWorkspaceId,
+            name: null,
+            title: prepareEntityTitle(local_name, meta.title ?? null, NEW_FORMAT_EXT_TEST_REGEXP),
+            icon: meta.icon ?? null,
+            isAbstract: !!meta.isAbstract,
+            typeIds,
+            createdAt: created_at,
+            updatedAt: updated_at,
+            deletedAt: null,
+            rights: AssetRights.FULL_ACCESS,
+            index: meta.index ?? null,
+            creatorUserId: null,
+            unread: 0,
+            hasImage: false,
+            parentIds,
+            ownTitle: null,
+            ownIcon: meta.icon ?? null,
+            blocks,
+            comments: [],
+            references: [],
+            lastViewedAt: null,
+            localName: local_name,
+        };
+    }
+
+    /**
+     * Load an arbitrary .json file (no __meta) as an asset. Blocks are inferred
+     * from the top-level JSON structure: each key becomes a block, string values
+     * become markdown blocks, everything else is wrapped in { value: <data> }.
+     */
+    private _loadPlainJsonAsset(
+        parsed: any,
+        local_name: string,
+        local_path: string,
+        parentWorkspaceId: string | null,
+        created_at: string,
+        updated_at: string,
+        absolutePath: string,
+        rootPath: string,
+    ): ProjectFileDbAsset {
+        const title = node_path.basename(local_name, '.json');
+        const file_timestamps = { createdAt: created_at, updatedAt: updated_at };
+
+        const blocks: ProjectFileDbAsset['blocks'] = [{
+            id: BLOCK_ID_META,
+            type: BLOCK_TYPE_META,
+            name: BLOCK_NAME_META,
+            title: null,
+            index: 0,
+            ...file_timestamps,
+            ownTitle: null,
+            own: true,
+            props: {},
+            computed: {},
+            inherited: {},
+        }];
+
+        const is_plain_object = parsed && typeof parsed === 'object' && !Array.isArray(parsed);
+        if (is_plain_object) {
+            let index = 1;
+            for (const [key, value] of Object.entries(parsed)) {
+                if (key === '__meta') {
+                    // Reserved key — skip
+                    continue;
+                }
+                const block_type = typeof value === 'string' ? 'markdown' : 'props';
+                const block_props: Record<string, any> = typeof value === 'string'
+                    ? { value }
+                    : (typeof value === 'object' && value !== null && !Array.isArray(value)
+                        ? { ...value }
+                        : { value });
+                const block_computed = { ...block_props };
+                blocks.push({
+                    id: uuidv4(),
+                    type: block_type,
+                    name: key,
+                    title: null,
+                    index,
+                    ...file_timestamps,
+                    ownTitle: null,
+                    own: true,
+                    props: block_props,
+                    computed: block_computed,
+                    inherited: {},
+                });
+                index++;
+            }
+        }
+
+        return {
+            id: absolutePathToUuid(absolutePath, rootPath),
+            projectId: this.db.project.db.info.id ?? '',
+            workspaceId: parentWorkspaceId,
+            name: null,
+            title,
+            icon: 'file-json-line',
+            isAbstract: false,
+            typeIds: [],
+            createdAt: created_at,
+            updatedAt: updated_at,
+            deletedAt: null,
+            rights: AssetRights.FULL_ACCESS,
+            index: null,
+            creatorUserId: null,
+            unread: 0,
+            hasImage: false,
+            parentIds: [],
+            ownTitle: null,
+            ownIcon: 'file-json-line',
+            blocks,
+            comments: [],
+            references: [],
+            lastViewedAt: null,
+            localName: local_name,
+        };
     }
 
     private async _loadFileItems(items: fs.Dirent[], path: string, parentWorkspaceId: string, rootPath: string): Promise<{
@@ -586,8 +832,31 @@ export class FileSystemService{
         this.db.asset.assets.addMany(user_files.assets.map(asset => asset.entry));
         this.db.workspace.workspaces.add(this.db.RootGddFolder)
         this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
-        
+
+        this._computeTypeIdsForNewFormatAssets();
+
         this._initWatcher();
+    }
+
+    /**
+     * New-format assets don't store typeIds. Compute them from the parent chain.
+     * Uses a fixpoint loop so multi-level inheritance (C->B->A) resolves even if
+     * parents were loaded out of order.
+     */
+    private _computeTypeIdsForNewFormatAssets() {
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const asset of this.db.asset.assets.iterate()) {
+                if (asset.typeIds.length === 0 && asset.parentIds?.length > 0) {
+                    const parent = this.db.asset.assets.byId.get(asset.parentIds[0]);
+                    if (parent && parent.typeIds.length > 0) {
+                        asset.typeIds = [parent.id, ...parent.typeIds];
+                        changed = true;
+                    }
+                }
+            }
+        }
     }
 
     async destroy(){

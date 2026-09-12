@@ -129,6 +129,9 @@ export default {
         openLogsFolder: 'Protokollordner öffnen',
         autoUpdate: 'Beim Start der Anwendung auf Updates prüfen',
         syncWithCloud: 'Automatische Cloud-Synchronisierung',
+        assetSaveFormat: 'Asset-Dateiformat',
+        assetSaveFormatIma: 'Eigenständig (.ima.json)',
+        assetSaveFormatJson: 'Vereinfacht (.json)',
         mcp: {
           port: 'Port',
           autoStart: 'MCP-Server beim Öffnen eines Projekts starten',

@@ -13,14 +13,14 @@ export class SettingsService{
 
     }
 
-    async getKey(key: string, default_value?: any){
+    async getKey<T = any>(key: string, default_value?: T): Promise<T>{
         const settings: {
             [path: string]: {
                 [key: string]: any
             }
         } = await storageGetKey('settings') ?? {};
         const project_settings = settings[this.db.localPath] ?? {};
-        return project_settings[key] ?? default_value;
+        return project_settings[key] ?? default_value as T;
     }
 
     async setKey(key: string, value: any){

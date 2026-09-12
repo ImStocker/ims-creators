@@ -15,7 +15,7 @@ import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUt
 import JSZip from "jszip";
 import { once } from "node:events";
 import { PassThrough, type Writable } from "node:stream";
-import { WORKSPACE_BASE_ORDERING } from "../project-db-constants";
+import { WORKSPACE_BASE_ORDERING, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT } from "../project-db-constants";
 import { WORKSPACE_EXT } from "./FileSystemService";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { serializeWorkspaceToJSON } from "../logic/serialize";
@@ -336,13 +336,14 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 workspaceId: workspaceId
             }
         })
+        const format = await this.db.settings.getKey(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
         const used_names = new Set<string>();
         for (const asset of assets.list){
-            const name = this.db.asset.getAssetFileSavingFilename(asset, (val) => !used_names.has(val))
+            const name = await this.db.asset.getAssetFileSavingFilename(asset, (val) => !used_names.has(val))
             used_names.add(name);
             const writeStream = new PassThrough();
             targetZip.file((subfolder ? subfolder + "/" : '') + name, writeStream);
-            this.db.asset.saveAssetFileToStream(asset, writeStream);
+            await this.db.asset.saveAssetFileToStream(asset, writeStream, format);
             writeStream.end();
         }
         const workspaces = await this._searchWorkspaces({

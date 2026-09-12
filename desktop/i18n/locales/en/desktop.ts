@@ -129,6 +129,9 @@ export default {
         openLogsFolder: 'Open folder with logs',
         autoUpdate: 'Check for updates when the app starts',
         syncWithCloud: 'Auto syncing with the cloud',
+        assetSaveFormat: 'Asset file format',
+        assetSaveFormatIma: 'Self-contained (.ima.json)',
+        assetSaveFormatJson: 'Simplified (.json)',
         mcp: {
           port: 'Port',
           autoStart: 'Start MCP server when a project is opened',

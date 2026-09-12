@@ -239,7 +239,7 @@ export class ProjectFileDbTransaction{
                 if(newEntry.workspaceId) {
                     parent_workspace_path = getWorkspaceLocalPathFolderById(newEntry.workspaceId, this.db);
                 }
-                const suggest_title = this.db.asset.getAssetFileSavingFilename(
+                const suggest_title = await this.db.asset.getAssetFileSavingFilename(
                     newEntry,
                     (name) => !fs.existsSync(node_path.join(parent_workspace_path, name))
                 )

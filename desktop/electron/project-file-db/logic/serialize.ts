@@ -1,5 +1,6 @@
 import type { AssetPropsPlainObject } from '~ims-app-base/logic/types/Props';
 import type { SharedAssetBlock } from './asset-ops';
+import { BLOCK_NAME_META } from '~ims-app-base/logic/constants';
 
 // ── Asset Serialization ───────────────────────────────────────────────────────
 
@@ -71,6 +72,98 @@ export function serializeAssetToJSON(
   ima_asset.values = values;
 
   return ima_asset;
+}
+
+/**
+ * Serialize an asset to the new simplified .json format.
+ *
+ * Structure:
+ * - Top-level keys = block values (named by block name, or @blockId for unnamed)
+ * - __meta: system fields + __meta block values + block metadata array
+ * - Markdown blocks: value unwrapped to a string (no "value" wrapper)
+ * - Only own blocks stored; inherited copies skipped
+ * - typeIds NOT stored (computed from parent chain at load time)
+ */
+export function serializeAssetToNewFormatJSON(
+  asset: {
+    id: string;
+    title?: string | null;
+    icon?: string | null;
+    parentIds?: string[];
+    projectId?: string;
+    index?: number | null;
+    isAbstract?: boolean;
+    blocks?: SharedAssetBlock[];
+  },
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  const blocks = asset.blocks ?? [];
+
+  // Find the __meta block
+  const meta_block = blocks.find((b) => b.name === BLOCK_NAME_META);
+  const meta_block_own_props = meta_block ? { ...meta_block.props } : {};
+
+  // Top-level keys: own blocks (non-empty props, not __meta)
+  for (const block of blocks) {
+    if (block.name === BLOCK_NAME_META) continue;
+    if (block.delete) continue;
+
+    const has_own_props = block.props && Object.keys(block.props).length > 0;
+    if (!has_own_props) continue;
+
+    const key = block.name ? block.name : `@${block.id}`;
+
+    // Markdown blocks: unwrap value
+    if (block.type === 'markdown' && typeof block.props.value === 'string') {
+      result[key] = block.props.value;
+    } else {
+      result[key] = { ...block.props };
+    }
+  }
+
+  // Build __meta.blocks metadata
+  const blocks_meta: Record<string, unknown>[] = [];
+  for (const block of blocks) {
+    if (block.name === BLOCK_NAME_META) continue;
+
+    if (block.delete) {
+      blocks_meta.push({
+        id: block.id,
+        name: block.name,
+        deleted: true,
+      });
+    } else {
+      const has_own_props = block.props && Object.keys(block.props).length > 0;
+      if (!has_own_props) continue;
+
+      const entry: Record<string, unknown> = {
+        id: block.id,
+        index: block.index,
+        type: block.type,
+      };
+      if (block.name) entry.name = block.name;
+      if (block.title) entry.title = block.title;
+      if (block.createdAt) entry.createdAt = block.createdAt;
+      if (block.updatedAt) entry.updatedAt = block.updatedAt;
+
+      blocks_meta.push(entry);
+    }
+  }
+
+  result.__meta = {
+    id: asset.id,
+    title: asset.title ?? null,
+    parentIds: asset.parentIds ?? [],
+    icon: asset.icon ?? undefined,
+    projectId: asset.projectId ?? '',
+    isAbstract: asset.isAbstract ?? undefined,
+    index: asset.index ?? null,
+    values: meta_block_own_props,
+    blocks: blocks_meta,
+  };
+
+  return result;
 }
 
 /**

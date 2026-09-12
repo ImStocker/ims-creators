@@ -22,3 +22,8 @@ export const WORKSPACE_BASE_ORDERING = [
   'createdAt',
   'id',
 ];
+
+export type AssetSaveFormat = 'ima' | 'json';
+
+export const ASSET_SAVE_FORMAT_SETTING_KEY = 'assetSaveFormat';
+export const ASSET_SAVE_FORMAT_DEFAULT: AssetSaveFormat = 'json';
