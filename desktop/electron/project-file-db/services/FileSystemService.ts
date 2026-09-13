@@ -281,25 +281,37 @@ export class FileSystemService{
             const key = bm.name ? bm.name : `@${bm.id}`;
             const raw_value = parsed[key];
 
-            if (raw_value === undefined) {
+            const block_meta =
+                bm.meta && typeof bm.meta === 'object' && !Array.isArray(bm.meta)
+                    ? bm.meta
+                    : null;
+
+            if (raw_value === undefined && !block_meta) {
                 // Block referenced in metadata but no value at top-level — skip
                 continue;
             }
 
             const block_type = bm.type || 'props';
-            let block_props: Record<string, any>;
-            let block_computed: Record<string, any>;
+            let block_props: Record<string, any> = {};
 
-            if (block_type === 'markdown' && typeof raw_value === 'string') {
-                block_props = { value: raw_value };
-                block_computed = { value: raw_value };
-            } else if (typeof raw_value === 'object' && raw_value !== null && !Array.isArray(raw_value)) {
-                block_props = { ...raw_value };
-                block_computed = { ...raw_value };
-            } else {
-                // Primitive or array — wrap in value
-                block_props = { value: raw_value };
-                block_computed = { value: raw_value };
+            // markdown/text/prop store their `value` directly at the top-level key
+            const value_unwrapped =
+                block_type === 'markdown' || block_type === 'text' || block_type === 'prop';
+
+            if (raw_value !== undefined) {
+                if (typeof raw_value === 'string' && value_unwrapped) {
+                    block_props = { value: raw_value };
+                } else if (typeof raw_value === 'object' && raw_value !== null && !Array.isArray(raw_value)) {
+                    block_props = { ...raw_value };
+                } else {
+                    // Primitive or array — wrap in value
+                    block_props = { value: raw_value };
+                }
+            }
+
+            // Restore block meta keys (own props that aren't stored at the root) back into the block
+            if (block_meta) {
+                block_props = { ...block_props, ...block_meta };
             }
 
             blocks.push({
@@ -313,7 +325,7 @@ export class FileSystemService{
                 ownTitle: null,
                 own: true,
                 props: assignPlainValueToAssetProps({}, block_props),
-                computed: assignPlainValueToAssetProps({}, block_computed),
+                computed: assignPlainValueToAssetProps({}, block_props),
                 inherited: {},
             });
         }

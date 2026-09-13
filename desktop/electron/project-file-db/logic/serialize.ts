@@ -99,7 +99,14 @@ export function serializeAssetToJSON(
  * Structure:
  * - Top-level keys = block values (named by block name, or @blockId for unnamed)
  * - __meta: system fields + __meta block values + block metadata array
- * - Markdown blocks: value unwrapped to a string (no "value" wrapper)
+ * - For `markdown` / `text` / `prop` block types the `value` prop is stored
+ *   directly at the top-level key (no "value" wrapper); every other own prop
+ *   of such a block is written to `block[X].meta`. For all other block types
+ *   keys starting with `__` are skipped from the top-level object and written
+ *   to `block[X].meta` instead.
+ * - Block entries never carry createdAt/updatedAt (reconciled from file stats).
+ * - __meta drops projectId, and omits isAbstract (false), index (null) and
+ *   values (empty).
  * - Only own blocks stored; inherited copies skipped
  * - typeIds NOT stored (computed from parent chain at load time)
  */
@@ -125,6 +132,8 @@ export function serializeAssetToNewFormatJSON(
     ? convertAssetPropsToPlainObject(meta_block.props ?? {})
     : {};
 
+  const value_unwrapped_types = new Set(['markdown', 'text', 'prop']);
+
   // Top-level keys: own blocks (non-empty props, not __meta)
   for (const block of blocks) {
     if (block.name === BLOCK_NAME_META) continue;
@@ -136,11 +145,18 @@ export function serializeAssetToNewFormatJSON(
     const key = block.name ? block.name : `@${block.id}`;
     const block_props_plain = convertAssetPropsToPlainObject(block.props ?? {});
 
-    // Markdown blocks: unwrap value
-    if (block.type === 'markdown' && typeof block_props_plain.value === 'string') {
-      result[key] = block_props_plain.value;
+    // Unwrap types store only their `value` at the root; all other props go to `meta`.
+    if (value_unwrapped_types.has(block.type)) {
+      if (block_props_plain.value !== undefined) {
+        result[key] = block_props_plain.value;
+      }
     } else {
-      result[key] = { ...block_props_plain };
+      const root_props: Record<string, unknown> = {};
+      for (const [prop_key, prop_val] of Object.entries(block_props_plain)) {
+        if (prop_key.startsWith('__')) continue;
+        root_props[prop_key] = prop_val;
+      }
+      if (Object.keys(root_props).length > 0) result[key] = root_props;
     }
   }
 
@@ -155,35 +171,49 @@ export function serializeAssetToNewFormatJSON(
         name: block.name,
         deleted: true,
       });
-    } else {
-      const has_own_props = block.props && Object.keys(block.props).length > 0;
-      if (!has_own_props) continue;
-
-      const entry: Record<string, unknown> = {
-        id: block.id,
-        index: block.index,
-        type: block.type,
-      };
-      if (block.name) entry.name = block.name;
-      if (block.title) entry.title = block.title;
-      if (block.createdAt) entry.createdAt = block.createdAt;
-      if (block.updatedAt) entry.updatedAt = block.updatedAt;
-
-      blocks_meta.push(entry);
+      continue;
     }
+
+    const has_own_props = block.props && Object.keys(block.props).length > 0;
+    if (!has_own_props) continue;
+
+    const block_props_plain = convertAssetPropsToPlainObject(block.props ?? {});
+
+    let meta: Record<string, unknown> | undefined;
+    if (value_unwrapped_types.has(block.type)) {
+      const { value: _value, ...block_rest } = block_props_plain;
+      if (Object.keys(block_rest).length > 0) meta = block_rest;
+    } else {
+      const block_rest: Record<string, unknown> = {};
+      for (const [prop_key, prop_val] of Object.entries(block_props_plain)) {
+        if (prop_key.startsWith('__')) block_rest[prop_key] = prop_val;
+      }
+      if (Object.keys(block_rest).length > 0) meta = block_rest;
+    }
+
+    const entry: Record<string, unknown> = {
+      id: block.id,
+      index: block.index,
+      type: block.type,
+    };
+    if (block.name) entry.name = block.name;
+    if (block.title) entry.title = block.title;
+    if (meta) entry.meta = meta;
+
+    blocks_meta.push(entry);
   }
 
-  result.__meta = {
+  const meta_obj: Record<string, unknown> = {
     id: asset.id,
     title: asset.title ?? null,
     parentIds: asset.parentIds ?? [],
     icon: asset.icon ?? undefined,
-    projectId: asset.projectId ?? '',
-    isAbstract: asset.isAbstract ?? undefined,
-    index: asset.index ?? null,
-    values: meta_block_own_props,
-    blocks: blocks_meta,
   };
+  if (asset.isAbstract) meta_obj.isAbstract = true;
+  if (asset.index !== undefined && asset.index !== null) meta_obj.index = asset.index;
+  if (Object.keys(meta_block_own_props).length > 0) meta_obj.values = meta_block_own_props;
+  meta_obj.blocks = blocks_meta;
+  result.__meta = meta_obj;
 
   return result;
 }
