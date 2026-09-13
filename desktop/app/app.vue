@@ -137,6 +137,7 @@ provide('getDropdownHost', () => {
   height: 100vh;
   user-select: none;
   display: flex;
+  overflow-x: clip;
   --ProjectLayout-header-height: 51px;
 }
 
