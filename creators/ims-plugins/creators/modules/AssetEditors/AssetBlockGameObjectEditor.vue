@@ -163,6 +163,7 @@ export default defineComponent({
 @include devices-mixins.device-type(not-mb) {
   .AssetBlockGameObjectEditor-header {
     display: flex;
+    gap: 10px;
   }
 
   .AssetBlockGameObjectEditor-gallery {
@@ -173,7 +174,7 @@ export default defineComponent({
 
   .AssetBlockGameObjectEditor-description {
     flex: 1;
-    --editor-block-padding-left: 25px;
+    --editor-block-padding-left: 15px;
   }
 }
 </style>
