@@ -34,6 +34,7 @@ export type ProjectFileDbAssetBlock = {
   props: AssetPropsPlainObject,
   computed: AssetPropsPlainObject,
   inherited: AssetPropsPlainObject | null,
+  isComputed?: boolean,
   delete?: true,
 }
 
@@ -47,6 +48,12 @@ export type ProjectFileDbAsset = AssetShort & {
   comments: AssetCommentDTO[];
   references: AssetReferenceEntity[];
   lastViewedAt?: string | null;
+  /**
+   * Transient cache-validity stamps ({id, updatedAt} for the asset + its
+   * typeIds chain). Only kept in memory on full-computed assets — never
+   * serialized to file or sent to consumers.
+   */
+  stamps?: { id: string; updatedAt: string }[];
 };
 
 export type ProjectFileDbWorkspace = {

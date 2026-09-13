@@ -833,30 +833,10 @@ export class FileSystemService{
         this.db.workspace.workspaces.add(this.db.RootGddFolder)
         this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
 
-        this._computeTypeIdsForNewFormatAssets();
-
+        //  New-format assets don't store typeIds. Rebuild them
+        this.db.asset.rebuildTypeStructure();
+        
         this._initWatcher();
-    }
-
-    /**
-     * New-format assets don't store typeIds. Compute them from the parent chain.
-     * Uses a fixpoint loop so multi-level inheritance (C->B->A) resolves even if
-     * parents were loaded out of order.
-     */
-    private _computeTypeIdsForNewFormatAssets() {
-        let changed = true;
-        while (changed) {
-            changed = false;
-            for (const asset of this.db.asset.assets.iterate()) {
-                if (asset.typeIds.length === 0 && asset.parentIds?.length > 0) {
-                    const parent = this.db.asset.assets.byId.get(asset.parentIds[0]);
-                    if (parent && parent.typeIds.length > 0) {
-                        asset.typeIds = [parent.id, ...parent.typeIds];
-                        changed = true;
-                    }
-                }
-            }
-        }
     }
 
     async destroy(){

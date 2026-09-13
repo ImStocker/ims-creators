@@ -61,7 +61,7 @@ export interface BuildAssetParams {
  * Compute the `computed` props for a block from its own `props` (already in
  * AssetProps assigned form) merged with its `inherited` props.
  * This is the canonical derived-value algorithm used by both the desktop
- * (AssetService._getAssetFullById) and the save/merge paths.
+ * (AssetService.computeFullAsset) and the save/merge paths.
  */
 export function formBlockComputedToPlain(
   props: AssetProps | null | undefined,

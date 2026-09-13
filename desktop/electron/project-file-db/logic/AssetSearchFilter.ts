@@ -67,6 +67,7 @@ export class AssetSearchFilter {
     private _subFiltersOrs: AssetSearchFilter[][] = [];
     private _resultNothing: boolean = false;
     private _propFilters: { block: AssetBlockIdWithName, propPath: string[], value: AssetPropWhereOp }[] = [];
+    private _propFilterBlocks: AssetBlockIdWithName[] = [];
 
     static async Create(where: AssetQueryWhere, db: ProjectFileDb) {
         const res = new AssetSearchFilter(where, db);
@@ -161,9 +162,17 @@ export class AssetSearchFilter {
                 })
             }
         }
+
+        for (const prop_filter of this._propFilters) {
+            if (!this._propFilterBlocks.some(existing =>
+                existing.blockId === prop_filter.block.blockId && existing.blockName === prop_filter.block.blockName
+            )) {
+                this._propFilterBlocks.push({ blockId: prop_filter.block.blockId, blockName: prop_filter.block.blockName });
+            }
+        }
     }
 
-    private *_applySelf(assets: Iterable<ProjectFileDbAsset>): Generator<ProjectFileDbAsset> {
+    private async *_applySelf(assets: Iterable<ProjectFileDbAsset>): AsyncGenerator<ProjectFileDbAsset> {
         if (this._resultNothing) {
             return;
         }
@@ -234,46 +243,52 @@ export class AssetSearchFilter {
                 }
             }
 
-            let prop_filter_i = 0;
-            while (is_passed && prop_filter_i < this._propFilters.length) {
-                const prop_filter = this._propFilters[prop_filter_i];
-                let asset_prop_value: AssetPropsPlainObjectValue = null;
-                if (prop_filter.block.blockId) {
-                    const block = asset.blocks.find(b => b.id === prop_filter.block.blockId);
-                    if (block) asset_prop_value = block.computed;
-                }
-                else if (prop_filter.block.blockName) {
-                    const block = asset.blocks.find(b => b.name === prop_filter.block.blockName);
-                    if (block) asset_prop_value = block.computed;
-                }
-                for (const prop_key_part of prop_filter.propPath) {
-                    if (asset_prop_value === null) break;
-                    if (typeof asset_prop_value !== 'object') {
-                        asset_prop_value = null;
+            if (is_passed && this._propFilters.length > 0){
+                const partial_full = await this.db.asset.computeFullAsset(asset, this._propFilterBlocks);
+
+                let prop_filter_i = 0;
+                while (is_passed && prop_filter_i < this._propFilters.length) {
+                    const prop_filter = this._propFilters[prop_filter_i];
+                    let asset_prop_value: AssetPropsPlainObjectValue = null;
+                    if (partial_full) {
+                        const block = partial_full.blocks.find(b => {
+                            if (prop_filter.block.blockId) return b.id === prop_filter.block.blockId;
+                            if (prop_filter.block.blockName) return b.name === prop_filter.block.blockName;
+                            return false;
+                        });
+                        if (block && block.isComputed) {
+                            asset_prop_value = block.computed as AssetPropsPlainObjectValue;
+                        }
                     }
-                    else {
-                        const asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
-                        if (asset_prop_value_type) {
+                    for (const prop_key_part of prop_filter.propPath) {
+                        if (asset_prop_value === null) break;
+                        if (typeof asset_prop_value !== 'object') {
                             asset_prop_value = null;
                         }
                         else {
-                            asset_prop_value = (asset_prop_value as AssetPropsPlainObject)[prop_key_part];
+                            const asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
+                            if (asset_prop_value_type) {
+                                asset_prop_value = null;
+                            }
+                            else {
+                                asset_prop_value = (asset_prop_value as AssetPropsPlainObject)[prop_key_part];
+                            }
                         }
                     }
-                }
 
-                const final_asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
-                if (!final_asset_prop_value_type) {
-                    is_passed = false;
-                }
-                else {
-                    is_passed = testAssetPropValueByWhereCondition(
-                        asset_prop_value as AssetPropValue,
-                        prop_filter.value
-                    );
-                }
+                    const final_asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
+                    if (!final_asset_prop_value_type) {
+                        is_passed = false;
+                    }
+                    else {
+                        is_passed = testAssetPropValueByWhereCondition(
+                            asset_prop_value as AssetPropValue,
+                            prop_filter.value
+                        );
+                    }
 
-                prop_filter_i++;
+                    prop_filter_i++;
+                }
             }
 
             if (is_passed) {
@@ -282,28 +297,31 @@ export class AssetSearchFilter {
         }
     }
 
-    apply(assets: Iterable<ProjectFileDbAsset>): Generator<ProjectFileDbAsset> {
-        let res = this._applySelf(assets);
+    async apply(assets: Iterable<ProjectFileDbAsset>): Promise<ProjectFileDbAsset[]> {
+        const result: ProjectFileDbAsset[] = [];
+        for await (const asset of this._applySelf(assets)) {
+            result.push(asset);
+        }
+        let res = result;
         for (const subfilter of this._subFiltersAnds) {
-            res = subfilter.apply(res);
+            res = await subfilter.apply(res);
         }
         if (this._subFiltersOrs.length > 0) {
             for (const subfilter_or of this._subFiltersOrs) {
-                const current_res = [...res]
+                const current_res = res;
 
-                let or_res_set = new Set<ProjectFileDbAsset>();
+                const or_res_set = new Set<ProjectFileDbAsset>();
                 let or_index = 0;
                 for (const or_subfilter of subfilter_or) {
                     const left = or_index > 0 ? current_res.filter(a => !or_res_set.has(a)) : current_res;
-                    for (const asset of or_subfilter.apply(left)) {
+                    const or_result = await or_subfilter.apply(left);
+                    for (const asset of or_result) {
                         or_res_set.add(asset);
                     }
                     or_index++;
                 }
 
-                res = (function* (arr: Set<ProjectFileDbAsset>) {
-                    yield* arr;
-                })(or_res_set);
+                res = [...or_res_set];
             }
 
         }

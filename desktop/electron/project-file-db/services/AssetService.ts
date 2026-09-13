@@ -20,7 +20,7 @@ import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, 
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
 import type { IProjectDatabaseAsset, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore, ChangesStreamRequest, ChangesStreamResponse } from "~ims-app-base/logic/types/ProjectTypes";
-import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef } from "~ims-app-base/logic/types/Props";
+import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
 import type { AssetPropsSelectionField, AssetPropsSelectionOrder, AssetPropsSelection } from "~ims-app-base/logic/types/PropsSelection";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
@@ -47,6 +47,9 @@ export class AssetService implements IProjectDatabaseAsset {
     private _sessionDeletedAssets = new ProjectFileDbCollection<ProjectFileDbAsset>();
     assets = new ProjectFileDbCollection<ProjectFileDbAsset>();
     systemAssets = new ProjectFileDbCollection<ProjectFileDbAsset>();
+
+    private _typeChildren = new Map<string, Set<string>>();
+    private _fullAssetCache = new Map<string, ProjectFileDbAsset>();
 
     constructor(public db: ProjectFileDb) {
 
@@ -85,8 +88,8 @@ export class AssetService implements IProjectDatabaseAsset {
         }
 
         const filter = await AssetSearchFilter.Create(where, this.db);
-        const result = filter.apply(this.assets.iterate());
-        return [...result];
+        const result = await filter.apply(this.assets.iterate());
+        return result;
     }
 
     public getAssetField(asset: ProjectFileDbAsset, field: string): AssetPropValue {
@@ -189,13 +192,69 @@ export class AssetService implements IProjectDatabaseAsset {
         };
     }
 
-    private async _getAssetFullById(asset_id: string): Promise<ProjectFileDbAsset | null> {
+    async getAssetFullById(asset_id: string): Promise<ProjectFileDbAsset | null> {
         const db_asset = this.assets.byId.get(asset_id);
-        if (!db_asset) return null;
+        if (!db_asset) {
+            this._fullAssetCache.delete(asset_id);
+            return null;
+        }
+        return await this.computeFullAsset(db_asset, null);
+    }
 
+    private _getFullAssetStamps(db_asset: ProjectFileDbAsset): { id: string, updatedAt: string }[] {
+        const stamps: { id: string, updatedAt: string }[] = [];
+        stamps.push({ id: db_asset.id, updatedAt: db_asset.updatedAt ?? '' });
+        for (const ancestor_id of db_asset.typeIds) {
+            const ancestor = this.assets.byId.get(ancestor_id);
+            stamps.push({ id: ancestor_id, updatedAt: ancestor?.updatedAt ?? '' });
+        }
+        return stamps;
+    }
+
+    private _fullAssetStampsMatch(cached: { id: string, updatedAt: string }[], current: { id: string, updatedAt: string }[]): boolean {
+        if (cached.length !== current.length) return false;
+        for (let i = 0; i < cached.length; i++) {
+            if (cached[i].id !== current[i].id) return false;
+            if (cached[i].updatedAt !== current[i].updatedAt) return false;
+        }
+        return true;
+    }
+
+    private _cloneFullAsset(asset: ProjectFileDbAsset): ProjectFileDbAsset {
+        const result: ProjectFileDbAsset = {
+            ...asset,
+            blocks: asset.blocks.map(block => ({ ...block }))
+        };
+        delete (result as any).stamps;
+        return result;
+    }
+
+    private _requestIsFullyComputed(cached: ProjectFileDbAsset, blocks_to_resolve: AssetBlockIdWithName[] | null): boolean {
+        if (blocks_to_resolve === null) {
+            return cached.blocks.every(block => block.isComputed);
+        }
+        return blocks_to_resolve.every(ref => cached.blocks.some(block =>
+            block.isComputed && (
+                (ref.blockId && ref.blockId === block.id) || (ref.blockName && ref.blockName === block.name)
+            )
+        ));
+    }
+
+    public async computeFullAsset(
+        db_asset: ProjectFileDbAsset,
+        blocks_to_resolve: AssetBlockIdWithName[] | null = null,
+    ): Promise<ProjectFileDbAsset> {
+        const stamps = this._getFullAssetStamps(db_asset);
+        const cached = this._fullAssetCache.get(db_asset.id);
+        const cache_fresh = !!cached && !!cached.stamps && this._fullAssetStampsMatch(cached.stamps, stamps);
+        if (cache_fresh && this._requestIsFullyComputed(cached, blocks_to_resolve)) {
+            return this._cloneFullAsset(cached);
+        }
+
+        const base_blocks = cache_fresh ? cached.blocks : db_asset.blocks;
         const asset: ProjectFileDbAsset = {
             ...db_asset,
-            blocks: db_asset.blocks.map(block => {
+            blocks: base_blocks.map(block => {
                 return {
                     ...block,
                     inherited: null
@@ -204,10 +263,9 @@ export class AssetService implements IProjectDatabaseAsset {
         };
 
         const parent_id = db_asset.parentIds && db_asset.parentIds.length > 0 ? db_asset.parentIds[0] : null
-        const parent_asset = parent_id ? await this._getAssetFullById(parent_id) : null;
+        const parent_basic = parent_id ? (this.assets.byId.get(parent_id) ?? null) : null;
+        const parent_asset = parent_basic ? await this.computeFullAsset(parent_basic, blocks_to_resolve) : null;
         if (parent_asset) {
-
-            asset.typeIds = [parent_asset.id, ...parent_asset.typeIds]
 
             if (!asset.ownIcon) {
                 asset.icon = parent_asset.icon;
@@ -236,19 +294,118 @@ export class AssetService implements IProjectDatabaseAsset {
         const existing_blocks: ProjectFileDbAssetBlock[] = [];
         for (const block of asset.blocks) {
             if (!block.delete) {
-
-                const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
-                const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
-
-                existing_blocks.push({
-                    ...block,
-                    computed: formBlockComputedToPlain(block_props, block_inherited)
-                });
+                if (!block.isComputed && this._blockNeedsResolve(block, blocks_to_resolve)) {
+                    const block_props = assignPlainValueToAssetProps({}, block.props ?? {});
+                    const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
+                    existing_blocks.push({
+                        ...block,
+                        computed: formBlockComputedToPlain(block_props, block_inherited),
+                        isComputed: true,
+                    });
+                }
+                else {
+                    existing_blocks.push({ ...block });
+                }
             }
         }
         asset.blocks = existing_blocks;
 
-        return asset;
+        asset.stamps = stamps;
+        this._fullAssetCache.set(db_asset.id, asset);
+        return this._cloneFullAsset(asset);
+    }
+
+    private _blockNeedsResolve(block: ProjectFileDbAssetBlock, blocks_to_resolve: AssetBlockIdWithName[] | null): boolean {
+        if (blocks_to_resolve === null) return true;
+        return blocks_to_resolve.some(ref => {
+            if (ref.blockId && ref.blockId === block.id) return true;
+            if (ref.blockName && ref.blockName === block.name) return true;
+            return false;
+        });
+    }
+
+    public rebuildTypeStructure(): void {
+        this._rebuildTypeChildrenMap();
+        for (const asset of this.assets.iterate()) {
+            this._recalcTypeIdAsset(asset.id);
+        }
+        this._fullAssetCache.clear();
+    }
+
+    public onAssetCollectionUpdated(oldEntry: ProjectFileDbAsset | null, newEntry: ProjectFileDbAsset | null): void {
+        if (!newEntry) return;
+        const old_parent_id = oldEntry?.parentIds && oldEntry.parentIds.length > 0 ? oldEntry.parentIds[0] : null;
+        const new_parent_id = newEntry.parentIds && newEntry.parentIds.length > 0 ? newEntry.parentIds[0] : null;
+        if (old_parent_id && old_parent_id !== new_parent_id) {
+            this._removeChildFromParentList(old_parent_id, newEntry.id);
+        }
+        if (new_parent_id && this.assets.byId.has(new_parent_id)) {
+            this._addChildToParentList(new_parent_id, newEntry.id);
+        }
+        this._recalcTypeIdAsset(newEntry.id);
+        this._fullAssetCache.delete(newEntry.id);
+        if (old_parent_id !== new_parent_id) {
+            this._recalcTypeIdSubtree(newEntry.id);
+        }
+    }
+
+    private _rebuildTypeChildrenMap(): void {
+        this._typeChildren = new Map<string, Set<string>>();
+        for (const asset of this.assets.iterate()) {
+            const parent_id = asset.parentIds && asset.parentIds.length > 0 ? asset.parentIds[0] : null;
+            if (parent_id && this.assets.byId.has(parent_id)) {
+                this._addChildToParentList(parent_id, asset.id);
+            }
+        }
+    }
+
+    private _addChildToParentList(parent_id: string, child_id: string): void {
+        let children = this._typeChildren.get(parent_id);
+        if (!children) {
+            children = new Set<string>();
+            this._typeChildren.set(parent_id, children);
+        }
+        children.add(child_id);
+    }
+
+    private _removeChildFromParentList(parent_id: string, child_id: string): void {
+        const children = this._typeChildren.get(parent_id);
+        if (children) {
+            children.delete(child_id);
+            if (children.size === 0) this._typeChildren.delete(parent_id);
+        }
+    }
+
+    private _recalcTypeIdAsset(asset_id: string): void {
+        const asset = this.assets.byId.get(asset_id);
+        if (!asset) return;
+        const chain: string[] = [];
+        let cursor: ProjectFileDbAsset | null = asset;
+        const visited = new Set<string>();
+        while (cursor) {
+            if (visited.has(cursor.id)) break;
+            visited.add(cursor.id);
+            const parent_id: string | null = cursor.parentIds && cursor.parentIds.length > 0 ? cursor.parentIds[0] : null;
+            const parent: ProjectFileDbAsset | null = parent_id ? (this.assets.byId.get(parent_id) ?? null) : null;
+            if (!parent) break;
+            chain.unshift(parent.id);
+            cursor = parent;
+        }
+        asset.typeIds = chain;
+    }
+
+    private _recalcTypeIdSubtree(asset_id: string, visited: Set<string> = new Set<string>()): void {
+        if (visited.has(asset_id)) return;
+        visited.add(asset_id);
+        if (!this.assets.byId.has(asset_id)) return;
+        this._recalcTypeIdAsset(asset_id);
+        this._fullAssetCache.delete(asset_id);
+        const children = this._typeChildren.get(asset_id);
+        if (children) {
+            for (const child_id of [...children]) {
+                this._recalcTypeIdSubtree(child_id, visited);
+            }
+        }
     }
 
     async getAssetFulls(query: ApiRequestList<AssetQueryWhere>): Promise<{
@@ -263,7 +420,7 @@ export class AssetService implements IProjectDatabaseAsset {
         }
         const actual_list = [];
         for (let asset of list) {
-            const actual_asset = await this._getAssetFullById(asset.id);
+            const actual_asset = await this.getAssetFullById(asset.id);
             assert(actual_asset);
             actual_list.push(actual_asset);
         }
@@ -637,7 +794,8 @@ export class AssetService implements IProjectDatabaseAsset {
                 const block_inherited = block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null;
                 return {
                     ...block,
-                    computed: formBlockComputedToPlain(block_props, block_inherited)
+                    computed: formBlockComputedToPlain(block_props, block_inherited),
+                    isComputed: true,
                 };
             })
         };
@@ -780,15 +938,18 @@ export class AssetService implements IProjectDatabaseAsset {
 
                 let merge_old_blocks = changing_asset.blocks
                 if (params.set.blocks){
-                    const full_asset = await this._getAssetFullById(changing_asset.id) 
+                    const full_asset = await this.getAssetFullById(changing_asset.id) 
                     const aug_old_blocks = this._augmentMergeOldBlocks(changing_asset.blocks, full_asset?.blocks, params.set.blocks);
                     merge_old_blocks = this._mergeBlocksToSave(aug_old_blocks, params.set.blocks, undo)
                 }
                 
-                const new_asset = {
+                const new_asset: ProjectFileDbAsset = {
                     ...changing_asset,
                     ...params.set,
                     blocks: merge_old_blocks
+                };
+                if (params.set.blocks || params.set.parentIds) {
+                    new_asset.updatedAt = (new Date()).toISOString();
                 }
 
                 tx.changeAsset(changing_asset, new_asset);
@@ -893,10 +1054,19 @@ export class AssetService implements IProjectDatabaseAsset {
     }
 
     public deleteOwnAssetFromCollectionOnly(asset_id: string): void {
+        const old_entry = this.assets.byId.get(asset_id);
+        if (old_entry) {
+            const old_parent_id = old_entry.parentIds && old_entry.parentIds.length > 0 ? old_entry.parentIds[0] : null;
+            if (old_parent_id) {
+                this._removeChildFromParentList(old_parent_id, asset_id);
+            }
+        }
         this.assets.delete(asset_id)
+        this._fullAssetCache.delete(asset_id)
         const system_asset = this.systemAssets.byId.get(asset_id);
         if (system_asset) {
             this.assets.add({ ...system_asset });
+            this.onAssetCollectionUpdated(null, this.assets.byId.get(asset_id) ?? null);
         }
     }
 
@@ -946,8 +1116,8 @@ export class AssetService implements IProjectDatabaseAsset {
         ids: string[],
     }> {
         const filter = await AssetSearchFilter.Create(where, this.db);
-        const result = filter.apply(this._sessionDeletedAssets.iterate());
-        const restoring_assets = [...result];
+        const result = await filter.apply(this._sessionDeletedAssets.iterate());
+        const restoring_assets = result;
         for (const asset_full of restoring_assets) {
             this._sessionDeletedAssets.delete(asset_full.id);
             tx.changeAsset(null, asset_full);

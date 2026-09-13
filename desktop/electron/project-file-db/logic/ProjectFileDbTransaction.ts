@@ -213,6 +213,7 @@ export class ProjectFileDbTransaction{
 
         if (newEntry){
             this.db.asset.assets.replace(newEntry)
+            this.db.asset.onAssetCollectionUpdated(oldEntry, newEntry)
             this._notSyncedAssets.push({id: newEntry.id, title: newEntry.title})
         }
         else {
