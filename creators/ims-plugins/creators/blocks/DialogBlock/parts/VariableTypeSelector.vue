@@ -168,22 +168,22 @@ export default defineComponent({
   height: 12px;
   border-radius: 50%;
   &.type-boolean {
-    background-color: var(--imsde-type-boolean-fill);
+    background-color: var(--ims-type-boolean-fill);
   }
   &.type-float {
-    background-color: var(--imsde-type-float-fill);
+    background-color: var(--ims-type-float-fill);
   }
   &.type-integer {
-    background-color: var(--imsde-type-integer-fill);
+    background-color: var(--ims-type-integer-fill);
   }
   &.type-string {
-    background-color: var(--imsde-type-string-fill);
+    background-color: var(--ims-type-string-fill);
   }
   &.type-text {
-    background-color: var(--imsde-type-text-fill);
+    background-color: var(--ims-type-text-fill);
   }
   &.type-asset {
-    background-color: var(--imsde-type-asset-fill);
+    background-color: var(--ims-type-asset-fill);
   }
 }
 

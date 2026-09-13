@@ -59,50 +59,50 @@ export default defineComponent({
 .DataHandle {
   &.type-boolean {
     .DataHandle-svg {
-      stroke: var(--imsde-type-boolean-stroke);
+      stroke: var(--ims-type-boolean-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-boolean-fill);
+      fill: var(--ims-type-boolean-fill);
     }
   }
   &.type-float {
     .DataHandle-svg {
-      stroke: var(--imsde-type-float-stroke);
+      stroke: var(--ims-type-float-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-float-fill);
+      fill: var(--ims-type-float-fill);
     }
   }
   &.type-integer {
     .DataHandle-svg {
-      stroke: var(--imsde-type-integer-stroke);
+      stroke: var(--ims-type-integer-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-integer-fill);
+      fill: var(--ims-type-integer-fill);
     }
   }
   &.type-string {
     .DataHandle-svg {
-      stroke: var(--imsde-type-string-stroke);
+      stroke: var(--ims-type-string-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-string-fill);
+      fill: var(--ims-type-string-fill);
     }
   }
   &.type-text {
     .DataHandle-svg {
-      stroke: var(--imsde-type-text-stroke);
+      stroke: var(--ims-type-text-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-text-fill);
+      fill: var(--ims-type-text-fill);
     }
   }
   &.type-asset {
     .DataHandle-svg {
-      stroke: var(--imsde-type-asset-stroke);
+      stroke: var(--ims-type-asset-stroke);
     }
     &:hover .DataHandle-svg {
-      fill: var(--imsde-type-asset-fill);
+      fill: var(--ims-type-asset-fill);
     }
   }
 }

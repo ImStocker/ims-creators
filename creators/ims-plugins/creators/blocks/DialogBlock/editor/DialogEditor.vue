@@ -1117,28 +1117,6 @@ export default defineComponent({
   --imsde-node-selected-outline-width: 0;
 }
 
-:root {
-  --imsde-type-boolean-stroke: #ff5757;
-  --imsde-type-boolean-fill: #d64848;
-
-  --imsde-type-float-stroke: #82ff57;
-  --imsde-type-float-fill: #75d255;
-
-  --imsde-type-integer-stroke: #57f6ff;
-  --imsde-type-integer-fill: #4ad6de;
-
-  --imsde-type-string-stroke: #ff57d8;
-  --imsde-type-string-fill: #ef53ca;
-
-  --imsde-type-text-stroke: #f7aece;
-  --imsde-type-text-fill: #eb83b0;
-
-  --imsde-type-asset-stroke: #ffb957;
-  --imsde-type-asset-fill: #f0af55;
-
-  --imsde-type-any-stroke: #fff;
-  --imsde-type-any-fill: #555555;
-}
 [data-theme='ims-light'] {
   .DialogEditor {
     --imsde-node-content-bg-color: #f9fafee9;
