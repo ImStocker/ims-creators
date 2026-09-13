@@ -4,7 +4,7 @@ import type { AssetQueryWhere } from "~ims-app-base/logic/types/AssetsType";
 import { AssetPropWhereOpKind, getAssetPropWhereProp, type AssetPropWhereCondition, type AssetPropWhereOp, type AssetPropWhereOpAnd, type AssetPropWhereValue } from '~ims-app-base/logic/types/PropsWhere';
 import { escapeRegExp } from "~ims-app-base/logic/utils/stringUtils";
 import type { ProjectFileDb, ProjectFileDbAsset } from "../ProjectFileDb";
-import { AssetPropType, castAssetPropValueToFloat, castAssetPropValueToInt, castAssetPropValueToString, compareAssetPropValues, getAssetPropType, parseAssetNewBlockPropKeyRef, type AssetBlockIdWithName, type AssetPropsPlainObject, type AssetPropsPlainObjectValue, type AssetPropValue } from '~ims-app-base/logic/types/Props';
+import { AssetPropType, castAssetPropValueToFloat, castAssetPropValueToInt, castAssetPropValueToString, compareAssetPropValues, convertAssetPropsToPlainObject, getAssetPropType, parseAssetNewBlockPropKeyRef, type AssetBlockIdWithName, type AssetPropsPlainObject, type AssetPropsPlainObjectValue, type AssetPropValue } from '~ims-app-base/logic/types/Props';
 
 function testAssetPropValueByWhereCondition(val: AssetPropValue, where: AssetPropWhereOp): boolean {
     const oprnd_prop = getAssetPropWhereProp(where.v as AssetPropWhereCondition);
@@ -257,7 +257,8 @@ export class AssetSearchFilter {
                             return false;
                         });
                         if (block && block.isComputed) {
-                            asset_prop_value = block.computed as AssetPropsPlainObjectValue;
+                            // computed is stored assigned — convert to plain for the propPath walk
+                            asset_prop_value = block.computed ? convertAssetPropsToPlainObject(block.computed) : null;
                         }
                     }
                     for (const prop_key_part of prop_filter.propPath) {

@@ -1,4 +1,4 @@
-import { AssetPropType, parseAssetNewBlockPropKeyRef, splitPropParts, type AssetPropsPlainObject, type AssetPropsPlainObjectValue } from "~ims-app-base/logic/types/Props"
+import { AssetPropType, parseAssetNewBlockPropKeyRef, extractSubObjectAsPlainValue, type AssetPropsPlainObjectValue } from "~ims-app-base/logic/types/Props"
 import type { ProjectFileDbAsset } from "./ProjectFileDb"
 
 export type ProjectFileDbAssetFieldDescriptor = {
@@ -127,14 +127,11 @@ export function getFieldDescriptor(prop: string): ProjectFileDbAssetFieldDescrip
                     }
                 });
                 if (block) {
-                    const prop_parts = splitPropParts(parsed_prop.propKey);
-                    let value: AssetPropsPlainObjectValue = block.computed;
-                    for(let i = 0; i < prop_parts.length; i++){
-                        if (!value){
-                            break;
-                        }
-                        value = (value as AssetPropsPlainObject)[prop_parts[i]];
-                    }
+                    // computed is stored assigned — extract the leaf back to plain
+                    const value = extractSubObjectAsPlainValue(
+                        block.computed ?? {},
+                        parsed_prop.propKey,
+                    );
                     return value;
                 }
                 return null;

@@ -13,8 +13,29 @@ import type { AssetBlockParamsDTO } from '~ims-app-base/logic/types/AssetsType';
 
 // ── Shared Types ──────────────────────────────────────────────────────────────
 
-/** Minimal block type compatible with both Desktop (ProjectFileDbAssetBlock) and MCP server */
+/** Minimal block type compatible with both Desktop (ProjectFileDbAssetBlock) — stored in
+ * assigned (flatten) AssetBlockEntity shape: props/computed/inherited are AssetProps. */
 export interface SharedAssetBlock {
+  id: string;
+  type: string;
+  name: string | null;
+  title: string | null;
+  index: number;
+  own: boolean;
+  ownTitle: string | null;
+  props: AssetProps;
+  computed: AssetProps;
+  inherited: AssetProps | null;
+  createdAt: string;
+  updatedAt: string;
+  delete?: true;
+  [key: string]: unknown;
+}
+
+/**
+ * On-disk / wire plain block shape (folded props) as persisted in .json / .ima.json.
+ */
+export interface PlainBlockDisk {
   id: string;
   type: string;
   name: string | null;
@@ -28,7 +49,49 @@ export interface SharedAssetBlock {
   createdAt: string;
   updatedAt: string;
   delete?: true;
-  [key: string]: unknown;
+}
+
+/**
+ * Convert a block from its persisted plain form to the assigned form stored in the collection.
+ */
+export function plainBlockToAssigned(block: PlainBlockDisk): SharedAssetBlock {
+  const result: SharedAssetBlock = {
+    id: block.id,
+    type: block.type,
+    name: block.name,
+    title: block.title,
+    index: block.index,
+    own: block.own,
+    ownTitle: block.ownTitle,
+    createdAt: block.createdAt,
+    updatedAt: block.updatedAt,
+    props: assignPlainValueToAssetProps({}, block.props ?? {}),
+    computed: assignPlainValueToAssetProps({}, block.computed ?? {}),
+    inherited: block.inherited ? assignPlainValueToAssetProps({}, block.inherited) : null,
+  };
+  if (block.delete) result.delete = true;
+  return result;
+}
+
+/**
+ * Convert a block from the assigned form back to the persisted plain form.
+ */
+export function assignedBlockToPlain(block: SharedAssetBlock): PlainBlockDisk {
+  return {
+    id: block.id,
+    type: block.type,
+    name: block.name,
+    title: block.title,
+    index: block.index,
+    own: block.own,
+    ownTitle: block.ownTitle,
+    createdAt: block.createdAt,
+    updatedAt: block.updatedAt,
+    ...(block.delete ? { delete: true } : {}),
+    props: convertAssetPropsToPlainObject(block.props ?? {}),
+    computed: convertAssetPropsToPlainObject(block.computed ?? {}),
+    inherited: block.inherited ? convertAssetPropsToPlainObject(block.inherited) : null,
+  };
 }
 
 /** Minimal asset type compatible with both sides */
@@ -62,11 +125,12 @@ export interface BuildAssetParams {
  * AssetProps assigned form) merged with its `inherited` props.
  * This is the canonical derived-value algorithm used by both the desktop
  * (AssetService.computeFullAsset) and the save/merge paths.
+ * Returns the result in assigned (AssetProps) form.
  */
-export function formBlockComputedToPlain(
+export function formBlockComputed(
   props: AssetProps | null | undefined,
   inherited: AssetProps | null | undefined,
-): AssetPropsPlainObject {
+): AssetProps {
   const block_props = props ? { ...props } : {};
   const { normalProps, remapParentProps } = extractRemapParentProps(block_props);
   let block_computed: AssetProps = {};
@@ -78,7 +142,18 @@ export function formBlockComputedToPlain(
     }
   }
   block_computed = { ...block_computed, ...normalProps };
-  return convertAssetPropsToPlainObject(block_computed);
+  return block_computed;
+}
+
+/**
+ * Plain-object (folded) variant of {@link formBlockComputed}. Kept for
+ * compat with callers that need the plain form (MCP parity / external use).
+ */
+export function formBlockComputedToPlain(
+  props: AssetProps | null | undefined,
+  inherited: AssetProps | null | undefined,
+): AssetPropsPlainObject {
+  return convertAssetPropsToPlainObject(formBlockComputed(props, inherited));
 }
 
 /**
@@ -159,10 +234,8 @@ export function prepareBlockToSave(
     throw new Error('Type is not set');
   }
 
-  const old_block_props = assignPlainValueToAssetProps({}, old_block?.props ?? {});
-  const old_block_inherited = old_block?.inherited
-    ? assignPlainValueToAssetProps({}, old_block.inherited ?? {})
-    : null;
+  const old_block_props = old_block?.props ?? {};
+  const old_block_inherited = old_block?.inherited ?? null;
 
   let result_props = old_block_props;
   let result_props_undo: AssetProps[] | undefined;
@@ -179,7 +252,7 @@ export function prepareBlockToSave(
     result_props_undo = result_props_applied_change.undo;
   }
 
-  const computed_plain = formBlockComputedToPlain(result_props, old_block_inherited);
+  const computed_assigned = formBlockComputed(result_props, old_block_inherited);
 
   const now = new Date().toISOString();
   const block_entity: SharedAssetBlock = {
@@ -192,11 +265,9 @@ export function prepareBlockToSave(
     createdAt: old_block?.createdAt ?? now,
     updatedAt: now,
     own: old_block?.own ?? true,
-    inherited: old_block_inherited
-      ? convertAssetPropsToPlainObject(old_block_inherited)
-      : null,
-    computed: computed_plain,
-    props: convertAssetPropsToPlainObject(result_props),
+    inherited: old_block_inherited,
+    computed: computed_assigned,
+    props: result_props,
   };
 
   if (block_undo) {
@@ -206,7 +277,7 @@ export function prepareBlockToSave(
           index: old_block.index,
           name: old_block.name,
           title: old_block.title,
-          props: assignPlainValueToAssetProps({}, old_block.props ?? {}),
+          props: { ...old_block.props },
           type: old_block.type,
         };
       }

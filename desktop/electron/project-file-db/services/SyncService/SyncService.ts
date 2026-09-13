@@ -627,21 +627,11 @@ export class SyncService {
         return this._getAssetsChangesServer(
             {
                 ...source_asset,
-                blocks: source_asset.blocks.map(b => {
-                    return {
-                        ...b,
-                        props: assignPlainValueToAssetProps({}, b.props),
-                    }
-                })
+                blocks: source_asset.blocks,
             },
             target_asset ? {
                 ...target_asset,
-                blocks: target_asset.blocks.map(b => {
-                    return {
-                        ...b,
-                        props: assignPlainValueToAssetProps({}, b.props),
-                    }
-                })
+                blocks: target_asset.blocks,
             } : null
         )
     }
@@ -775,7 +765,7 @@ export class SyncService {
                 index: r.index,
                 name: r.name,
                 title: r.title,
-                props: assignPlainValueToAssetProps({}, r.props),
+                props: r.props,
                 type: r.type,
             };
         }
@@ -949,9 +939,9 @@ export class SyncService {
         for(const block of asset.blocks){
             const new_block: AssetBlockEntity = {
                 ...block,
-                props: await this.convertLocalPropsToServer(block.props),
-                computed: await this.convertLocalPropsToServer(block.computed),
-                inherited: block.inherited ? await this.convertLocalPropsToServer(block.inherited) : null,
+                props: await this.convertLocalAssignedPropsToServer(block.props),
+                computed: await this.convertLocalAssignedPropsToServer(block.computed),
+                inherited: block.inherited ? await this.convertLocalAssignedPropsToServer(block.inherited) : null,
                 rights: 5
             };
             new_asset.blocks.push(new_block);
@@ -969,6 +959,27 @@ export class SyncService {
 
     async convertLocalPropsToServer(local_block_props: AssetPropsPlainObjectValue): Promise<AssetProps>{
         let props = assignPlainValueToAssetProps({}, local_block_props);
+        for(const [key, prop] of Object.entries(props)) {
+            const prop_type = getAssetPropType(prop);
+            if(prop_type === AssetPropType.TEXT) {
+                for (const [ind, sub_prop] of (prop as AssetPropValueText).Ops.entries()) {
+                    if(sub_prop.insert?.file?.value && 
+                        getAssetPropType(sub_prop.insert?.file?.value) === AssetPropType.FILE){
+                        const new_prop = await this.convertLocalFileToServer(sub_prop.insert.file.value);
+                        (props[key] as any).Ops[ind].insert.file.value = new_prop;
+                    }
+                }
+            }
+            else if(prop_type === AssetPropType.FILE){
+                const new_prop = await this.convertLocalFileToServer(prop as AssetPropValueFile);
+                props[key] = new_prop;
+            }
+        }
+        return props;
+    }
+
+    async convertLocalAssignedPropsToServer(local_block_props: AssetProps): Promise<AssetProps>{
+        let props: AssetProps = structuredClone(local_block_props);
         for(const [key, prop] of Object.entries(props)) {
             const prop_type = getAssetPropType(prop);
             if(prop_type === AssetPropType.TEXT) {
@@ -1039,36 +1050,14 @@ export class SyncService {
 
     async convertServerAssetToLocal (server_asset: AssetFull): Promise<ProjectFileDbAsset>{
         const local_asset: ProjectFileDbAsset = {
-            id: server_asset.id,   
-            typeIds: [...server_asset.typeIds],
-            parentIds: [...server_asset.parentIds],
-            ownTitle: server_asset.ownTitle,
-            ownIcon: server_asset.ownIcon,
+            ...server_asset,
             blocks: [],
-            comments: server_asset.comments,
-            references: server_asset.references,
-            projectId: server_asset.projectId,
-            workspaceId: server_asset.workspaceId,
-            name: server_asset.name,
-            title: server_asset.title,
-            icon: server_asset.icon,
-            isAbstract: server_asset.isAbstract,
-            createdAt: server_asset.createdAt,
-            updatedAt: server_asset.updatedAt,
-            deletedAt: server_asset.deletedAt,
-            rights: server_asset.rights,
-            index: server_asset.index,
-            creatorUserId: server_asset.creatorUserId,
-            unread: server_asset.unread,
-            hasImage: server_asset.hasImage,
         }
         for(const block of server_asset.blocks){
             const local_block = await this.convertServerPropsToLocal(block);
             local_asset.blocks.push({
                 ...local_block,
-                props: convertAssetPropsToPlainObject(local_block.props),
-                computed: convertAssetPropsToPlainObject(local_block.computed),
-                inherited: local_block.inherited ? convertAssetPropsToPlainObject(local_block.inherited) : null,
+                // Store assigned — no plain conversion (sync now works on assigned)
             })
         }
         return local_asset; 

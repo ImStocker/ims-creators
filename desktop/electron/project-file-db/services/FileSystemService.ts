@@ -11,6 +11,8 @@ import path from "node:path";
 import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../project-db-constants";
 import log from 'electron-log/main';
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
+import { plainBlockToAssigned } from "../logic/asset-ops";
+import { assignPlainValueToAssetProps } from '~ims-app-base/logic/types/Props';
    
 type FileSystemExpectChange = {
     filepaths: string[]
@@ -110,6 +112,8 @@ export class FileSystemService{
                 asset.updatedAt = updated_at;
                 asset.projectId = this.db.info.id ?? '';
                 asset.rights = AssetRights.FULL_ACCESS;
+                // On-disk blocks are plain — store them in assigned (flatten) form
+                asset.blocks = (asset.blocks ?? []).map(block => plainBlockToAssigned(block as any));
                 return {
                     type: 'asset',
                     localPath: local_path,
@@ -183,12 +187,12 @@ export class FileSystemService{
                     updatedAt: updated_at,
                     ownTitle: null,
                     own: true,
-                    props: {
+                    props: assignPlainValueToAssetProps({}, {
                         format: 'md',
-                    },
-                    computed: {
+                    }),
+                    computed: assignPlainValueToAssetProps({}, {
                         format: 'md',
-                    },
+                    }),
                     inherited: {},
                 },
                 {
@@ -201,12 +205,12 @@ export class FileSystemService{
                     updatedAt: updated_at,
                     ownTitle: null,
                     own: true,
-                    props: {
+                    props: assignPlainValueToAssetProps({}, {
                         value: file,
-                    },
-                    computed: {
+                    }),
+                    computed: assignPlainValueToAssetProps({}, {
                         value: file,
-                    },
+                    }),
                     inherited: {},
                 }],
                 comments: [],
@@ -245,8 +249,8 @@ export class FileSystemService{
             ...file_timestamps,
             ownTitle: null,
             own: true,
-            props: { ...meta_values },
-            computed: { ...meta_values },
+            props: assignPlainValueToAssetProps({}, { ...meta_values }),
+            computed: assignPlainValueToAssetProps({}, { ...meta_values }),
             inherited: {},
         }];
 
@@ -266,8 +270,8 @@ export class FileSystemService{
                     ownTitle: null,
                     own: true,
                     delete: true,
-                    props: {},
-                    computed: {},
+                    props: assignPlainValueToAssetProps({}, {}),
+                    computed: assignPlainValueToAssetProps({}, {}),
                     inherited: {},
                 });
                 continue;
@@ -308,8 +312,8 @@ export class FileSystemService{
                 updatedAt: bm.updatedAt ?? updated_at,
                 ownTitle: null,
                 own: true,
-                props: block_props,
-                computed: block_computed,
+                props: assignPlainValueToAssetProps({}, block_props),
+                computed: assignPlainValueToAssetProps({}, block_computed),
                 inherited: {},
             });
         }
@@ -379,8 +383,8 @@ export class FileSystemService{
             ...file_timestamps,
             ownTitle: null,
             own: true,
-            props: {},
-            computed: {},
+            props: assignPlainValueToAssetProps({}, {}),
+            computed: assignPlainValueToAssetProps({}, {}),
             inherited: {},
         }];
 
@@ -408,8 +412,8 @@ export class FileSystemService{
                     ...file_timestamps,
                     ownTitle: null,
                     own: true,
-                    props: block_props,
-                    computed: block_computed,
+                    props: assignPlainValueToAssetProps({}, block_props),
+                    computed: assignPlainValueToAssetProps({}, block_computed),
                     inherited: {},
                 });
                 index++;
@@ -818,12 +822,13 @@ export class FileSystemService{
         this.db.workspace.workspaces.clear();
 
         // System
-        this.db.asset.systemAssets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(asset => {
-            return {...asset, rights: 1}
-        }))
-        this.db.asset.assets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(asset => {
-            return {...asset, rights: 1}
-        }));
+        const toSystemAsset = (asset: ProjectFileDbAsset): ProjectFileDbAsset => ({
+            ...asset,
+            rights: 1,
+            blocks: (asset.blocks ?? []).map(block => plainBlockToAssigned(block as any)),
+        })
+        this.db.asset.systemAssets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(toSystemAsset))
+        this.db.asset.assets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(toSystemAsset));
         this.db.workspace.workspaces.addMany((SystemBundle.workspaces as unknown as ProjectFileDbWorkspace[]).map(workspace => {
             return {...workspace, rights: 1}
         }));

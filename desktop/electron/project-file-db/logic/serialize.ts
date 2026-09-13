@@ -1,4 +1,5 @@
 import type { AssetPropsPlainObject } from '~ims-app-base/logic/types/Props';
+import { convertAssetPropsToPlainObject } from '~ims-app-base/logic/types/Props';
 import type { SharedAssetBlock } from './asset-ops';
 import { BLOCK_NAME_META } from '~ims-app-base/logic/constants';
 
@@ -46,9 +47,27 @@ export function serializeAssetToJSON(
     references: asset.references ?? [],
   };
 
-  // Write blocks if present (Electron always writes them)
+  // Write blocks if present (Electron always writes them).
+  // Stored blocks are in assigned (flatten) form; persist them as plain objects.
   if (asset.blocks) {
-    ima_asset.blocks = asset.blocks;
+    ima_asset.blocks = asset.blocks.map((block) => {
+      const disk_block: Record<string, unknown> = {
+        id: block.id,
+        type: block.type,
+        name: block.name ?? null,
+        title: block.title ?? null,
+        index: block.index,
+        own: block.own,
+        ownTitle: block.ownTitle,
+        createdAt: block.createdAt,
+        updatedAt: block.updatedAt,
+        props: convertAssetPropsToPlainObject(block.props ?? {}),
+        computed: convertAssetPropsToPlainObject(block.computed ?? {}),
+        inherited: block.inherited ? convertAssetPropsToPlainObject(block.inherited) : null,
+      };
+      if (block.delete) disk_block.delete = true;
+      return disk_block;
+    });
   }
 
   // Build values from blocks (user-props only, filtered)
@@ -59,7 +78,7 @@ export function serializeAssetToJSON(
     );
     for (const block of blocks_for_values) {
       if (!block.name) continue;
-      const values_block_props = { ...block.props };
+      const values_block_props = convertAssetPropsToPlainObject(block.props ?? {});
       const block_props_keys = Object.keys(values_block_props);
       for (const block_props_key of block_props_keys) {
         if (/^(__|~).+/.test(block_props_key)) {
@@ -102,7 +121,9 @@ export function serializeAssetToNewFormatJSON(
 
   // Find the __meta block
   const meta_block = blocks.find((b) => b.name === BLOCK_NAME_META);
-  const meta_block_own_props = meta_block ? { ...meta_block.props } : {};
+  const meta_block_own_props = meta_block
+    ? convertAssetPropsToPlainObject(meta_block.props ?? {})
+    : {};
 
   // Top-level keys: own blocks (non-empty props, not __meta)
   for (const block of blocks) {
@@ -113,12 +134,13 @@ export function serializeAssetToNewFormatJSON(
     if (!has_own_props) continue;
 
     const key = block.name ? block.name : `@${block.id}`;
+    const block_props_plain = convertAssetPropsToPlainObject(block.props ?? {});
 
     // Markdown blocks: unwrap value
-    if (block.type === 'markdown' && typeof block.props.value === 'string') {
-      result[key] = block.props.value;
+    if (block.type === 'markdown' && typeof block_props_plain.value === 'string') {
+      result[key] = block_props_plain.value;
     } else {
-      result[key] = { ...block.props };
+      result[key] = { ...block_props_plain };
     }
   }
 

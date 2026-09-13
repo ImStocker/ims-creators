@@ -16,7 +16,7 @@ import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IPr
 import { sendEventToProjectDbWindows } from "./project-registry";
 import { SettingsService } from "./services/SettingsService";
 import type { AssetReferenceEntity, AssetShort } from "~ims-app-base/logic/types/AssetsType";
-import type { AssetPropsPlainObject } from "~ims-app-base/logic/types/Props";
+import type { AssetProps, AssetPropsPlainObject } from "~ims-app-base/logic/types/Props";
 import type { AssetCommentDTO } from "~ims-app-base/logic/types/CommentTypes";
 import type { SyncCurrentState } from "#bridge/types/SyncTypes";
 import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
@@ -31,9 +31,9 @@ export type ProjectFileDbAssetBlock = {
   updatedAt: string;
   ownTitle: string | null;
   own: boolean;
-  props: AssetPropsPlainObject,
-  computed: AssetPropsPlainObject,
-  inherited: AssetPropsPlainObject | null,
+  props: AssetProps,
+  computed: AssetProps,
+  inherited: AssetProps | null,
   isComputed?: boolean,
   delete?: true,
 }
