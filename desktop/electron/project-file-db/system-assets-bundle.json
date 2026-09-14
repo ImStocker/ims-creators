@@ -3037,7 +3037,7 @@
           "name": "description",
           "title": "[[t:Description]]",
           "own": true,
-          "type": "text",
+          "type": "markdown",
           "props": {},
           "computed": {},
           "inherited": null,
