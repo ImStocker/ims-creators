@@ -20,6 +20,7 @@
           :readonly="readonly"
           :item="mainItem"
           :files="[mainItem]"
+          :allow-caption="false"
           @delete="deleteImage(mainItem)"
         ></gallery-block-item
       ></screenshot-renderer>

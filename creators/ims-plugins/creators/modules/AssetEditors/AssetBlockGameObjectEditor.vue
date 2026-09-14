@@ -39,7 +39,19 @@
       :hide-root-links="hideRootLinks"
       :show-comments="showComments"
       @update:is-dirty="$emit('update:is-dirty', $event)"
-    ></asset-block-editor>
+    >
+      <template #add-blocks-actions>
+        <button
+          v-if="canAddPropQuick"
+          class="AssetBlockGameObjectEditor-quickProp is-button"
+          :title="$t('assetEditor.quickAddProp')"
+          @click="quickAddPropBlock()"
+        >
+          <i class="ri-price-tag-3-line"></i>
+          {{ $t('assetEditor.quickAddProp') }}
+        </button>
+      </template>
+    </asset-block-editor>
   </div>
 </template>
 
@@ -47,6 +59,8 @@
 import { type PropType, defineComponent } from 'vue';
 import AssetBlockEditor from '~ims-app-base/components/Asset/Editor/AssetBlockEditor.vue';
 import type { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditorVM';
+import UiManager from '~ims-app-base/logic/managers/UiManager';
+import EditorManager from '~ims-app-base/logic/managers/EditorManager';
 import GameObjectGalleryBlock from './GameObjectGalleryBlock.vue';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { makeBlockIdAnchorTagId } from '~ims-app-base/logic/utils/assets';
@@ -98,6 +112,9 @@ export default defineComponent({
         !this.galleryBlock || this.galleryBlock.rights <= AssetRights.READ_ONLY
       );
     },
+    canAddPropQuick() {
+      return this.assetBlockEditor.canAddBlocks();
+    },
   },
   mounted() {
     this.$emit('update:is-dirty', this.isDirty);
@@ -134,6 +151,25 @@ export default defineComponent({
       if (!otherEditor) return false;
       return otherEditor.revealAssetBlock(blockId, anchor);
     },
+    async quickAddPropBlock() {
+      await this.$getAppManager()
+        .get(UiManager)
+        .doTask(async () => {
+          const created_block = await this.assetBlockEditor.createBlock('prop');
+          if (!created_block) return;
+          const otherEditor = this.$refs['otherEditor'] as InstanceType<
+            typeof AssetBlockEditor
+          > | null;
+          if (
+            otherEditor &&
+            this.$getAppManager().get(EditorManager).getBlockTypesMap()['prop']
+              ?.focusOnAdded
+          ) {
+            await otherEditor.focusByBlockId(created_block.id);
+          }
+          await this.assetBlockEditor.commitBlock(created_block.id);
+        });
+    },
   },
 });
 </script>
@@ -158,6 +194,37 @@ export default defineComponent({
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   flex: 1;
+}
+
+.AssetBlockGameObjectEditor-quickProp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 var(--editor-block-padding-right) 20px
+    var(--editor-block-padding-left);
+  padding: 5px 10px;
+  border: 1.5px dashed var(--local-border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--local-sub-text-color);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  i {
+    font-size: 15px;
+  }
+
+  &:hover {
+    color: var(--local-text-color);
+    border-color: var(--local-border-color);
+    background: var(--button-bg-color-hover);
+  }
 }
 
 @include devices-mixins.device-type(not-mb) {
