@@ -1711,7 +1711,7 @@
       "references": [],
       "icon": "file-settings-fill",
       "index": null,
-      "name": "game-mechanics",
+      "name": null,
       "ownIcon": "file-settings-fill",
       "ownTitle": "[[t:GameMechanics]]",
       "parentIds": [],
@@ -2990,6 +2990,62 @@
           ]
         }
       }
+    },
+    {
+      "id": "00000000-506f-4400-b6d0-000000000037",
+      "blocks": [
+        {
+          "id": "00000000-0000-0000-0000-000000000100",
+          "name": "__meta",
+          "title": null,
+          "own": true,
+          "type": "props",
+          "props": {
+            "complete_set": null,
+            "complete_comp": 0,
+            "complete_track": true,
+            "plan_milestone": null,
+            "complete_progress": null
+          },
+          "computed": {
+            "complete_set": null,
+            "complete_comp": 0,
+            "complete_track": true,
+            "plan_milestone": null,
+            "complete_progress": null
+          },
+          "inherited": null,
+          "index": 0,
+          "createdAt": "2025-07-31T12:55:34.293Z",
+          "updatedAt": "2025-07-31T12:55:34.293Z"
+        },
+        {
+          "id": "00000000-0000-0000-0000-370000000001",
+          "name": null,
+          "title": "[[t:Description]]",
+          "own": true,
+          "type": "markdown",
+          "props": {},
+          "computed": {},
+          "inherited": null,
+          "index": 1,
+          "createdAt": "2025-07-31T12:55:34.293Z",
+          "updatedAt": "2025-07-31T12:55:34.293Z"
+        }
+      ],
+      "isAbstract": true,
+      "projectId": "111112",
+      "references": [],
+      "icon": "file-settings-fill",
+      "index": null,
+      "name": "game-mechanics",
+      "ownIcon": "file-settings-fill",
+      "ownTitle": "[[t:GameMechanics]]",
+      "parentIds": [],
+      "title": "[[t:GameMechanics]]",
+      "typeIds": [],
+      "workspaceId": "00000000-0000-0000-0000-000000000002",
+      "values": {}
     },
     {
       "id": "00000000-c197-40c8-9fc6-000000000035",

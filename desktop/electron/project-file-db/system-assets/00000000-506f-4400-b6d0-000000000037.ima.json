@@ -1,5 +1,5 @@
 {
- "id": "00000000-0000-0000-0000-000000000037",
+ "id": "00000000-506f-4400-b6d0-000000000037",
  "blocks": [
   {
    "id": "00000000-0000-0000-0000-000000000100",
@@ -31,7 +31,7 @@
    "name": null,
    "title": "[[t:Description]]",
    "own": true,
-   "type": "text",
+   "type": "markdown",
    "props": {},
    "computed": {},
    "inherited": null,
@@ -45,7 +45,7 @@
  "references": [],
  "icon": "file-settings-fill",
  "index": null,
- "name": null,
+ "name": "game-mechanics",
  "ownIcon": "file-settings-fill",
  "ownTitle": "[[t:GameMechanics]]",
  "parentIds": [],
