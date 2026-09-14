@@ -99,7 +99,7 @@ export function serializeAssetToJSON(
  * Structure:
  * - Top-level keys = block values (named by block name, or @blockId for unnamed)
  * - __meta: system fields + __meta block values + block metadata array
- * - For `markdown` / `text` / `prop` block types the `value` prop is stored
+ * - For `markdown` / `text` / `prop` / `assetList` block types the `value` prop is stored
  *   directly at the top-level key (no "value" wrapper); every other own prop
  *   of such a block is written to `block[X].meta`. For all other block types
  *   keys starting with `__` are skipped from the top-level object and written
@@ -132,7 +132,7 @@ export function serializeAssetToNewFormatJSON(
     ? convertAssetPropsToPlainObject(meta_block.props ?? {})
     : {};
 
-  const value_unwrapped_types = new Set(['markdown', 'text', 'prop']);
+  const value_unwrapped_types = new Set(['markdown', 'text', 'prop', 'assetList']);
 
   // Top-level keys: own blocks (non-empty props, not __meta)
   for (const block of blocks) {
