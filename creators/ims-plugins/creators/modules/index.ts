@@ -4,6 +4,7 @@ import {
   DIAGRAM_ASSET_ID,
   SCRIPT_ASSET_ID,
   GAME_OBJECT_ASSET_ID,
+  LEGACY_GAME_OBJECT_ASSET_ID,
   GRAPH_ASSET_ID,
 } from '~ims-app-base/logic/constants';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
@@ -57,6 +58,12 @@ export default function () {
             appManager
               .get(EditorManager)
               .registerAssetLayoutBind(GAME_OBJECT_ASSET_ID, 'gameobject'),
+          );
+
+          cancel_callbacks.push(
+            appManager
+              .get(EditorManager)
+              .registerAssetLayoutBind(LEGACY_GAME_OBJECT_ASSET_ID, 'gameobject'),
           );
 
           return async () => {

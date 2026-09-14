@@ -1,5 +1,5 @@
 {
- "id": "00000000-0000-0000-0000-000000000035",
+ "id": "00000000-c197-40c8-9fc6-000000000035",
  "blocks": [
   {
    "id": "00000000-0000-0000-0000-000000000100",
@@ -53,19 +53,6 @@
    "updatedAt": "2025-06-24T12:55:34.293Z"
   },
   {
-   "id": "00000000-0000-0000-0000-350000000003",
-   "name": "props",
-   "title": "[[t:Properties]]",
-   "own": true,
-   "type": "props",
-   "props": {},
-   "computed": {},
-   "inherited": null,
-   "index": 3,
-   "createdAt": "2025-06-24T12:55:34.293Z",
-   "updatedAt": "2025-06-24T12:55:34.293Z"
-  },
-  {
    "id": "00000000-0000-0000-0000-350000000004",
    "name": "locale",
    "title": "[[t:Localization]]",
@@ -74,7 +61,7 @@
    "props": {},
    "computed": {},
    "inherited": null,
-   "index": 4,
+   "index": 3,
    "createdAt": "2025-06-24T12:55:34.293Z",
    "updatedAt": "2025-06-24T12:55:34.293Z"
   }
@@ -84,7 +71,7 @@
  "references": [],
  "icon": "shapes-fill",
  "index": null,
- "name": null,
+ "name": "game-object",
  "ownIcon": "shapes-fill",
  "ownTitle": "[[t:GameObject]]",
  "parentIds": [],
@@ -94,7 +81,6 @@
  "values": {
   "gallery": {},
   "description": {},
-  "props": {},
   "locale": {}
  }
 }
