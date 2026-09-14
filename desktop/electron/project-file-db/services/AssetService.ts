@@ -939,6 +939,9 @@ export class AssetService implements IProjectDatabaseAsset {
                     ...params.set,
                     blocks: merge_old_blocks
                 };
+                if (params.set.icon !== undefined) {
+                    new_asset.ownIcon = params.set.icon;
+                }
                 if (params.set.blocks || params.set.parentIds) {
                     new_asset.updatedAt = (new Date()).toISOString();
                 }
