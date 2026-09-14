@@ -9,6 +9,8 @@ export class LevelEditorBlockDefinition extends BlockTypeDefinition {
   name = 'leveleditor';
   component = async () => (await import('./LevelEditorBlock.vue')).default;
   icon = 'map-2-line';
+  override group = 'editors';
+  override index = 23;
   override resizableBlockHeight = true;
   override aiSpec = levelEditorBlockAiSpec.aiSpec;
   override createController(

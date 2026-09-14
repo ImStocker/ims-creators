@@ -15,6 +15,8 @@ export class DialogBlockDefinition extends BlockTypeDefinition {
   name = 'script';
   component = async () => (await import('./DialogBlock.vue')).default;
   icon = 'file-paper-2-fill';
+  override group = 'editors';
+  override index = 21;
   override resizableBlockHeight = true;
   override aiSpec = dialogBlockAiSpec.aiSpec;
 

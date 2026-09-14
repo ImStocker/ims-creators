@@ -8,6 +8,9 @@ export class TextGridBlockDefinition extends BlockTypeDefinition {
   name = 'textgrid';
   component = async () => (await import('./TextGridBlock.vue')).default;
   icon = 'layout-grid-fill';
+  override group = 'other';
+  override index = 35;
+  override deprecated = true;
   override hideInAdding = false;
   override focusOnAdded = false;
   override aiSpec = textGridBlockAiSpec.aiSpec;

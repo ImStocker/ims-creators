@@ -9,6 +9,8 @@ export class GraphBlockDefinition extends BlockTypeDefinition {
   name = 'graph';
   component = async () => (await import('./GraphBlock.vue')).default;
   icon = 'node-tree';
+  override group = 'editors';
+  override index = 22;
   override resizableBlockHeight = true;
   override aiSpec = graphBlockAiSpec.aiSpec;
 
