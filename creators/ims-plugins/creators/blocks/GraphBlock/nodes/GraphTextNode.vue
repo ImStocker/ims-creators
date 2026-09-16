@@ -50,7 +50,7 @@
             ></asset-link>
           </div>
           <template v-else>
-            <imc-editor
+            <imc-format-text-editor
               v-if="editing"
               ref="editorRef"
               v-model="localValue"
@@ -60,7 +60,7 @@
               :placeholder="$t('graphBlock.node.placeholder')"
               @update:model-value="onValueChange"
               @blur="onEditorBlur"
-            ></imc-editor>
+            ></imc-format-text-editor>
             <imc-presenter
               v-else
               :value="localValue"
@@ -174,7 +174,7 @@ import { Position, Handle, type ViewportTransform } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import type { GraphBlockController } from '../editor/GraphBlockController';
 import { DATA_COLOR_TO_HEX, hexToRgba } from '../editor/GraphEditor';
-import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
+import ImcFormatTextEditor from '~ims-app-base/components/Common/ImcFormatTextEditor.vue';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
@@ -198,7 +198,7 @@ export default defineComponent({
   name: 'GraphTextNode',
   components: {
     Handle,
-    ImcEditor,
+    ImcFormatTextEditor,
     ImcPresenter,
     ContextMenuZone,
     FilePresenter: defineAsyncComponent(
@@ -354,7 +354,7 @@ export default defineComponent({
       if (this.editing) {
         this.$nextTick(() => {
           const editor = this.$refs['editorRef'] as InstanceType<
-            typeof ImcEditor
+            typeof ImcFormatTextEditor
           > | null;
           if (editor) {
             editor.focus();

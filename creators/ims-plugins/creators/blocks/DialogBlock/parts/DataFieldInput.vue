@@ -31,7 +31,7 @@
       :disabled="readonly"
     />
     <template v-else-if="dataType.Type === AssetPropType.TEXT">
-      <imc-editor
+      <imc-format-text-editor
         v-if="!readonly"
         ref="input"
         v-model="modeValueComp"
@@ -44,7 +44,7 @@
         @input-value="modeValueComp = $event"
         @focus="elementInFocus = true"
         @blur="elementInFocus = false"
-      ></imc-editor>
+      ></imc-format-text-editor>
       <imc-presenter
         v-else
         :value="modeValueComp"
@@ -97,7 +97,7 @@ import isUUID from 'validator/es/lib/isUUID';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import type { AssetPropWhere } from '~ims-app-base/logic/types/PropsWhere';
 import AssetSelectorPropEditor from '~ims-app-base/components/Props/AssetSelectorPropEditor.vue';
-import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
+import ImcFormatTextEditor from '~ims-app-base/components/Common/ImcFormatTextEditor.vue';
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
 import AssetLinkPropPresenter from '~ims-app-base/components/Props/AssetLinkPropPresenter.vue';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
@@ -108,7 +108,7 @@ export default defineComponent({
   components: {
     AssetSelectorPropEditor,
     AssetLinkPropPresenter,
-    ImcEditor,
+    ImcFormatTextEditor,
     ImcPresenter,
     ImsInput,
   },

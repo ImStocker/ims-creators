@@ -29,7 +29,7 @@
         @drop="onDrop"
       >
         <div ref="cellEditor" class="ImcDiagram-cellEditor">
-          <imc-editor
+          <imc-format-text-editor
             v-if="editingCell"
             ref="cellEditorComp"
             v-model="editingCell.value"
@@ -40,7 +40,7 @@
                 ? editingCell.state.width + 'px'
                 : undefined,
             }"
-          ></imc-editor>
+          ></imc-format-text-editor>
         </div>
       </div>
       <Teleport
@@ -92,13 +92,13 @@ import {
   sameAssetPropObjects,
   type AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
-import ImcEditor from '~ims-app-base/components/ImcText/ImcEditor.vue';
+import ImcFormatTextEditor from '~ims-app-base/components/Common/ImcFormatTextEditor.vue';
 import ImcPresenter from '~ims-app-base/components/ImcText/ImcPresenter.vue';
 
 export default defineComponent({
   name: 'ImcDiagram',
   components: {
-    ImcEditor,
+    ImcFormatTextEditor,
     ImcPresenter,
     ImcDiagramToolbar,
   },
