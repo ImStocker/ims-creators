@@ -47,9 +47,9 @@
  "index": null,
  "name": null,
  "ownIcon": "file-settings-fill",
- "ownTitle": "[[t:GameMechanics]]",
- "parentIds": [],
- "title": "[[t:GameMechanics]]",
+"ownTitle": "[[t:LegacyGameMechanics]]",
+  "parentIds": [],
+  "title": "[[t:LegacyGameMechanics]]",
  "typeIds": [],
  "workspaceId": "00000000-0000-0000-0000-000000000002",
  "values": {}

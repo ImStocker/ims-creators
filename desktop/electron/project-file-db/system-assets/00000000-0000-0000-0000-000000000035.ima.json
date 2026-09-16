@@ -86,9 +86,9 @@
  "index": null,
  "name": null,
  "ownIcon": "shapes-fill",
- "ownTitle": "[[t:GameObject]]",
- "parentIds": [],
- "title": "[[t:GameObject]]",
+"ownTitle": "[[t:LegacyGameObject]]",
+  "parentIds": [],
+  "title": "[[t:LegacyGameObject]]",
  "typeIds": [],
  "workspaceId": "00000000-0000-0000-0000-000000000002",
  "values": {

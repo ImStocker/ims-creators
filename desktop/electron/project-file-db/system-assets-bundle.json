@@ -1580,9 +1580,9 @@
       "index": null,
       "name": null,
       "ownIcon": "shapes-fill",
-      "ownTitle": "[[t:GameObject]]",
+      "ownTitle": "[[t:LegacyGameObject]]",
       "parentIds": [],
-      "title": "[[t:GameObject]]",
+      "title": "[[t:LegacyGameObject]]",
       "typeIds": [],
       "workspaceId": "00000000-0000-0000-0000-000000000002",
       "values": {
@@ -1713,9 +1713,9 @@
       "index": null,
       "name": null,
       "ownIcon": "file-settings-fill",
-      "ownTitle": "[[t:GameMechanics]]",
+      "ownTitle": "[[t:LegacyGameMechanics]]",
       "parentIds": [],
-      "title": "[[t:GameMechanics]]",
+      "title": "[[t:LegacyGameMechanics]]",
       "typeIds": [],
       "workspaceId": "00000000-0000-0000-0000-000000000002",
       "values": {}
