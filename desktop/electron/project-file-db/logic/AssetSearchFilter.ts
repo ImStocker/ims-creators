@@ -256,7 +256,7 @@ export class AssetSearchFilter {
                             if (prop_filter.block.blockName) return b.name === prop_filter.block.blockName;
                             return false;
                         });
-                        if (block && block.isComputed) {
+                        if (block && block.computedAt) {
                             // computed is stored assigned — convert to plain for the propPath walk
                             asset_prop_value = block.computed ? convertAssetPropsToPlainObject(block.computed) : null;
                         }

@@ -34,7 +34,12 @@ export type ProjectFileDbAssetBlock = {
   props: AssetProps,
   computed: AssetProps,
   inherited: AssetProps | null,
-  isComputed?: boolean,
+  /**
+   * Transient cache-validity marker: when this block's `computed` was last
+   * (re)computed. Kept only in memory on full-computed assets — never
+   * serialized to file or sent to consumers.
+   */
+  computedAt?: string,
   delete?: true,
 }
 
@@ -49,11 +54,11 @@ export type ProjectFileDbAsset = AssetShort & {
   references: AssetReferenceEntity[];
   lastViewedAt?: string | null;
   /**
-   * Transient cache-validity stamps ({id, updatedAt} for the asset + its
-   * typeIds chain). Only kept in memory on full-computed assets — never
-   * serialized to file or sent to consumers.
+   * Transient cache-validity marker: when this asset's full form (blocks +
+   * inheritance) was last recomputed. Only kept in memory on full-computed
+   * assets — never serialized to file or sent to consumers.
    */
-  stamps?: { id: string; updatedAt: string }[];
+  computedAt?: string;
 };
 
 export type ProjectFileDbWorkspace = {

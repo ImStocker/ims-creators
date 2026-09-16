@@ -200,22 +200,27 @@ export class AssetService implements IProjectDatabaseAsset {
         return await this.computeFullAsset(db_asset, null);
     }
 
-    private _getFullAssetStamps(db_asset: ProjectFileDbAsset): { id: string, updatedAt: string }[] {
-        const stamps: { id: string, updatedAt: string }[] = [];
-        stamps.push({ id: db_asset.id, updatedAt: db_asset.updatedAt ?? '' });
+    private _getMaxTypeChangeTime(db_asset: ProjectFileDbAsset): string | null {
+        let max: string | null = null;
         for (const ancestor_id of db_asset.typeIds) {
             const ancestor = this.assets.byId.get(ancestor_id);
-            stamps.push({ id: ancestor_id, updatedAt: ancestor?.updatedAt ?? '' });
+            const t = ancestor?.updatedAt;
+            if (t && (max === null || t > max)) max = t;
         }
-        return stamps;
+        return max;
     }
 
-    private _fullAssetStampsMatch(cached: { id: string, updatedAt: string }[], current: { id: string, updatedAt: string }[]): boolean {
-        if (cached.length !== current.length) return false;
-        for (let i = 0; i < cached.length; i++) {
-            if (cached[i].id !== current[i].id) return false;
-            if (cached[i].updatedAt !== current[i].updatedAt) return false;
-        }
+    private _assetIsComputed(asset: ProjectFileDbAsset, parent_change_at: string | null): boolean {
+        if (!asset.computedAt) return false;
+        if (asset.updatedAt && asset.computedAt < asset.updatedAt) return false;
+        if (parent_change_at && asset.computedAt < parent_change_at) return false;
+        return true;
+    }
+
+    private _blockIsComputed(block: ProjectFileDbAssetBlock, asset_computed_at: string | null | undefined, parent_change_at: string | null): boolean {
+        if (!block.computedAt) return false;
+        if (parent_change_at && block.computedAt < parent_change_at) return false;
+        if (asset_computed_at && block.computedAt < asset_computed_at) return false;
         return true;
     }
 
@@ -224,16 +229,17 @@ export class AssetService implements IProjectDatabaseAsset {
             ...asset,
             blocks: asset.blocks.map(block => ({ ...block }))
         };
-        delete (result as any).stamps;
+        delete (result as any).computedAt;
         return result;
     }
 
     private _requestIsFullyComputed(asset: ProjectFileDbAsset, blocks_to_resolve: AssetBlockIdWithName[] | null): boolean {
+        const parent_change_at = this._getMaxTypeChangeTime(asset);
         if (blocks_to_resolve === null) {
-            return asset.blocks.every(block => block.delete || block.isComputed);
+            return asset.blocks.every(block => block.delete || this._blockIsComputed(block, asset.computedAt, parent_change_at));
         }
         return blocks_to_resolve.every(ref => asset.blocks.some(block =>
-            block.isComputed && (
+            this._blockIsComputed(block, asset.computedAt, parent_change_at) && (
                 (ref.blockId && ref.blockId === block.id) || (ref.blockName && ref.blockName === block.name)
             )
         ));
@@ -243,10 +249,11 @@ export class AssetService implements IProjectDatabaseAsset {
         db_asset: ProjectFileDbAsset,
         blocks_to_resolve: AssetBlockIdWithName[] | null = null,
     ): Promise<ProjectFileDbAsset> {
-        const stamps = this._getFullAssetStamps(db_asset);
         const current = this.assets.byId.get(db_asset.id) ?? db_asset;
-        const current_fresh = !!current.stamps && this._fullAssetStampsMatch(current.stamps, stamps);
-        if (current_fresh && this._requestIsFullyComputed(current, blocks_to_resolve)) {
+        const parent_change_at = this._getMaxTypeChangeTime(current);
+        const asset_stale = !this._assetIsComputed(current, parent_change_at);
+
+        if (!asset_stale && this._requestIsFullyComputed(current, blocks_to_resolve)) {
             return this._cloneFullAsset(current);
         }
 
@@ -289,17 +296,18 @@ export class AssetService implements IProjectDatabaseAsset {
             }
         }
 
+        const now = new Date().toISOString();
         const existing_blocks: ProjectFileDbAssetBlock[] = [];
         for (const block of asset.blocks) {
             if (block.delete) {
                 existing_blocks.push({ ...block });
                 continue;
             }
-            if (!block.isComputed && this._blockNeedsResolve(block, blocks_to_resolve)) {
+            if ((asset_stale || !this._blockIsComputed(block, current.computedAt, parent_change_at)) && this._blockNeedsResolve(block, blocks_to_resolve)) {
                 existing_blocks.push({
                     ...block,
                     computed: formBlockComputed(block.props ?? {}, block.inherited),
-                    isComputed: true,
+                    computedAt: now,
                 });
             }
             else {
@@ -308,7 +316,9 @@ export class AssetService implements IProjectDatabaseAsset {
         }
         asset.blocks = existing_blocks;
 
-        asset.stamps = stamps;
+        if (asset_stale) {
+            asset.computedAt = now;
+        }
         this.assets.replace(asset);
         return this._cloneFullAsset(asset);
     }
@@ -387,7 +397,12 @@ export class AssetService implements IProjectDatabaseAsset {
             chain.unshift(parent.id);
             cursor = parent;
         }
-        asset.typeIds = chain;
+        if (asset.typeIds.length !== chain.length || asset.typeIds.some((id, i) => id !== chain[i])) {
+            // Type-chain membership changed — clear the cache marker so the
+            // asset (and its subtree) is recomputed on next read.
+            delete (asset as any).computedAt;
+            asset.typeIds = chain;
+        }
     }
 
     private _recalcTypeIdSubtree(asset_id: string, visited: Set<string> = new Set<string>()): void {
@@ -443,7 +458,7 @@ export class AssetService implements IProjectDatabaseAsset {
                     const new_blocks: AssetBlockEntity[] = [];
                     for (const block of asset.blocks) {
                         if (block.delete) continue;
-                        const { isComputed: _isComputed, delete: _block_delete, ...block_fields } = block;
+                        const { computedAt: _computedAt, delete: _block_delete, ...block_fields } = block;
                         new_blocks.push({
                             ...block_fields,
                             rights: 5,
@@ -795,13 +810,14 @@ export class AssetService implements IProjectDatabaseAsset {
     }
 
     private _formComputedAsset(asset_full: ProjectFileDbAsset): ProjectFileDbAsset {
+        const now = new Date().toISOString();
         return {
             ...asset_full,
             blocks: asset_full.blocks.map(block => {
                 return {
                     ...block,
                     computed: formBlockComputed(block.props ?? {}, block.inherited),
-                    isComputed: true,
+                    computedAt: now,
                 };
             })
         };
@@ -945,6 +961,7 @@ export class AssetService implements IProjectDatabaseAsset {
         if (assets_from_db.length > 0) {
             const changing_assets = [...assets_from_db];
             for (let changing_asset of changing_assets) {
+                let was_changed = false;
                 const undo: AssetSetDTO = {};
                 for (const [prop, val] of Object.entries(params.set) as [keyof AssetSetDTO, any][]) {
                     switch (prop) {
@@ -955,6 +972,7 @@ export class AssetService implements IProjectDatabaseAsset {
                         default:
                             if ((changing_asset)[prop] !== val) {
                                 undo[prop] = (changing_asset)[prop] as any;
+                                was_changed = true;
                             }
                     }
                 }
@@ -964,6 +982,7 @@ export class AssetService implements IProjectDatabaseAsset {
                     const full_asset = await this.getAssetFullById(changing_asset.id) 
                     const aug_old_blocks = this._augmentMergeOldBlocks(changing_asset.blocks, full_asset?.blocks, params.set.blocks);
                     merge_old_blocks = this._mergeBlocksToSave(aug_old_blocks, params.set.blocks, undo)
+                    was_changed = true;
                 }
                 
                 const new_asset: ProjectFileDbAsset = {
@@ -974,7 +993,7 @@ export class AssetService implements IProjectDatabaseAsset {
                 if (params.set.icon !== undefined) {
                     new_asset.ownIcon = params.set.icon;
                 }
-                if (params.set.blocks || params.set.parentIds) {
+                if (was_changed) {
                     new_asset.updatedAt = (new Date()).toISOString();
                 }
 
