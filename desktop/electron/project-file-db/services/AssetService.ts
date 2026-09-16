@@ -7,7 +7,7 @@ import fse from 'fs-extra';
 import * as node_path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetSearchFilter } from "../logic/AssetSearchFilter";
-import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getImsExtname, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById } from "../utils/files";
+import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getImsExtname, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, absolutePathToUuid } from "../utils/files";
 import { ASSET_EXT } from "./FileSystemService";
 import isUUID from 'validator/es/lib/isUUID';
 import { once } from "node:events";
@@ -702,7 +702,7 @@ export class AssetService implements IProjectDatabaseAsset {
         let parent_props: ProjectFileDbAssetBlock[] = [];
         let type_ids: string[] = [];
 
-        const asset_id = params.id ?? uuidv4();
+        let asset_id = params.id ?? uuidv4();
         const system_asset = this.systemAssets.byId.get(asset_id);
         let asset_name = null;
         let asset_title = null;
@@ -770,6 +770,20 @@ export class AssetService implements IProjectDatabaseAsset {
             lastViewedAt: null,
             localName: params.localName,
         };
+        if (!params.id && this.isMarkdownAsset(asset_full)) {
+            // Markdown files carry no embeddable id, so their id is derived from the
+            // save path. Assign it at creation to match what the fs loader computes,
+            // otherwise the id would change once the file is re-read from disk.
+            const parent_workspace_path = asset_full.workspaceId
+                ? getWorkspaceLocalPathFolderById(asset_full.workspaceId, this.db)
+                : this.db.localPath;
+            const suggested_name = await this.getAssetFileSavingFilename(
+                asset_full,
+                (name) => !fs.existsSync(node_path.join(parent_workspace_path, name)),
+            );
+            asset_id = absolutePathToUuid(node_path.join(parent_workspace_path, suggested_name), this.db.localPath);
+            asset_full.id = asset_id;
+        }
         tx.changeAsset(null, asset_full)
         changeRecord.addChange(asset_id, {
             delete: true
