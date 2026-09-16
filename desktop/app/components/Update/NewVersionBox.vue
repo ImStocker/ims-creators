@@ -5,7 +5,7 @@
             {{ $t('desktop.about.updateBoxAvail') }}
         </template>
         <template v-else-if="status === UpdateStatus.DOWNLOADING">
-            ...
+            {{ downloadPercent }} %
         </template>
         <template v-else-if="status === UpdateStatus.DOWNLOADED">
             {{ $t('desktop.about.updateBoxReady') }}

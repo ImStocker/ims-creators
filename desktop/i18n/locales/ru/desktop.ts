@@ -34,7 +34,8 @@ export default {
         openInCloud: 'Открыть в облаке',
         repeat: 'Повторить',
         pauseSyncing: 'Приостановить синхронизацию',
-        loginToSync: "Пожалуйста, войдите в свою PRO-учетную запись, чтобы синхронизировать проект"
+        loginToSync: "Пожалуйста, войдите в свою PRO-учетную запись, чтобы синхронизировать проект",
+        unlinkFromCloud: 'Отвязать проект от облака'
       },
       header: 'Ошибки синхронизации',
       synchronization: 'Синхронизация',
@@ -43,7 +44,15 @@ export default {
       notSyncedWorkspaces: 'Несинхронизированные папки',
       noErrors: 'Нет ошибок',
       createNew: 'Создать новый',
-      selectExist: 'Выбрать существующий'
+      selectExist: 'Выбрать существующий',
+      status: {
+        active: 'Синхронизация активна',
+        disabled: 'Синхронизация отключена'
+      },
+      unlinkFromCloudHeader: 'Отвязка проекта',
+      unlinkFromCloudConfirm: 'Проект будет отвязан от облака, а синхронизация остановлена. Продолжить?',
+      unlinkFromCloudEnd: 'Проект отвязан от облака',
+      actionsHeader: 'Действия'
     },
     welcome: {
       begin: 'Добро пожаловать в',
@@ -116,6 +125,7 @@ export default {
       searchSettings: 'Поиск настроек',
       groups: {
         common: 'Общие',
+        sync: 'Синхронизация',
         plugins: 'Плагины',
         other: 'Другое',
         mcp: 'MCP-сервер',
