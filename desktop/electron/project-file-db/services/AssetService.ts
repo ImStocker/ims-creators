@@ -792,7 +792,7 @@ export class AssetService implements IProjectDatabaseAsset {
         };
     }
 
-    private _checkIsMdFile(asset_full: ProjectFileDbAsset) {
+    isMarkdownAsset(asset_full: ProjectFileDbAsset) {
         const formed_asset = this._formComputedAsset(asset_full);
         return formed_asset.blocks?.some(
             (block) => block.name === BLOCK_NAME_META && (block.computed as any)?.format === 'md',
@@ -804,7 +804,7 @@ export class AssetService implements IProjectDatabaseAsset {
         const formed_asset = this._formComputedAsset(asset_full);
         let local_path = getAssetLocalPath(asset_full, this.db);
         const format = await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
-        const is_md_file = this._checkIsMdFile(formed_asset);
+        const is_md_file = this.isMarkdownAsset(formed_asset);
         if (is_md_file && getImsExtname(asset_full.localName) === ASSET_EXT) {
             const new_name = await this.getAssetFileSavingFilename(
                 formed_asset,
@@ -862,7 +862,7 @@ export class AssetService implements IProjectDatabaseAsset {
 
     async saveAssetFileToStream(asset_full: ProjectFileDbAsset, target: Writable, format?: AssetSaveFormat) {
         const formed_asset = this._formComputedAsset(asset_full);
-        if (this._checkIsMdFile(formed_asset)) {
+        if (this.isMarkdownAsset(formed_asset)) {
             const md_block = formed_asset.blocks.find(block => block.type === 'markdown');
             target.write(md_block ? (md_block.computed.value ?? '').toString() : '')
             return;
@@ -879,7 +879,7 @@ export class AssetService implements IProjectDatabaseAsset {
     }
 
     async getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean) {
-        if (this._checkIsMdFile(asset_full)) {
+        if (this.isMarkdownAsset(asset_full)) {
             return suggestUniqueFilename(asset_full.title, '.md', check_avail);
         }
         const format = await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);

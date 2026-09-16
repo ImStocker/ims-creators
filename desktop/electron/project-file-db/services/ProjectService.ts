@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { ProjectFullInfo, ProjectSettingsValue } from '~ims-app-base/logic/types/ProjectTypes'
 import type { AiSession, AiTurn } from '~ims-app-base/logic/ai-core/AiTypes'
-import type { ProjectFileDb } from "../ProjectFileDb"
+import type { ProjectFileDb, ProjectFileDbAsset } from "../ProjectFileDb"
 import fs from "node:fs";
 import type { Readable } from "node:stream";
 import tmp from "tmp";
@@ -9,7 +9,9 @@ import JSZip from "jszip";
 import * as node_path from 'path';
 import path from 'node:path';
 import log from 'electron-log/main';
-import { PROJECT_META_AI_CHAT, PROJECT_META_SETTINGS } from '../project-db-constants';
+import { PROJECT_META_AI_CHAT, PROJECT_META_SETTINGS, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT, type AssetSaveFormat } from '../project-db-constants';
+import { ASSET_EXT, WORKSPACE_EXT, WORKSPACE_EXT_TEST_REGEXP, ATTACHMENTS_FOLDER } from './FileSystemService';
+import { suggestUniqueFilename } from '../utils/files';
 
 function saveStreamToTempFile(stream: Readable,){
     return new Promise<{
@@ -200,11 +202,121 @@ export class ProjectService {
         });
         // Создаём write stream и подключаем к нему
         const temp_zip_loc = await saveStreamToTempFile(response.data);
+        let temp_dir: { name: string; removeCallback: () => void } | null = null;
         try {
-            await unzipArchive(temp_zip_loc.filepath, this.db.localPath);
+            temp_dir = tmp.dirSync({ unsafeCleanup: true });
+            await unzipArchive(temp_zip_loc.filepath, temp_dir.name);
+            const format = await this.db.settings.getKey<AssetSaveFormat>(ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT);
+            await this.convertImportedRootToTarget(temp_dir.name, this.db.localPath, this.db.RootGddFolder.id, format);
         }
         finally{
             temp_zip_loc.delete();
+            temp_dir?.removeCallback();
+        }
+    }
+
+    /**
+     * Import helper: walk files of a not-yet-imported project (e.g. an unzipped
+     * template) and write them into `targetRoot` re-serialized in the target
+     * project's save format.
+     * - workspace meta files (`*.imw.json`) and non-asset files are copied as-is
+     * - asset files are re-serialized: markdown-typed assets are written as `.md`,
+     *   everything else as new-format `.json` (or legacy `.ima.json` per `format`)
+     * - file names are preserved, only the extension is swapped; collisions get
+     *   a unique ` - N` suffix
+     */
+    async convertImportedRootToTarget(srcRoot: string, targetRoot: string, rootWorkspaceId: string, format: AssetSaveFormat) {
+        await this._convertImportedFolder(srcRoot, srcRoot, targetRoot, rootWorkspaceId, format);
+    }
+
+    private async _convertImportedFolder(srcFolder: string, srcRoot: string, targetFolder: string, parentWorkspaceId: string, format: AssetSaveFormat) {
+        const items = await fs.promises.readdir(srcFolder, { withFileTypes: true });
+        const is_root = node_path.resolve(srcFolder) === node_path.resolve(srcRoot);
+        const folder_base = node_path.basename(srcFolder);
+        const workspace_meta_name = is_root ? null : folder_base + WORKSPACE_EXT;
+
+        let child_workspace_id = parentWorkspaceId;
+        await fs.promises.mkdir(targetFolder, { recursive: true });
+
+        if (workspace_meta_name) {
+            const has_ws_file = items.some((item) => item.isFile() && item.name === workspace_meta_name);
+            if (has_ws_file) {
+                const ws_raw = node_path.join(srcFolder, workspace_meta_name);
+                const parsed = JSON.parse(await fs.promises.readFile(ws_raw, 'utf8'));
+                if (parsed && typeof parsed.id === 'string') {
+                    child_workspace_id = parsed.id;
+                }
+                await this._copyImportedFile(ws_raw, node_path.join(targetFolder, workspace_meta_name));
+            }
+        }
+
+        for (const item of items) {
+            if (item.name.startsWith('.')) continue;
+            if (is_root && item.isDirectory() && item.name === ATTACHMENTS_FOLDER) {
+                await this._copyImportedFolder(node_path.join(srcFolder, item.name), node_path.join(targetFolder, item.name));
+                continue;
+            }
+            if (item.isFile() && (item.name === workspace_meta_name || WORKSPACE_EXT_TEST_REGEXP.test(item.name))) {
+                if (item.name !== workspace_meta_name) {
+                    await this._copyImportedFile(node_path.join(srcFolder, item.name), node_path.join(targetFolder, item.name));
+                }
+                continue;
+            }
+            const src_path = node_path.join(srcFolder, item.name);
+            if (item.isDirectory()) {
+                await this._convertImportedFolder(src_path, srcRoot, node_path.join(targetFolder, item.name), child_workspace_id, format);
+            }
+            else {
+                await this._convertImportedAssetFile(src_path, targetFolder, child_workspace_id, srcRoot, format);
+            }
+        }
+    }
+
+    private async _convertImportedAssetFile(src_path: string, targetFolder: string, workspaceId: string, srcRoot: string, format: AssetSaveFormat) {
+        const src_name = node_path.basename(src_path);
+        const extname = node_path.extname(src_name).toLowerCase();
+
+        if (extname !== '.json' && extname !== '.md') {
+            await this._copyImportedFile(src_path, node_path.join(targetFolder, src_name));
+            return;
+        }
+
+        const asset = await this.db.fileSystem.loadAssetFromFile(src_path, workspaceId, srcRoot);
+        if (!asset) {
+            await this._copyImportedFile(src_path, node_path.join(targetFolder, src_name));
+            return;
+        }
+
+        const is_md = this.db.asset.isMarkdownAsset(asset);
+        const target_ext = is_md ? '.md' : (format === 'json' ? '.json' : ASSET_EXT);
+        const base_name = src_name.endsWith(ASSET_EXT)
+            ? src_name.substring(0, src_name.length - ASSET_EXT.length)
+            : src_name.substring(0, src_name.length - extname.length);
+        const target_name = suggestUniqueFilename(
+            base_name,
+            target_ext,
+            (name) => !fs.existsSync(node_path.join(targetFolder, name)),
+        );
+        await this.db.asset.saveAssetFileToFile(asset, node_path.join(targetFolder, target_name), format);
+    }
+
+    private async _copyImportedFile(src_path: string, target_path: string) {
+        await fs.promises.mkdir(node_path.dirname(target_path), { recursive: true });
+        await fs.promises.copyFile(src_path, target_path);
+    }
+
+    private async _copyImportedFolder(srcFolder: string, targetFolder: string) {
+        const items = await fs.promises.readdir(srcFolder, { withFileTypes: true });
+        await fs.promises.mkdir(targetFolder, { recursive: true });
+        for (const item of items) {
+            const src_path = node_path.join(srcFolder, item.name);
+            const target_path = node_path.join(targetFolder, item.name);
+            if (item.isDirectory()) {
+                await this._copyImportedFolder(src_path, target_path);
+            }
+            else {
+                await this._copyImportedFile(src_path, target_path);
+            }
         }
     }
 }

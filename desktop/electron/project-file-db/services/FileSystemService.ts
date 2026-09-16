@@ -448,7 +448,7 @@ export class FileSystemService{
             workspaceId: parentWorkspaceId,
             name: null,
             title,
-            icon: 'file-json-line',
+            icon: 'file-code-line',
             isAbstract: false,
             typeIds: [],
             createdAt: created_at,
@@ -461,7 +461,7 @@ export class FileSystemService{
             hasImage: false,
             parentIds: [],
             ownTitle: null,
-            ownIcon: 'file-json-line',
+            ownIcon: 'file-code-line',
             blocks,
             comments: [],
             references: [],
@@ -605,6 +605,11 @@ export class FileSystemService{
             assets: res_assets,
             workspaces: res_workspaces,
         }
+    }
+
+    async loadAssetFromFile(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<ProjectFileDbAsset | null> {
+        const loaded = await this._loadFile(absolutePath, parentWorkspaceId, rootPath);
+        return loaded && loaded.type === 'asset' ? loaded.asset : null;
     }
 
     private _getWatcherIgnore(): string[]{
