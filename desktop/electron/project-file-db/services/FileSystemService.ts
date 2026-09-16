@@ -12,7 +12,7 @@ import { PROJECT_META_FOLDER, PROJECT_META_FS_WATCHER_SNAPSHOT } from "../projec
 import log from 'electron-log/main';
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { plainBlockToAssigned } from "../logic/asset-ops";
-import { assignPlainValueToAssetProps } from '~ims-app-base/logic/types/Props';
+import { assignPlainValueToAssetProps, getAssetPropType } from '~ims-app-base/logic/types/Props';
    
 type FileSystemExpectChange = {
     filepaths: string[]
@@ -299,9 +299,11 @@ export class FileSystemService{
                 block_type === 'markdown' || block_type === 'text' || block_type === 'prop';
 
             if (raw_value !== undefined) {
-                if (typeof raw_value === 'string' && value_unwrapped) {
+                const type = getAssetPropType(raw_value);
+                if (type !== undefined){
                     block_props = { value: raw_value };
-                } else if (typeof raw_value === 'object' && raw_value !== null && !Array.isArray(raw_value)) {
+                }
+                else if (typeof raw_value === 'object' && raw_value !== null && !Array.isArray(raw_value)) {
                     block_props = { ...raw_value };
                 } else {
                     // Primitive or array — wrap in value
