@@ -369,9 +369,10 @@ export class FileSystemService{
     }
 
     /**
-     * Load an arbitrary .json file (no __meta) as an asset. Blocks are inferred
-     * from the top-level JSON structure: each key becomes a block, string values
-     * become markdown blocks, everything else is wrapped in { value: <data> }.
+     * Load an arbitrary .json file (no __meta) as an asset. Each top-level
+     * attribute becomes a block: scalar values become prop blocks with an
+     * inferred __type, arrays become multi-value prop blocks, objects stay
+     * as props blocks with per-attribute type metadata.
      */
     private _loadPlainJsonAsset(
         parsed: any,
@@ -408,12 +409,19 @@ export class FileSystemService{
                     // Reserved key — skip
                     continue;
                 }
-                const block_type = typeof value === 'string' ? 'markdown' : 'props';
-                const block_props: Record<string, any> = typeof value === 'string'
-                    ? { value }
-                    : (typeof value === 'object' && value !== null && !Array.isArray(value)
-                        ? { ...value }
-                        : { value });
+                const is_array = Array.isArray(value);
+                const is_object = typeof value === 'object' && value !== null && !is_array;
+                const block_type = is_object ? 'props' : 'prop';
+                const prop_type = is_array
+                    ? jsonArrayToPropType(value)
+                    : (is_object ? null : jsonValueToPropType(value));
+                let block_props: Record<string, any>;
+                if (is_object) {
+                    block_props = { ...value, __props: buildStructPropMeta(value as Record<string, unknown>) };
+                } else {
+                    block_props = { value, ...(prop_type ? { __type: prop_type } : {}) };
+                    if (is_array) block_props.__multiple = true;
+                }
                 const block_computed = { ...block_props };
                 blocks.push({
                     id: uuidv4(),
@@ -871,4 +879,40 @@ export class FileSystemService{
             this._fsWatcherSubscription = null;
         }
     }
+}
+
+function jsonValueToPropType(value: unknown): string | null {
+    if (typeof value === 'string') return 'text';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'checkbox';
+    return null;
+}
+
+function jsonArrayToPropType(value: unknown[]): string | null {
+    let detected: string | null = null;
+    for (let index = 0; index < value.length; index++) {
+        const item_type = jsonValueToPropType(value[index]);
+        if (index === 0) {
+            detected = item_type;
+        } else if (item_type !== detected) {
+            return null;
+        }
+    }
+    return detected;
+}
+
+function buildStructPropMeta(value: Record<string, unknown>): Record<string, unknown> {
+    const meta: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+        const is_array = Array.isArray(item);
+        const entry: Record<string, unknown> = {};
+        if (is_array) {
+            entry.type = jsonArrayToPropType(item as unknown[]);
+            entry.multiple = true;
+        } else {
+            entry.type = jsonValueToPropType(item);
+        }
+        meta[key] = entry;
+    }
+    return meta;
 }

@@ -23,8 +23,14 @@ export class ProjectFileDbCollection<T extends ProjectFileDbEntity>{
     }
 
     replace(entity: T){
-        this.delete(entity.id)
-        this.add(entity)
+        const existing = this.byId.get(entity.id);
+        if (existing?.name && existing.name !== entity.name) {
+            this.byName.delete(existing.name)
+        }
+        this.byId.set(entity.id, entity);
+        if (entity.name) {
+            this.byName.set(entity.name, entity)
+        }
     }
 
     deleteMany(deleting_ids: string[]){
