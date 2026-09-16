@@ -20,7 +20,7 @@ import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, 
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
 import type { IProjectDatabaseAsset, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore, ChangesStreamRequest, ChangesStreamResponse } from "~ims-app-base/logic/types/ProjectTypes";
-import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
+import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, convertAssetPropsToPlainObject, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
 import type { AssetPropsSelectionField, AssetPropsSelectionOrder, AssetPropsSelection } from "~ims-app-base/logic/types/PropsSelection";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
@@ -30,6 +30,7 @@ import { ASSET_BASE_ORDERING, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_D
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { mergeBlocksToSave, formBlockComputed } from "../logic/asset-ops";
 import { serializeAssetToJSON, serializeAssetToNewFormatJSON } from "../logic/serialize";
+import { buildMarkdownFrontmatter, MARKDOWN_DEFAULT_ICON, type MarkdownFrontmatterMeta } from "../logic/markdown-frontmatter";
 import { suggestUniqueFilename, prepareFileBasenameByEntityTitle } from "../utils/files";
 
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
@@ -878,7 +879,9 @@ export class AssetService implements IProjectDatabaseAsset {
         const formed_asset = this._formComputedAsset(asset_full);
         if (this.isMarkdownAsset(formed_asset)) {
             const md_block = formed_asset.blocks.find(block => block.type === 'markdown');
-            target.write(md_block ? (md_block.computed.value ?? '').toString() : '')
+            const content = (md_block ? (md_block.computed.value ?? '') : '').toString();
+            const { frontmatter, content: stripped } = this._buildMarkdownFrontmatter(formed_asset, content);
+            target.write(frontmatter ? frontmatter + stripped : stripped)
             return;
         }
 
@@ -890,6 +893,21 @@ export class AssetService implements IProjectDatabaseAsset {
             const ima_asset = serializeAssetToJSON(formed_asset as any);
             target.write(JSON.stringify(ima_asset, null, 1))
         }
+    }
+
+    private _buildMarkdownFrontmatter(asset: ProjectFileDbAsset, content: string): { frontmatter: string | null; content: string } {
+        const meta_block = asset.blocks?.find((block) => block.name === BLOCK_NAME_META);
+        const plain_props = meta_block
+            ? convertAssetPropsToPlainObject(meta_block.props ?? {})
+            : {};
+        const { format: _format, ...values } = plain_props;
+        const meta: MarkdownFrontmatterMeta = {};
+        const path_derived_id = absolutePathToUuid(getAssetLocalPath(asset, this.db), this.db.localPath);
+        if (asset.id !== path_derived_id) meta.id = asset.id;
+        if (asset.name) meta.name = asset.name;
+        if (asset.ownIcon && asset.ownIcon !== MARKDOWN_DEFAULT_ICON) meta.icon = asset.ownIcon;
+        if (Object.keys(values).length > 0) meta.values = values as Record<string, unknown>;
+        return buildMarkdownFrontmatter(meta, content);
     }
 
     async getAssetFileSavingFilename(asset_full: ProjectFileDbAsset, check_avail: (val: string) => boolean) {

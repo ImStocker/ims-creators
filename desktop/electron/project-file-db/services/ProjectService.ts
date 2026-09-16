@@ -226,7 +226,19 @@ export class ProjectService {
      *   a unique ` - N` suffix
      */
     async convertImportedRootToTarget(srcRoot: string, targetRoot: string, rootWorkspaceId: string, format: AssetSaveFormat) {
-        await this._convertImportedFolder(srcRoot, srcRoot, targetRoot, rootWorkspaceId, format);
+        // The template archive may wrap the gdd workspace into a `gdd/` folder with
+        // a `gdd.imw.json` meta next to it. In that case the folder contents belong
+        // to the project root (`rootWorkspaceId`); unwrap the wrapper instead of
+        // importing it as a nested workspace.
+        let import_root = srcRoot;
+        if (
+            fs.existsSync(node_path.join(srcRoot, 'gdd' + WORKSPACE_EXT))
+            && fs.existsSync(node_path.join(srcRoot, 'gdd'))
+            && fs.statSync(node_path.join(srcRoot, 'gdd')).isDirectory()
+        ) {
+            import_root = node_path.join(srcRoot, 'gdd');
+        }
+        await this._convertImportedFolder(import_root, import_root, targetRoot, rootWorkspaceId, format);
     }
 
     private async _convertImportedFolder(srcFolder: string, srcRoot: string, targetFolder: string, parentWorkspaceId: string, format: AssetSaveFormat) {
@@ -252,6 +264,8 @@ export class ProjectService {
 
         for (const item of items) {
             if (item.name.startsWith('.')) continue;
+            // Workspace content index emitted by the exporter is not importable content
+            if (is_root && item.isFile() && item.name === 'index.ima.json') continue;
             if (is_root && item.isDirectory() && item.name === ATTACHMENTS_FOLDER) {
                 await this._copyImportedFolder(node_path.join(srcFolder, item.name), node_path.join(targetFolder, item.name));
                 continue;

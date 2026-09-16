@@ -13,6 +13,7 @@ import log from 'electron-log/main';
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { plainBlockToAssigned } from "../logic/asset-ops";
 import { assignPlainValueToAssetProps, getAssetPropType } from '~ims-app-base/logic/types/Props';
+import { parseMarkdownFrontmatter, MARKDOWN_DEFAULT_ICON, type MarkdownFrontmatterMeta } from '../logic/markdown-frontmatter';
    
 type FileSystemExpectChange = {
     filepaths: string[]
@@ -79,7 +80,7 @@ export class FileSystemService{
         localPath: string
     } | null>{
     
-        const local_path = node_path.relative(this.db.localPath, absolutePath)
+        const local_path = node_path.relative(rootPath, absolutePath)
         const local_name = node_path.basename(absolutePath);
         const extname = node_path.extname(local_name);
         
@@ -157,13 +158,19 @@ export class FileSystemService{
             }
         }
         else if(extname === '.md'){
+            const { meta: fm_meta, content: md_content } = parseMarkdownFrontmatter(file);
+            const fm_values: Record<string, unknown> =
+                fm_meta?.values && typeof fm_meta.values === 'object' && !Array.isArray(fm_meta.values)
+                    ? fm_meta.values
+                    : {};
+            const own_icon: string = fm_meta?.icon ?? MARKDOWN_DEFAULT_ICON;
             const asset_full: ProjectFileDbAsset = {
-                id: absolutePathToUuid(absolutePath, rootPath),
+                id: fm_meta?.id ?? absolutePathToUuid(absolutePath, rootPath),
                 projectId: this.db.project.db.info.id ?? '',
                 workspaceId: parentWorkspaceId,
-                name: null,
+                name: fm_meta?.name ?? null,
                 title: node_path.basename(local_name, extname),
-                icon: 'markdown-fill',
+                icon: own_icon,
                 isAbstract: false,
                 typeIds: [MARKDOWN_ASSET_ID],
                 createdAt: created_at,
@@ -176,7 +183,7 @@ export class FileSystemService{
                 hasImage: false,
                 parentIds: [MARKDOWN_ASSET_ID],
                 ownTitle: null,
-                ownIcon: 'markdown-fill',
+                ownIcon: own_icon,
                 blocks: [{
                     id: uuidv4(),
                     type: 'props',
@@ -189,9 +196,11 @@ export class FileSystemService{
                     own: true,
                     props: assignPlainValueToAssetProps({}, {
                         format: 'md',
+                        ...fm_values,
                     }),
                     computed: assignPlainValueToAssetProps({}, {
                         format: 'md',
+                        ...fm_values,
                     }),
                     inherited: {},
                 },
@@ -206,10 +215,10 @@ export class FileSystemService{
                     ownTitle: null,
                     own: true,
                     props: assignPlainValueToAssetProps({}, {
-                        value: file,
+                        value: md_content,
                     }),
                     computed: assignPlainValueToAssetProps({}, {
-                        value: file,
+                        value: md_content,
                     }),
                     inherited: {},
                 }],
@@ -337,7 +346,7 @@ export class FileSystemService{
         const parentIds = Array.isArray(meta.parentIds) ? meta.parentIds : [];
         if (parentIds.length > 0) {
             const parent = this.db.asset.assets.byId.get(parentIds[0]);
-            if (parent && parent.typeIds.length > 0) {
+            if (parent) {
                 typeIds = [parent.id, ...parent.typeIds];
             }
         }
@@ -534,7 +543,7 @@ export class FileSystemService{
         localPath: string,
         content: FileSystemWorkspaceContent
     }>{
-        const local_path = node_path.relative(this.db.localPath, absolutePath) + WORKSPACE_EXT
+        const local_path = node_path.relative(root_path, absolutePath) + WORKSPACE_EXT
         let workspace = await getWorkspaceMeta();
         if(!workspace){
             const file_info = await fs.promises.stat(absolutePath);
@@ -581,7 +590,7 @@ export class FileSystemService{
                     continue; // Ignore service folders
                 }
 
-                const local_path = node_path.relative(this.db.localPath, node_path.join(absolutePath, item.name))
+                const local_path = node_path.relative(root_path, node_path.join(absolutePath, item.name))
                 const local_name = item.name + WORKSPACE_EXT
                 const folder = node_path.join(absolutePath, item.name);
                 const exist_workspace = workspaces.get(local_name) ?? null
