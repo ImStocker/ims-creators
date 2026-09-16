@@ -18,7 +18,6 @@ import type { LangStr } from '~ims-app-base/logic/types/ProjectTypes';
 import FormCheckBox from '~ims-app-base/components/Form/FormCheckBox.vue';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
-import DesktopSyncManager from '#logic/managers/DesktopSyncManager';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 
 export default defineComponent({
@@ -32,14 +31,12 @@ export default defineComponent({
   },
   data(){
     return {
-        syncWithCloud: 60,
         assetSaveFormat: 'json',
     }
   },
   async mounted(){
     const project_path = this.projectInfo?.localPath;
     assert(project_path, 'Need project path')
-    this.syncWithCloud = await window.imshost.settings.getKey(project_path, 'syncWithCloud', 60)
     this.assetSaveFormat = await window.imshost.settings.getKey(project_path, 'assetSaveFormat', 'json')
   },
   computed: {
@@ -96,25 +93,6 @@ export default defineComponent({
                 },
             },
         ]
-        if(this.projectInfo?.id){
-            schema.push({
-                caption: this.$t('desktop.settings.fields.syncWithCloud'),
-                prop: 'syncWithCloud',
-                editor: ImsSelect,
-                editorProps: {
-                    getOptionLabel: (opt: any) => opt.title,
-                    reduce: (opt: any) => opt.value,
-                    options: [30, 60, 300, -1].map(value => 
-                        {
-                            return {
-                                value: value as any,
-                                title: this.$t('desktop.settings.fields.syncWithCloudTime.every' + value)
-                            }
-                        }
-                    )
-                }
-            })
-        }
         schema.push({
             caption: this.$t('desktop.settings.fields.assetSaveFormat'),
             prop: 'assetSaveFormat',
@@ -189,9 +167,6 @@ export default defineComponent({
   watch:{
     formSchemaFiltered(){
         this.$emit('update:isEmpty', this.formSchemaFiltered.length === 0)
-    },
-    async syncWithCloud(new_val: number){
-        await this.$getAppManager().get(DesktopSyncManager).changeAutoSynchronization(new_val);
     },
     async assetSaveFormat(new_val: string){
         const project_path = this.projectInfo?.localPath;

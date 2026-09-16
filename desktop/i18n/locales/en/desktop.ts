@@ -34,7 +34,8 @@ export default {
         openInCloud: 'Open in cloud',
         repeat: 'Repeat',
         pauseSyncing: 'Pause syncing',
-        loginToSync: "Please, log in your PRO account to sync your project with cloud"
+        loginToSync: "Please, log in your PRO account to sync your project with cloud",
+        unlinkFromCloud: 'Unlink project from cloud'
       },
       header: 'Errors of synchronization',
       synchronization: 'Synchronization',
@@ -43,7 +44,15 @@ export default {
       notSyncedWorkspaces: 'Not synced workspaces',
       noErrors: 'No errors',
       createNew: 'Create new',
-      selectExist: 'Select existing'
+      selectExist: 'Choose existing',
+      status: {
+        active: 'Synchronization is active',
+        disabled: 'Synchronization is disabled'
+      },
+      unlinkFromCloudHeader: 'Unlink project',
+      unlinkFromCloudConfirm: 'The project will be unlinked from the cloud and synchronization will be stopped. Continue?',
+      unlinkFromCloudEnd: 'Project was unlinked from cloud',
+      actionsHeader: 'Actions'
     },
     welcome: {
       begin: 'Welcome to',
@@ -116,6 +125,7 @@ export default {
       searchSettings: 'Search for settings',
       groups: {
         common: 'Common',
+        sync: 'Synchronization',
         plugins: 'Plugins',
         other: 'Other',
         mcp: 'MCP server',

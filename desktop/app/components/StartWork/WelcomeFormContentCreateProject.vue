@@ -152,6 +152,8 @@ export type CreateProjectParams = {
   projectFolderName?: string,
 }
 
+const LAST_PROJECT_LOCATION_STORAGE_KEY = 'lastProjectLocation';
+
 export default defineComponent({
   name: 'WelcomeFormContentCreateProject',
   components: {
@@ -210,7 +212,8 @@ export default defineComponent({
     }
   },
   async mounted(){
-    this.params.projectLocation = await window.imshost.shell.getDocumentsFolder();
+    const savedLocation = await window.imshost.storage.getItem<string>(LAST_PROJECT_LOCATION_STORAGE_KEY);
+    this.params.projectLocation = savedLocation || await window.imshost.shell.getDocumentsFolder();
     if(this.params.projectType === 'cloud'){
       await this.updateUserLicense();
     }
@@ -338,6 +341,7 @@ export default defineComponent({
           }
           await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(this.projectPath);          
         })
+        await window.imshost.storage.setItem(LAST_PROJECT_LOCATION_STORAGE_KEY, this.params.projectLocation);
         this.loading = false;
       
     },

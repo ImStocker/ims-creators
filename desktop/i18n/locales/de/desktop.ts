@@ -34,7 +34,8 @@ export default {
         openInCloud: 'In der Cloud öffnen',
         repeat: 'Wiederholen',
         pauseSyncing: 'Synchronisierung anhalten',
-        loginToSync: "Für die Synchronisierung mit der Cloud ist ein PRO-Account erforderlich. Bitte melden Sie sich an."
+        loginToSync: "Für die Synchronisierung mit der Cloud ist ein PRO-Account erforderlich. Bitte melden Sie sich an.",
+        unlinkFromCloud: 'Projekt von der Cloud trennen'
       },
       header: 'Synchronisierungsfehler',
       synchronization: 'Synchronisierung',
@@ -43,7 +44,15 @@ export default {
       notSyncedWorkspaces: 'Arbeitsbereiche ohne Synchronisierung',
       noErrors: 'Keine Fehler',
       createNew: 'Neu erstellen',
-      selectExist: 'Bestehende auswählen'
+      selectExist: 'Bestehende auswählen',
+      status: {
+        active: 'Synchronisierung ist aktiv',
+        disabled: 'Synchronisierung ist deaktiviert'
+      },
+      unlinkFromCloudHeader: 'Projekt trennen',
+      unlinkFromCloudConfirm: 'Das Projekt wird von der Cloud getrennt und die Synchronisierung gestoppt. Fortfahren?',
+      unlinkFromCloudEnd: 'Projekt wurde von der Cloud getrennt',
+      actionsHeader: 'Aktionen'
     },
     welcome: {
       begin: 'Willkommen bei',
@@ -116,6 +125,7 @@ export default {
       searchSettings: 'Suche nach Einstellungen',
       groups: {
         common: 'Allgemein',
+        sync: 'Synchronisierung',
         plugins: 'Plugins',
         other: 'Andere',
         mcp: 'MCP-Server',

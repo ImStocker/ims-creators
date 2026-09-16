@@ -249,6 +249,26 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         this.appManager.get<DesktopCreatorAssetManager>(CreatorAssetManager).setProjectIdToFiles(project_info.id);
         await this.appManager.get(UiManager).reloadPage();
     }
+
+    async unlinkCloudProject(){
+        const project_info = this.appManager.get(DesktopProjectManager).getProjectInfo()
+        assert(project_info)
+        assert(this._loadedForProjectPath)
+
+        await this.appManager.get(DesktopSyncManager).changeAutoSynchronization(-1);
+
+        await this.appManager.get(DesktopProjectManager).initializeLocalProject(
+            this._loadedForProjectPath,
+            {
+                id: null,
+                title: project_info.title,
+                rootWorkspaceId: null,
+                recreate: true,
+            }
+        );
+
+        await this.appManager.get(UiManager).reloadPage();
+    }
 }
 
     
