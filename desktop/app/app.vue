@@ -232,9 +232,7 @@ provide('getDropdownHost', () => {
 }
 .App-toasts {
   position: fixed;
-  right: 50%;
-  bottom: 0;
-  transform: translateX(50%);
+  inset: 0;
   pointer-events: none;
   z-index: 3000;
 }
