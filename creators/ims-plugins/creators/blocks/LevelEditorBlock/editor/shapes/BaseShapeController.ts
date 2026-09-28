@@ -33,23 +33,28 @@ export default abstract class BaseShapeController<
   ): Partial<fabric.FabricObject> {
     const updates: Partial<fabric.FabricObject> = {};
 
+    let selection_local: { x: number; y: number } | undefined;
     const selected_object = canvasController.canvas.getActiveObject();
 
-    if (selected_object?.type === 'activeselection') {
+    if (
+      selected_object?.type === 'activeselection' &&
+      (new_data.x !== undefined || new_data.y !== undefined)
+    ) {
       const selection = selected_object as fabric.ActiveSelection;
 
       const selected_objects = selection.getObjects();
       if (selected_objects.find((obj) => obj.id === existing_object.id)) {
+        const model_shape =
+          canvasController.blockController.shapes?.[existing_object.id];
+        const target_x = new_data.x ?? model_shape?.x ?? existing_object.left;
+        const target_y = new_data.y ?? model_shape?.y ?? existing_object.top;
         const selection_matrix = selection.calcTransformMatrix();
         const inverted_selection_matrix =
           fabric.util.invertTransform(selection_matrix);
-        if (new_data.x !== undefined && new_data.y !== undefined) {
-          const { x, y } = new fabric.Point(new_data.x, new_data.y).transform(
-            inverted_selection_matrix,
-          );
-          new_data.x = x;
-          new_data.y = y;
-        }
+        const { x, y } = new fabric.Point(target_x, target_y).transform(
+          inverted_selection_matrix,
+        );
+        selection_local = { x, y };
       }
     }
 
@@ -64,12 +69,21 @@ export default abstract class BaseShapeController<
       updates.parentId = new_data.parentId ?? undefined;
     }
 
-    if (new_data.x !== undefined && existing_object.left !== new_data.x) {
-      updates.left = new_data.x;
-    }
+    if (selection_local) {
+      if (existing_object.left !== selection_local.x) {
+        updates.left = selection_local.x;
+      }
+      if (existing_object.top !== selection_local.y) {
+        updates.top = selection_local.y;
+      }
+    } else {
+      if (new_data.x !== undefined && existing_object.left !== new_data.x) {
+        updates.left = new_data.x;
+      }
 
-    if (new_data.y !== undefined && existing_object.top !== new_data.y) {
-      updates.top = new_data.y;
+      if (new_data.y !== undefined && existing_object.top !== new_data.y) {
+        updates.top = new_data.y;
+      }
     }
     if (
       new_data.angle !== undefined &&

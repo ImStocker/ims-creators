@@ -8,6 +8,7 @@ export default {
       image: 'Изображение',
       pointer: 'Указатель',
       polygon: 'Полигон',
+      pencil: 'Карандаш',
     },
     tools: {
       group: 'Сгруппировать',
@@ -17,6 +18,7 @@ export default {
       rect: 'Прямоугольник',
       ellipse: 'Эллипс',
       polygon: 'Полигон',
+      pencil: 'Карандаш',
       image: 'Изображение',
       pointer: 'Указатель',
       bringToFront: 'Поместить на передний план',
@@ -46,6 +48,8 @@ export default {
         fill: 'Заливка',
         stroke: 'Обводка',
         lock: 'Заблокировать',
+        unlock: 'Разблокировать',
+        strokeWidth: 'Толщина обводки',
       },
       actions: {
         textAlignLeft: 'Выровнять по левому краю',

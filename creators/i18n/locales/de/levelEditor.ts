@@ -8,6 +8,7 @@ export default {
       image: 'Bild',
       pointer: 'Zeiger',
       polygon: 'Polygon',
+      pencil: 'Bleistift',
     },
     tools: {
       group: 'Gruppieren',
@@ -17,6 +18,7 @@ export default {
       rect: 'Rechteck',
       ellipse: 'Ellipse',
       polygon: 'Polygon',
+      pencil: 'Bleistift',
       image: 'Bild',
       pointer: 'Zeiger',
       bringToFront: 'In den Vordergrund',
@@ -47,6 +49,8 @@ export default {
         fill: 'Füllung',
         stroke: 'Kontur',
         lock: 'Sperren',
+        unlock: 'Entsperren',
+        strokeWidth: 'Konturbreite',
       },
       actions: {
         textAlignLeft: 'Linksbündig',

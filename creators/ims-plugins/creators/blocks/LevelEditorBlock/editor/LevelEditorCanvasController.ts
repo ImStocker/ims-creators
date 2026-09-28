@@ -80,6 +80,7 @@ export default class LevelEditorCanvasController {
     active: false,
     lockAxis: null as 'x' | 'y' | null,
   };
+  private _pinnedLockedTransform: Map<string, fabric.TMat2D> | null = null;
   public readonly MAX_ZOOM_SCALE = 2;
   public readonly MIN_ZOOM_SCALE = 0.1;
 
@@ -441,6 +442,18 @@ export default class LevelEditorCanvasController {
     return this.blockController.changer?.makeOpId();
   }
 
+  getScenePointFromClient(clientX: number, clientY: number) {
+    const canvas_rect = this.canvas.upperCanvasEl.getBoundingClientRect();
+    return fabric.util.sendPointToPlane(
+      new fabric.Point({
+        x: clientX - canvas_rect.left,
+        y: clientY - canvas_rect.top,
+      }),
+      undefined,
+      this.canvas.viewportTransform,
+    );
+  }
+
   updateCanvas() {
     if (this._expectPropsChange) return;
     const shapes = this.blockController.shapes;
@@ -509,7 +522,6 @@ export default class LevelEditorCanvasController {
       let existing_object = fabric_objects_map.get(shape.id);
       if (existing_object) {
         // update existing object
-
         shape_controller.updateFabricObject(existing_object, shape, this);
         shape_controller.updateDecoration(existing_object, shape.value, this);
 
@@ -596,20 +608,11 @@ export default class LevelEditorCanvasController {
       previous_objects_stack.push(existing_object);
     }
 
-    // const selected_object = this.canvas.getActiveObject();
-    // if (selected_object?.type === 'activeselection') {
-    //   const selection = selected_object as fabric.ActiveSelection;
-    //   if (selection._objects.length > 1) {
-    //     const new_selection = new fabric.ActiveSelection(
-    //       selection.removeAll(),
-    //       {
-    //         canvas: this.canvas,
-    //       },
-    //     );
-
-    //     this.canvas.setActiveObject(new_selection);
-    //   }
-    // }
+    const selected_object = this.canvas.getActiveObject();
+    if (selected_object?.type === 'activeselection') {
+      const selection = selected_object as fabric.ActiveSelection;
+      selection.triggerLayout();
+    }
     this.canvas.requestRenderAll();
   }
 
@@ -746,13 +749,12 @@ export default class LevelEditorCanvasController {
     // const skip_group_matrix_options =
     //   fabric.util.qrDecompose(skip_group_matrix);
 
-    const matrix_with_anti_skew = fabric.util.composeMatrix({
-      ...options,
-      skewX: Math.abs(options.skewX),
-      skewY: Math.abs(options.skewY),
-    });
-    let origin_coords: fabric.Point | fabric.XY;
     const changes: Partial<LevelEditorShape> = {};
+    // Модель хранит x/y как сырые left/top, которые напрямую присваиваются
+    // left/top в createFabricObject и collectUpdates. getXY() возвращает
+    // именно эту точку в системе координат родителя и не зависит от
+    // strokeWidth, масштаба, поворота и skew.
+    const origin_coords = obj.getXY();
     let params:
       | LevelEditorShapeParamsMap[keyof LevelEditorShapeParamsMap]
       | undefined;
@@ -760,8 +762,6 @@ export default class LevelEditorCanvasController {
     switch (obj.type) {
       case 'ellipse': {
         const ellipseObj = obj as unknown as fabric.Ellipse;
-        origin_coords = new fabric.Point(0, 0).transform(matrix_with_anti_skew);
-
         params = {
           rx: ellipseObj.rx,
           ry: ellipseObj.ry,
@@ -769,10 +769,6 @@ export default class LevelEditorCanvasController {
         break;
       }
       case 'textbox': {
-        origin_coords = new fabric.Point(
-          -obj.width / 2,
-          -obj.height / 2,
-        ).transform(matrix_with_anti_skew);
         params = {
           width: obj.width,
           height: obj.height,
@@ -781,29 +777,28 @@ export default class LevelEditorCanvasController {
       }
       case 'polygon': {
         const polygonObj = obj as unknown as fabric.Polygon;
-        const { x, y } = polygonObj.getXY();
-        const relative_points = polygonObj.points.map((p) => ({
-          x: p.x,
-          y: p.y,
-        }));
-        origin_coords = { x, y };
+        // Точки хранятся локально относительно левого верхнего угла bbox
+        // (min === 0), иначе createFabricObject соберёт полигон со сдвигом.
+        const minX = polygonObj.points.length
+          ? Math.min(...polygonObj.points.map((p) => p.x))
+          : 0;
+        const minY = polygonObj.points.length
+          ? Math.min(...polygonObj.points.map((p) => p.y))
+          : 0;
         params = {
-          points: relative_points,
+          points: polygonObj.points.map((p) => ({
+            x: p.x - minX,
+            y: p.y - minY,
+          })),
         } as LevelEditorShapeParamsMap['polygon'];
         break;
       }
       case 'pointer': {
-        origin_coords = new fabric.Point(0, obj.height / 2).transform(
-          matrix_with_anti_skew,
-        );
-
+        // Указатель (originX: 'center', originY: 'bottom'), поэтому его
+        // left/top — это уже острие, ровно то, что хранится в модели.
         break;
       }
       case 'image': {
-        origin_coords = new fabric.Point(
-          -obj.width / 2,
-          -obj.height / 2,
-        ).transform(matrix_with_anti_skew);
         const imageObj = obj as unknown as Image;
         params = {
           width: imageObj.displayingWidth ?? imageObj.width,
@@ -812,17 +807,16 @@ export default class LevelEditorCanvasController {
         break;
       }
       case 'group': {
-        origin_coords = new fabric.Point(
-          -obj.width / 2,
-          -obj.height / 2,
-        ).transform(matrix_with_anti_skew);
+        break;
+      }
+      case 'path': {
+        // Карандаш (fabric.Path). Геометрия штриха лежит в params\path в
+        // абсолютных координатах и не пересчитывается при перемещении,
+        // поэтому params здесь возвращать нельзя — иначе в модель
+        // запишутся params\width/height от ветки default.
         break;
       }
       default: {
-        origin_coords = new fabric.Point(
-          -obj.width / 2,
-          -obj.height / 2,
-        ).transform(matrix_with_anti_skew);
         params = {
           width: obj.width,
           height: obj.height,
@@ -927,6 +921,12 @@ export default class LevelEditorCanvasController {
         break;
       }
       case 'group': {
+        normalizeSkew();
+        break;
+      }
+      case 'path': {
+        // У карандаша нет width/height в params, поэтому масштаб, как и у
+        // группы, остаётся в scaleX/scaleY модели, а skew нормализуется.
         normalizeSkew();
         break;
       }
@@ -1077,6 +1077,44 @@ export default class LevelEditorCanvasController {
     window.removeEventListener('keydown', this._onKeyDown);
   }
 
+  private _capturePinnedLocked(selection: fabric.ActiveSelection) {
+    this._pinnedLockedTransform = new Map();
+    selection.getObjects().forEach((obj) => {
+      if (this.blockController.shapes[obj.id]?.locked) {
+        this._pinnedLockedTransform!.set(obj.id, obj.calcTransformMatrix());
+      }
+    });
+  }
+
+  private _restorePinnedLocked(target: fabric.FabricObject | undefined) {
+    if (target?.type !== 'activeselection') return;
+    const selection = target as fabric.ActiveSelection;
+    if (!this._pinnedLockedTransform) {
+      this._capturePinnedLocked(selection);
+    }
+    if (!this._pinnedLockedTransform!.size) return;
+
+    const group_matrix = selection.calcTransformMatrix();
+    const inverted = fabric.util.invertTransform(group_matrix);
+    selection.getObjects().forEach((obj) => {
+      const pinned = this._pinnedLockedTransform!.get(obj.id);
+      if (!pinned) return;
+      const { translateX, translateY, scaleX, scaleY, angle, skewX } =
+        fabric.util.qrDecompose(
+          fabric.util.multiplyTransformMatrices(inverted, pinned),
+        );
+      obj.set({
+        left: translateX,
+        top: translateY,
+        scaleX,
+        scaleY,
+        angle,
+        skewX,
+      });
+      obj.setCoords();
+    });
+  }
+
   private _addHandler = (
     eventName: keyof fabric.CanvasEvents,
     func: (canvas: fabric.Canvas, ...args: any[]) => void,
@@ -1175,6 +1213,34 @@ export default class LevelEditorCanvasController {
     );
 
     this._addHandler(
+      'object:moving',
+      (canvas, eventParams: fabric.ModifiedEvent) => {
+        this._restorePinnedLocked(eventParams.target);
+      },
+    );
+
+    this._addHandler(
+      'object:scaling',
+      (canvas, eventParams: fabric.ModifiedEvent) => {
+        this._restorePinnedLocked(eventParams.target);
+      },
+    );
+
+    this._addHandler(
+      'object:rotating',
+      (canvas, eventParams: fabric.ModifiedEvent) => {
+        this._restorePinnedLocked(eventParams.target);
+      },
+    );
+
+    this._addHandler(
+      'object:skewing',
+      (canvas, eventParams: fabric.ModifiedEvent) => {
+        this._restorePinnedLocked(eventParams.target);
+      },
+    );
+
+    this._addHandler(
       'mouse:wheel',
       (canvas, eventParams: fabric.TPointerEventInfo<WheelEvent>) => {
         const event = eventParams.e;
@@ -1250,6 +1316,7 @@ export default class LevelEditorCanvasController {
             'center',
           );
           group.forEachObject((obj) => {
+            if (this.blockController.shapes[obj.id]?.locked) return;
             objects.push(obj);
           });
         } else {
@@ -1261,6 +1328,10 @@ export default class LevelEditorCanvasController {
           const changes = this.saveShapeState(obj);
           this.changeShape(obj.id, changes as any, { opId: op });
         });
+        if (shape.type === 'activeselection') {
+          (shape as fabric.ActiveSelection).triggerLayout();
+        }
+        this._pinnedLockedTransform = null;
         this.canvas.requestRenderAll();
       },
     );
@@ -1271,6 +1342,10 @@ export default class LevelEditorCanvasController {
         eventParams.e.preventDefault();
       },
     );
+
+    this._addHandler('mouse:down', () => {
+      this._pinnedLockedTransform = null;
+    });
 
     this._addHandler(
       'mouse:down:before',

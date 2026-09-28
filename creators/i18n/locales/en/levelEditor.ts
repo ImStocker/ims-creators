@@ -8,6 +8,7 @@ export default {
       image: 'Image',
       pointer: 'Pointer',
       polygon: 'Polygon',
+      pencil: 'Pencil',
     },
     tools: {
       group: 'Group',
@@ -17,6 +18,7 @@ export default {
       rect: 'Rectangle',
       ellipse: 'Ellipse',
       polygon: 'Polygon',
+      pencil: 'Pencil',
       image: 'Image',
       pointer: 'Pointer',
       bringToFront: 'Bring to front',
@@ -47,6 +49,8 @@ export default {
         fill: 'Fill',
         stroke: 'Stroke',
         lock: 'Lock',
+        unlock: 'Unlock',
+        strokeWidth: 'Stroke width',
       },
       actions: {
         textAlignLeft: 'Align left',

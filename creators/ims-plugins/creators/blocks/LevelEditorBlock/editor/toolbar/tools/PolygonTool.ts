@@ -177,22 +177,23 @@ export default class PolygonTool extends Tool {
 
   private _finishPolygon() {
     if (this._points.length >= 3) {
-      const origin = this._points[0];
-      const relativePoints = this._points.map((p) => ({
-        x: p.x - origin.x,
-        y: p.y - origin.y,
+      const minX = Math.min(...this._points.map((p) => p.x));
+      const minY = Math.min(...this._points.map((p) => p.y));
+      const localPoints = this._points.map((p) => ({
+        x: p.x - minX,
+        y: p.y - minY,
       }));
       this._cleanUp();
       const polygon = this.controller.createShape({
         id: uuidv4(),
         type: 'polygon',
         params: {
-          points: relativePoints,
+          points: localPoints,
           fill: '#eed81133',
           stroke: '#eed811',
         },
-        x: origin.x,
-        y: origin.y,
+        x: minX,
+        y: minY,
       });
       if (polygon) {
         this.controller.canvas.setActiveObject(polygon);

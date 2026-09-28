@@ -170,7 +170,7 @@ export default class LevelEditorBlockController extends BlockEditorController {
           itemId: 'shape-' + shape.id,
           title,
           anchor: 'shape-' + shape.id,
-          selectable: !shape.locked && !shape.parentId,
+          selectable: !shape.parentId,
           icon: shape_controller.icon ? shape_controller.icon : undefined,
           userData: {
             type: 'shape',

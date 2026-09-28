@@ -63,6 +63,16 @@ export type LevelEditorShapeParamsMap = {
     width: number;
     height: number;
   };
+  pencil: {
+    /**
+     * SVG path data (атрибут "d") в абсолютных координатах сцены.
+     * Хранится строкой, а не массивом команд: пропсы блока — плоский
+     * key-value стор, и массив развернулся бы в тысячи отдельных ключей.
+     */
+    path: string;
+    strokeWidth: number;
+    stroke?: string;
+  };
   group: {};
 };
 
