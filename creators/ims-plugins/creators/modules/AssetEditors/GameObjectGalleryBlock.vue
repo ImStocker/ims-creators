@@ -22,6 +22,7 @@
           :files="[mainItem]"
           :allow-caption="false"
           :allow-service-name="false"
+          :allow-drop="false"
           @delete="deleteImage(mainItem)"
         ></gallery-block-item
       ></screenshot-renderer>
