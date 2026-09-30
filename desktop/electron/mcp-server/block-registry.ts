@@ -1,6 +1,8 @@
 import type { AiSpecEntry } from '~ims-app-base/logic/types/AiSpec';
 import { textBlockAiSpec } from '~ims-plugin-base/blocks/TextBlock/TextBlockAiSpec';
+import { propBlockAiSpec } from '~ims-plugin-base/blocks/PropBlock/PropBlockAiSpec';
 import { propsBlockAiSpec } from '~ims-plugin-base/blocks/PropsBlock/PropsBlockAiSpec';
+import { assetListBlockAiSpec } from '~ims-plugin-base/blocks/AssetListBlock/AssetListBlockAiSpec';
 import { embedBlockAiSpec } from '~ims-plugin-base/blocks/EmbedBlock/EmbedBlockAiSpec';
 import { valueTableBlockAiSpec } from '~ims-plugin-base/blocks/ValueTableBlock/ValueTableBlockAiSpec';
 import { galleryAiSpec } from '~ims-plugin-base/blocks/GalleryBlock/GalleryAiSpec';
@@ -18,7 +20,9 @@ import { diagramBlockAiSpec } from '~ims-plugin-creators/blocks/DiagramBlock/Dia
 
 export const blockRegistry: AiSpecEntry[] = [
   textBlockAiSpec,
+  propBlockAiSpec,
   propsBlockAiSpec,
+  assetListBlockAiSpec,
   embedBlockAiSpec,
   valueTableBlockAiSpec,
   galleryAiSpec,
