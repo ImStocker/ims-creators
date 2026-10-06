@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { getFieldDescriptor } from "../asset-fields";
+import { readFieldDescriptorValue } from "../asset-fields";
 import { type ProjectFileDb, type ProjectFileDbAsset, type ProjectFileDbAssetBlock } from "../ProjectFileDb";
 import { ProjectFileDbCollection } from "../logic/ProjectFileDbCollection";
 import fs from 'node:fs';
@@ -7,33 +7,50 @@ import fse from 'fs-extra';
 import * as node_path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { AssetSearchFilter } from "../logic/AssetSearchFilter";
-import { applyImsFileLocationChange, getAssetLocalPath, getAssetLocalPathById, getImsExtname, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, absolutePathToUuid } from "../utils/files";
+import { getAssetLocalPath, getAssetLocalPathById, getImsExtname, getIndexRangeStartAndStep, getWorkspaceLocalPathFolderById, absolutePathToUuid } from "../utils/files";
 import { ASSET_EXT } from "./FileSystemService";
-import isUUID from 'validator/es/lib/isUUID';
 import { once } from "node:events";
 import type { Writable } from "node:stream";
 import { HistoryChangeRecord } from "../logic/HistoryChangeRecord";
-import { shell, ipcMain } from 'electron';
 import { BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import type { AssetHistoryDTO } from "~ims-app-base/logic/types/AssetHistory";
-import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, AssetsGraphItem, AssetsGraph, AssetBlockParamsDTO, AssetSetDTO, AssetCreateDTO, AssetsChangeResult, AssetChangeDTO, AssetChangeBatchOpDTO, AssetsBatchChangeResultDTO, AssetWhereParams, AssetDeleteResultDTO, CreateRefDTO, AssetReferencesResult, AssetDeleteRefResultDTO, AssetMoveParams, AssetMoveResult, AssetFull } from "~ims-app-base/logic/types/AssetsType";
+import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, AssetsGraphItem, AssetsGraph, AssetBlockParamsDTO, AssetSetDTO, AssetCreateDTO, AssetsChangeResult, AssetChangeDTO, AssetChangeBatchOpDTO, AssetsBatchChangeResultDTO, AssetWhereParams, AssetDeleteResultDTO, CreateRefDTO, AssetReferencesResult, AssetDeleteRefResultDTO, AssetMoveParams, AssetMoveResult } from "~ims-app-base/logic/types/AssetsType";
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
-import type { IProjectDatabaseAsset, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
-import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore, ChangesStreamRequest, ChangesStreamResponse } from "~ims-app-base/logic/types/ProjectTypes";
-import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, compareAssetPropValues, assignPlainValueToAssetProps, convertAssetPropsToPlainObject, type AssetProps, type AssetPropValueText, walkAssetPropValueTextOps, type AssetPropValueAsset, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
-import type { AssetPropsSelectionField, AssetPropsSelectionOrder, AssetPropsSelection } from "~ims-app-base/logic/types/PropsSelection";
+import type { IProjectDatabaseAsset } from "~ims-app-base/logic/types/IProjectDatabase";
+import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore } from "~ims-app-base/logic/types/ProjectTypes";
+import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, assignPlainValueToAssetProps, convertAssetPropsToPlainObject, castAssetPropValueToString, getAssetPropType, type AssetProps, extractAssetLinksFromProps, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
+import type { AssetPropsSelectionOrder, AssetPropsSelection, AssetPropsSelectionField } from "~ims-app-base/logic/types/PropsSelection";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
-import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import { ASSET_BASE_ORDERING, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT, type AssetSaveFormat } from "../project-db-constants";
 
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
+import {
+    applyAssetSelectionFunc,
+    computeSelectionFieldValue,
+    getSelectionFieldsBlocks,
+    isAggregateAssetSelectionFunc,
+    resolveOrderItems,
+    resolveSelectionField,
+    resolveSelectionFields,
+    selectionIsFullyAggregate,
+    sortByOrder,
+    validateAggregateSelection,
+    type ResolvedSelectionField,
+} from "../logic/asset-selection";
 import { mergeBlocksToSave, formBlockComputed } from "../logic/asset-ops";
 import { serializeAssetToJSON, serializeAssetToNewFormatJSON } from "../logic/serialize";
 import { buildMarkdownFrontmatter, MARKDOWN_DEFAULT_ICON, type MarkdownFrontmatterMeta } from "../logic/markdown-frontmatter";
-import { suggestUniqueFilename, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { suggestUniqueFilename } from "../utils/files";
 
 export type AssetServiceAssetCreateDTO = AssetCreateDTO & { localName?: string }
+
+const HAS_IMAGE_FIELD_SELECTOR: AssetPropsSelectionField = {
+    prop: 'gallery|main\\value',
+    as: 'hasImage',
+    func: 'notEmpty',
+}
+const HAS_IMAGE_FIELD = resolveSelectionField(HAS_IMAGE_FIELD_SELECTOR);
 
 export type AssetServiceAssetChangeBatchOpDTO = {
     create?: boolean | { id?: string | null, localName?: string };
@@ -55,33 +72,6 @@ export class AssetService implements IProjectDatabaseAsset {
 
     }
 
-    private _getAssetProp(asset: ProjectFileDbAsset, assetName: string): AssetPropsPlainObjectValue {
-        const prop = getFieldDescriptor(assetName);
-        if (prop) {
-            if (prop.get) {
-                return prop.get(asset);
-            }
-            else if (prop.jsonName) {
-                return (asset as any)[prop.jsonName];
-            }
-        }
-        return null;
-    }
-
-    private _readAssetPropBySelectField(target: AssetPropsPlainObject, asset: ProjectFileDbAsset, prop: AssetPropsSelectionField) {
-        if (typeof prop === 'string') {
-            target[prop] = this._getAssetProp(asset, prop);
-        }
-        else {
-            let val = this._getAssetProp(asset, prop.prop);
-            if (prop.func === 'notEmpty') {
-                val = !!val;
-            }
-            target[prop.as ?? prop.prop] = val
-        }
-    }
-
-
     public async searchAssets(where: AssetQueryWhere): Promise<ProjectFileDbAsset[]> {
         if (Object.keys(where).length === 0) {
             return [...this.assets.iterate()].map(asset => this._cloneFullAsset(asset))
@@ -92,32 +82,39 @@ export class AssetService implements IProjectDatabaseAsset {
         return result.map(asset => this._cloneFullAsset(asset));
     }
 
-    public getAssetField(asset: ProjectFileDbAsset, field: string): AssetPropValue {
-        return (asset as unknown as Record<string, AssetPropValue>)[field]
+    /**
+     * Block props only exist in `block.computed`, which is only filled in by
+     * computeFullAsset. Resolve just the blocks the query actually reads, the
+     * same way AssetSearchFilter does before filtering on block values.
+     */
+    private async _resolveAssetsBlocks(
+        assets: ProjectFileDbAsset[],
+        blocks: AssetBlockIdWithName[],
+    ): Promise<ProjectFileDbAsset[]> {
+        if (blocks.length === 0) {
+            return assets;
+        }
+        const res: ProjectFileDbAsset[] = [];
+        for (const asset of assets) {
+            res.push(await this.computeFullAsset(asset, blocks));
+        }
+        return res;
     }
 
     private async _sortAssets(assets: ProjectFileDbAsset[], order: AssetPropsSelectionOrder[]): Promise<ProjectFileDbAsset[]> {
-        const order_items = order ? order : ASSET_BASE_ORDERING;
-        return assets.sort((a, b) => {
-            for (const order_item of order_items) {
-                let order_field: string;
-                let order_desc = false;
-                if (typeof order_item === 'object') {
-                    order_field = order_item.prop;
-                    order_desc = order_item.desc ?? false;
-                }
-                else {
-                    order_field = order_item;
-                }
-                const a_val = this.getAssetField(a, order_field);
-                const b_val = this.getAssetField(b, order_field);
-                const res = compareAssetPropValues(a_val, b_val);
-                if (res !== 0) {
-                    return order_desc ? res : -res;
-                }
-            }
-            return 0;
-        });
+        const order_items = resolveOrderItems(order ? order : ASSET_BASE_ORDERING);
+        if (order_items.length === 0) {
+            return [...assets];
+        }
+        const prepared = await this._resolveAssetsBlocks(
+            assets,
+            getSelectionFieldsBlocks(order_items),
+        );
+        return sortByOrder(
+            prepared,
+            order_items,
+            (asset, field) => readFieldDescriptorValue(asset, field.descriptor) as AssetPropValue,
+        );
     }
     async assetsGetShort(query: ApiRequestList<AssetQueryWhere>): Promise<AssetsShortResult> {
         const result = await this.assetsGetView<AssetShort>({
@@ -162,7 +159,7 @@ export class AssetService implements IProjectDatabaseAsset {
                     prop: 'projectid',
                     as: 'projectId',
                 },
-                { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty' }
+                HAS_IMAGE_FIELD_SELECTOR
             ]
         },
             {
@@ -468,7 +465,10 @@ export class AssetService implements IProjectDatabaseAsset {
                     const changed_asset = { ...asset };
                     delete (changed_asset as any)['values'];
 
-                    this._readAssetPropBySelectField(changed_asset, asset, { prop: 'gallery|main\\value', as: 'hasImage', func: 'notEmpty' })
+                    changed_asset.hasImage = applyAssetSelectionFunc(
+                        readFieldDescriptorValue(asset, HAS_IMAGE_FIELD.descriptor),
+                        HAS_IMAGE_FIELD,
+                    ) as boolean;
                     return [changed_asset.id, {
                         ...changed_asset,
                         lastViewedAt: undefined,
@@ -504,6 +504,120 @@ export class AssetService implements IProjectDatabaseAsset {
         return getAssetLocalPathById(asset_id, this.db);
     }
 
+    /**
+     * Single implementation of asset selection, covering plain rows, grouped
+     * rows and aggregates. The result is bucketed three ways, and the mode is
+     * unambiguous because validateAggregateSelection rejects everything else:
+     *  - select is fully aggregate and there is no group -> one bucket holding
+     *    every asset, because SQL still returns a single row for an empty set
+     *  - group is given -> one bucket per distinct group key
+     *  - otherwise -> implicit identity grouping, one bucket per asset
+     */
+    private async _getAssetViewRows(query: AssetPropsSelection): Promise<{
+        list: AssetPropsPlainObject[],
+        total: number
+    }> {
+        const group = resolveSelectionFields(query.group ?? []);
+        const select = resolveSelectionFields(query.select ?? []);
+        // ASSET_BASE_ORDERING is the desktop's long-standing default for
+        // ungrouped queries. It cannot be applied to grouped ones, where every
+        // non-aggregate order field has to be a group key.
+        const order = resolveOrderItems(
+            query.order ?? (group.length > 0 ? [] : ASSET_BASE_ORDERING),
+        );
+        validateAggregateSelection(group, select, order);
+
+        const matched = await this.searchAssets(query.where ? query.where : {});
+        const prepared = await this._resolveAssetsBlocks(
+            matched,
+            getSelectionFieldsBlocks([...group, ...select, ...order]),
+        );
+
+        type AssetGroup = {
+            groupValues: AssetPropsPlainObjectValue[],
+            assets: ProjectFileDbAsset[],
+        };
+
+        const buckets: AssetGroup[] = [];
+        if (group.length === 0 && selectionIsFullyAggregate(select)) {
+            buckets.push({ groupValues: [], assets: prepared });
+        }
+        else if (group.length === 0) {
+            for (const asset of prepared) {
+                buckets.push({ groupValues: [], assets: [asset] });
+            }
+        }
+        else {
+            const group_key_part = (value: AssetPropsPlainObjectValue): string =>  {
+                if (value === null || value === undefined) return ' null';
+                const type = getAssetPropType(value as AssetPropValue);
+                if (type === undefined) {
+                    // plain object / array: stable stringify so equal groups collide
+                    return JSON.stringify(value, (_key, val) =>
+                        val && typeof val === 'object' && !Array.isArray(val)
+                            ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => (a < b ? -1 : 1)))
+                            : val,
+                    );
+                }
+                return `${type}:${castAssetPropValueToString(value as AssetPropValue)}`;
+            }
+
+            const group_key = (values: AssetPropsPlainObjectValue[]): string  => {
+                return JSON.stringify(values.map(value => group_key_part(value)));
+            }
+            
+            const groups_by_key = new Map<string, AssetGroup>();
+            for (const asset of prepared) {
+                const group_values = group.map(field => readFieldDescriptorValue(asset, field.descriptor));
+                const key = group_key(group_values);
+                const found = groups_by_key.get(key);
+                if (found) {
+                    found.assets.push(asset);
+                }
+                else {
+                    groups_by_key.set(key, { groupValues: group_values, assets: [asset] });
+                }
+            }
+            buckets.push(...groups_by_key.values());
+        }
+
+        const group_field_index = (field: ResolvedSelectionField) =>
+            group.findIndex(group_field => group_field.prop === field.prop);
+
+        const value_for = (asset_group: AssetGroup, field: ResolvedSelectionField): AssetPropsPlainObjectValue => {
+            const index = group_field_index(field);
+            if (!isAggregateAssetSelectionFunc(field.func) && index >= 0) {
+                return applyAssetSelectionFunc(asset_group.groupValues[index], field);
+            }
+            return computeSelectionFieldValue(
+                asset_group.assets.map(asset => readFieldDescriptorValue(asset, field.descriptor)),
+                field,
+            );
+        };
+
+        const ordered = sortByOrder(
+            buckets,
+            order,
+            (asset_group, field) => value_for(asset_group, field) as AssetPropValue,
+        );
+
+        let page = ordered;
+        if (query.count || query.offset) {
+            page = page.slice(query.offset ?? 0, query.count);
+        }
+
+        return {
+            list: page.map(asset_group => {
+                const view: AssetPropsPlainObject = {};
+                for (const field of select) {
+                    view[field.as] = value_for(asset_group, field);
+                }
+                return view;
+            }),
+            total: buckets.length,
+        };
+    }
+
     async assetsGetView<T extends AssetProps>(
         query: AssetPropsSelection,
         options?: { folded: false },
@@ -516,76 +630,28 @@ export class AssetService implements IProjectDatabaseAsset {
         query: AssetPropsSelection,
         options?: { folded: boolean },
     ): Promise<ApiResultListWithTotal<T>> {
-        const { list, total } = await this.getAssetFulls(query);
-        const res = {
-            list: list.map(asset => {
-                const view: AssetPropsPlainObject = {};
-                for (const prop of query.select) {
-                    this._readAssetPropBySelectField(view, asset, prop)
-                }
-                if (!options?.folded) {
-                    return assignPlainValueToAssetProps({}, view) as T;
-                }
-                return view as T;
-            }),
+        const { list, total } = await this._getAssetViewRows(query);
+        return {
+            list: list.map(view =>
+                options?.folded
+                    ? view as T
+                    : assignPlainValueToAssetProps({}, view) as T,
+            ),
             total,
         }
-        return res;
     }
 
     private _checkLinksInAssetBlockProps(asset: ProjectFileDbAsset): AssetsGraphItem[] {
         const list: AssetsGraphItem[] = [];
         for (const asset_block of asset.blocks) {
             const props: AssetProps = asset_block.props;
-            for (const [prop, val] of Object.entries(props)) {
-                if (!val) continue;
-
-                if ((val as AssetPropValueText).Ops) {
-                    for (const op_struct of walkAssetPropValueTextOps(
-                        (val as AssetPropValueText).Ops,
-                    )) {
-                        if (
-                            op_struct.attributeAsset &&
-                            isUUID(op_struct.attributeAsset.value.AssetId, 'loose')
-                        ) {
-                            list.push({
-                                source: asset.id,
-                                target: op_struct.attributeAsset.value.AssetId,
-                                type: 'mention',
-                            });
-                        }
-                        if (
-                            op_struct.insertTask &&
-                            isUUID(op_struct.insertTask.value.AssetId, 'loose')
-                        ) {
-                            list.push({
-                                source: asset.id,
-                                target: op_struct.insertTask.value.AssetId,
-                                type: 'mention',
-                            });
-                        }
-                        if (
-                            op_struct.insertProp &&
-                            op_struct.insertProp.value &&
-                            isUUID((op_struct.insertProp.value as AssetPropValueAsset).AssetId, 'loose')
-                        ) {
-                            list.push({
-                                source: asset.id,
-                                target: (op_struct.insertProp.value as AssetPropValueAsset)
-                                    .AssetId,
-                                type: 'mention',
-                            });
-                        }
-                    }
-                } else if ((val as AssetPropValueAsset).AssetId) {
-                    if (isUUID((val as AssetPropValueAsset).AssetId), 'loose') {
-                        list.push({
-                            source: asset.id,
-                            target: (val as AssetPropValueAsset).AssetId,
-                            type: 'mention',
-                        });
-                    }
-                }
+            for (const link of extractAssetLinksFromProps(props)) {
+                if ('mention' in link) continue;
+                list.push({
+                    source: asset.id,
+                    target: link.targetAssetId,
+                    type: link.type,
+                });
             }
         }
         return list;
