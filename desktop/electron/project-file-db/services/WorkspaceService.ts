@@ -1,7 +1,9 @@
 import type { AssetQueryWhere } from "~ims-app-base/logic/types/AssetsType";
 import type { IProjectDatabaseWorkspace } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal } from "~ims-app-base/logic/types/ProjectTypes";
-import { compareAssetPropValues, assignPlainValueToAssetProps, convertAssetPropsToPlainObject } from "~ims-app-base/logic/types/Props";
+import { assignPlainValueToAssetProps, convertAssetPropsToPlainObject } from "~ims-app-base/logic/types/Props";
+import { resolveOrderItems, sortByOrder } from "../logic/asset-selection";
+import { getEntityFieldValue } from "../asset-fields";
 import type { AssetPropsSelectionOrder } from "~ims-app-base/logic/types/PropsSelection";
 import type { WorkspaceQueryDTOWhere, Workspace, ChangeWorkspaceRequest, WorkspaceMoveParams, WorkspaceMoveResult } from "~ims-app-base/logic/types/Workspaces";
 import { type ProjectFileDb, type ProjectFileDbWorkspace } from "../ProjectFileDb";
@@ -115,27 +117,15 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
     }
     
     private async _sortWorkspaces(workspaces: ProjectFileDbWorkspace[], order: AssetPropsSelectionOrder[]): Promise<ProjectFileDbWorkspace[]>{
-        const order_items = order && order.length > 0 ? order : WORKSPACE_BASE_ORDERING;
-        return workspaces.sort((a,b) => {
-            for(const order_item of order_items){
-                let order_field: string;
-                let order_desc = false;
-                if(typeof order_item === 'object'){
-                    order_field = order_item.prop;
-                    order_desc = order_item.desc ?? false;
-                }
-                else {
-                    order_field = order_item;
-                }
-                const a_val = this.db.asset.getAssetField(a as any, order_field);
-                const b_val = this.db.asset.getAssetField(b as any, order_field);
-                const res = compareAssetPropValues(a_val, b_val);
-                if(res !== 0){
-                    return order_desc ? res : -res;
-                }
-            }
-            return 0;
-        });
+        const order_items = resolveOrderItems(order && order.length > 0 ? order : WORKSPACE_BASE_ORDERING);
+        if(order_items.length === 0){
+            return [...workspaces];
+        }
+        return sortByOrder(
+            workspaces,
+            order_items,
+            (workspace, field) => getEntityFieldValue(workspace as any, field.prop),
+        );
     }
     private async _workspacesGetDb(query: ApiRequestList<WorkspaceQueryDTOWhere>): Promise<ApiResultListWithTotal<ProjectFileDbWorkspace>> {
         let workspaces = await this._searchWorkspaces( query.where ? query.where : {});

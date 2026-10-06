@@ -3081,8 +3081,20 @@
           "title": "[[t:Gallery]]",
           "own": true,
           "type": "gallery",
-          "props": {},
-          "computed": {},
+          "props": {
+            "__slots": {
+              "main": {
+                "name": "main"
+              }
+            }
+          },
+          "computed": {
+            "__slots": {
+              "main": {
+                "name": "main"
+              }
+            }
+          },
           "inherited": null,
           "index": 1,
           "createdAt": "2025-06-24T12:55:34.293Z",
