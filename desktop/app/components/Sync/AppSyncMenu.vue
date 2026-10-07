@@ -48,6 +48,11 @@ export default defineComponent({
     MenuButton,
     MenuList,
   },
+  data() {
+    return {
+      syncWithCloudLoading: false,
+    };
+  },
   computed: {
     syncIsRunning(){
       return this.syncInfo ? this.inProcess : false;
@@ -79,6 +84,8 @@ export default defineComponent({
         list.push({
           title: this.$t('desktop.fsSync.menu.syncWithCloud'),
           icon: 'ri-refresh-line',
+          keepOpenOnClick: true,
+          loading: this.syncWithCloudLoading,
           action: async () => {
               await this.syncWithCloud();
             }
@@ -174,14 +181,18 @@ export default defineComponent({
   },
   methods: {
     async syncWithCloud(){
-      const logged_in = await this.$getAppManager()
-        .get(AuthManager)
-        .ensureLoggedInDialog(this.$t('desktop.fsSync.menu.loginToSync'));
-      if (!logged_in){
+      if(this.syncWithCloudLoading){
         return;
       }
-    
+      this.syncWithCloudLoading = true;
       try {
+        const logged_in = await this.$getAppManager()
+          .get(AuthManager)
+          .ensureLoggedInDialog(this.$t('desktop.fsSync.menu.loginToSync'));
+        if (!logged_in){
+          return;
+        }
+
         const user_licenses = await this.$getAppManager()
           .get<DesktopAuthManager>(AuthManager)
           .getUserLicense();
@@ -199,6 +210,9 @@ export default defineComponent({
       }
       catch(err: any) {
         this.$getAppManager().get(UiManager).showError(err.message);
+      }
+      finally {
+        this.syncWithCloudLoading = false;
       }
     },
     async openSyncManageDialog() {
