@@ -9,7 +9,7 @@
     @dragover.prevent="dragFileEnter"
     @dragleave.prevent="dragFileLeave"
   >
-    <div v-if="mainItem">
+    <div v-if="displayItem">
       <screenshot-renderer
         :disabled="displayMode !== 'print'"
         :ready="ready"
@@ -18,12 +18,12 @@
         <gallery-block-item
           class="GameObjectGalleryBlock-itemContent"
           :readonly="readonly"
-          :item="mainItem"
-          :files="[mainItem]"
+          :item="displayItem"
+          :files="[displayItem]"
           :allow-caption="false"
           :allow-service-name="false"
           :allow-drop="false"
-          @delete="deleteImage(mainItem)"
+          @delete="deleteImage(displayItem)"
         ></gallery-block-item
       ></screenshot-renderer>
     </div>
@@ -90,6 +90,7 @@ import type {
 } from '~ims-app-base/logic/utils/assets';
 import {
   extractGalleryBlockEntries,
+  isGalleryItemEmpty,
   type GalleryBlockExtractedEntries,
   type GalleryBlockItemObject,
 } from '~ims-plugin-base/blocks/GalleryBlock/GalleryBlock';
@@ -186,6 +187,11 @@ export default defineComponent({
     },
     mainItem() {
       return this.realEntries.list.find((item) => item.key === SET_GALLERY_KEY);
+    },
+    displayItem(): GalleryBlockItemObject | null {
+      const item = this.mainItem;
+      if (!item || isGalleryItemEmpty(item)) return null;
+      return { ...item, name: undefined };
     },
     galleryItems(): GalleryBlockItemObject[] {
       return this.realEntries.list;
