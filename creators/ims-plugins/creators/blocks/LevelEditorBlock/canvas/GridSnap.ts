@@ -11,8 +11,8 @@ export type GridSettings = {
 };
 
 export type LevelSize = {
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 };
 
 export const DEFAULT_GRID_SETTINGS: GridSettings = {
@@ -39,17 +39,19 @@ export function normalizeGridSettings(raw: RawGridSettings): GridSettings {
 }
 
 export function normalizeLevelSize(raw: RawLevelSize): LevelSize | null {
+  // Каждое измерение независимо: 0/пусто = без ограничения. Раньше
+  // отсутствие любой из сторон давало null, и введённая в одном поле
+  // ширина «исчезала» до тех пор, пока не была введена и высота.
   const width = Number(raw?.width);
   const height = Number(raw?.height);
-  if (
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return null;
+  const size: LevelSize = {};
+  if (Number.isFinite(width) && width > 0) {
+    size.width = width;
   }
-  return { width, height };
+  if (Number.isFinite(height) && height > 0) {
+    size.height = height;
+  }
+  return size.width === undefined && size.height === undefined ? null : size;
 }
 
 /**
@@ -170,12 +172,15 @@ const MODEL_ANCHORS: Record<LevelEditorShape['type'], ModelAnchor> = {
 
 /**
  * Типы, у которых размер по сетке не привязываем: произвольная геометрия
- * (polygon, pencil) и группы (масштабирование меняет содержимое детей).
+ * (polygon, pencil), группы (масштабирование меняет содержимое детей)
+ * и pointer — он лишь указывает на точку, его размер — постоянный
+ * маркер, который сетка не должна растягивать.
  */
 const SIZE_SNAP_SKIP_MODEL_TYPES = new Set<LevelEditorShape['type']>([
   'polygon',
   'pencil',
   'group',
+  'pointer',
 ]);
 
 function readNumericParam(
@@ -289,13 +294,16 @@ export type FabricSnapOptions = {
 
 /**
  * Типы fabric-объектов, у которых размер по сетке не привязываем.
- * Соответствует модельным polygon/pencil/group.
+ * Соответствует модельным polygon/pencil/group; pointer — постоянный
+ * маркер точки, его геометрия (высота линии, картинка) не кратна
+ * ячейке и растягивать её нельзя.
  */
 const SIZE_SNAP_SKIP_FABRIC_TYPES = new Set<string>([
   'polygon',
   'path',
   'group',
   'activeselection',
+  'pointer',
 ]);
 
 /**

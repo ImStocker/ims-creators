@@ -32,6 +32,7 @@ export default {
       fillColor: 'Заливка',
       strokeColor: 'Обводка',
       gridSettings: 'Настройки сетки',
+      holdCtrlHint: 'Удерживайте Ctrl, чтобы вставлять несколько',
     },
     grid: {
       title: 'Сетка',

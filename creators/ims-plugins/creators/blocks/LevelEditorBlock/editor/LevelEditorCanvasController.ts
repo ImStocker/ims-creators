@@ -142,8 +142,6 @@ export default class LevelEditorCanvasController {
 
     this._drawGrid();
 
-    this.updateCanvas();
-
     this.toolManager = createDefaultToolManager(
       this.canvas,
       this.appManager,
@@ -151,6 +149,15 @@ export default class LevelEditorCanvasController {
     ) as ToolManager;
 
     this._initEventHandlers();
+
+    // Строго после _initEventHandlers: подписи декораций подписываются
+    // на canvas object:moving в момент создания фигуры (updateCanvas).
+    // Если подписи зарегистрируются раньше обработчиков контроллера
+    // (как было при загрузке стартовых фигур), их обработчик вызовется
+    // до привязки к сетке и подпись во время перетаскивания будет
+    // отставать от уже снапленной фигуры.
+    this.updateCanvas();
+
     watch(
       () => this.blockController.shapes,
       () => this.updateCanvas(),
@@ -191,7 +198,9 @@ export default class LevelEditorCanvasController {
       | LevelFrame
       | undefined;
 
-    if (!level_size) {
+    // Рамка уровня — только при заданных обеих сторонах; пока вторая
+    // сторона не введена (без ограничения), рамка не рисуется.
+    if (!level_size?.width || !level_size?.height) {
       if (frame) {
         this.canvas.remove(frame);
         this.canvas.requestRenderAll();
@@ -460,7 +469,10 @@ export default class LevelEditorCanvasController {
       const opId = this.blockController.changer?.makeOpId();
 
       const is_parsed_item_valid = (parsed_item: any) =>
-        parsed_item.type && parsed_item.id && parsed_item.x && parsed_item.y;
+        parsed_item.type &&
+        parsed_item.id &&
+        parsed_item.x !== undefined &&
+        parsed_item.y !== undefined;
 
       const id_mapping: Record<string, string> = {};
 
@@ -489,6 +501,8 @@ export default class LevelEditorCanvasController {
               new_parent_id = id_mapping[parsed_item.parentId];
             }
             delete parsed_item.index;
+            delete parsed_item._screenX;
+            delete parsed_item._screenY;
 
             const new_object_props = {
               ...parsed_item,
@@ -1594,6 +1608,13 @@ export default class LevelEditorCanvasController {
         if (shape.type === 'activeselection') {
           (shape as fabric.ActiveSelection).triggerLayout();
         }
+        // Подписи декораций слушают только moving/scaling/rotating/skewing,
+        // но не object:modified — а normalize/снап здесь меняют left/top и
+        // размер (снап размера на отпускании сдвигает центр). Пересчитываем
+        // после всех трансформаций, включая triggerLayout выделения.
+        const decorated = new Set<fabric.FabricObject>(objects);
+        decorated.add(shape);
+        decorated.forEach((obj) => obj.decorationObject?.updatePosition());
         this._pinnedLockedTransform = null;
         this.canvas.requestRenderAll();
       },

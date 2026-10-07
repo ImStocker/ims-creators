@@ -9,6 +9,7 @@ export default class PolygonTool extends Tool {
   name = 'polygon';
   icon = 'ri-shape-line';
   override exclusiveGroup: string = 'drawing';
+  override supportsMultiInsert = true;
   section: ToolSection = 'draw';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;
@@ -87,7 +88,7 @@ export default class PolygonTool extends Tool {
           (event.e instanceof MouseEvent || event.e instanceof PointerEvent) &&
           event.e.button === 2
         ) {
-          this._finishPolygon();
+          this._finishPolygon(this.shouldKeepActiveAfterInsert(event.e));
           return;
         }
       },
@@ -115,7 +116,7 @@ export default class PolygonTool extends Tool {
           const dist = Math.hypot(pointer.x - first.x, pointer.y - first.y);
 
           if (dist < 10) {
-            this._finishPolygon();
+            this._finishPolygon(this.shouldKeepActiveAfterInsert(event.e));
             return;
           }
         }
@@ -175,7 +176,8 @@ export default class PolygonTool extends Tool {
     this.controller.canvas.add(this._previewLine);
   }
 
-  private _finishPolygon() {
+  private _finishPolygon(keepActive: boolean) {
+    let created = false;
     if (this._points.length >= 3) {
       const minX = Math.min(...this._points.map((p) => p.x));
       const minY = Math.min(...this._points.map((p) => p.y));
@@ -198,6 +200,7 @@ export default class PolygonTool extends Tool {
       if (polygon) {
         this.controller.canvas.setActiveObject(polygon);
         polygon.setCoords();
+        created = true;
       }
     } else {
       this._cleanUp();
@@ -205,6 +208,10 @@ export default class PolygonTool extends Tool {
 
     this.controller.canvas.requestRenderAll();
 
-    this.deactivate();
+    // Ctrl/Cmd при завершении — инструмент остаётся активным для следующего
+    // многоугольника; отмена (менее 3 точек) деактивирует всегда.
+    if (!keepActive || !created) {
+      this.deactivate();
+    }
   }
 }

@@ -56,6 +56,11 @@ export default abstract class ShapeCreationTool extends Tool {
       this.onMouseUp(),
     );
     this.controller.canvas.defaultCursor = 'crosshair';
+    // Как и PolygonTool: пока рисуем, клик не должен выделять/перемещать
+    // уже вставленные фигуры (иначе при многократной вставке Ctrl+клик
+    // по предыдущей фигуре вместо новой фигуры сдвигал бы старую).
+    this.controller.canvas.selection = false;
+    this.controller.canvas.skipTargetFind = true;
   }
 
   override onDeactivate() {
@@ -67,6 +72,8 @@ export default abstract class ShapeCreationTool extends Tool {
       if (disposer) disposer();
     });
     this.controller.canvas.defaultCursor = 'default';
+    this.controller.canvas.selection = true;
+    this.controller.canvas.skipTargetFind = false;
   }
 
   onMouseDown() {
@@ -165,7 +172,6 @@ export default abstract class ShapeCreationTool extends Tool {
 
         this._shape = this.controller.createShape(levelEditorShape, { snap });
 
-        canvas.selection = true;
         if (this._shape) {
           canvas.setActiveObject(this._shape);
           this.onShapeCreated(this._shape);
@@ -173,7 +179,11 @@ export default abstract class ShapeCreationTool extends Tool {
         }
 
         this.resetState();
-        this.deactivate();
+        // Удержание Ctrl/Cmd после вставки — инструмент остаётся активным
+        // для вставки следующей фигуры (без Ctrl — как раньше, один раз).
+        if (!this.shouldKeepActiveAfterInsert(event.e)) {
+          this.deactivate();
+        }
       },
     );
   }

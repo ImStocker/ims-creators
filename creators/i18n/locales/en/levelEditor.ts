@@ -32,6 +32,7 @@ export default {
       fillColor: 'Fill',
       strokeColor: 'Stroke',
       gridSettings: 'Grid settings',
+      holdCtrlHint: 'Hold Ctrl to insert multiple',
     },
     grid: {
       title: 'Grid',

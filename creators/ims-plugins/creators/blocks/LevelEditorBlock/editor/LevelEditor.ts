@@ -58,6 +58,7 @@ export type LevelEditorShapeParamsMap = {
     height?: number;
     fill?: string;
     stroke?: string;
+    pixelated?: boolean;
   };
   pointer: {
     width: number;

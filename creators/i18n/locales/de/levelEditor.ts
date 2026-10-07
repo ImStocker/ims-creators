@@ -32,6 +32,7 @@ export default {
       fillColor: 'Füllung',
       strokeColor: 'Kontur',
       gridSettings: 'Raster-Einstellungen',
+      holdCtrlHint: 'Strg halten, um mehrere einzufügen',
     },
     grid: {
       title: 'Raster',
