@@ -109,6 +109,19 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             if (is_passed && where.names){
                 is_passed = workspace.name ? where.names.includes(workspace.name) : false;
             }
+            if (is_passed && where.insideId !== undefined){
+                if (where.insideId){
+                    let current: ProjectFileDbWorkspace | null = workspace;
+                    let found = false;
+                    while (current && current.parentId){
+                        found = current.parentId === where.insideId;
+                        if (found) break;
+                        current = this.workspaces.byId.get(current.parentId) ?? null;
+                    }
+                    is_passed = found;
+                }
+                else is_passed = workspace.parentId === null
+            }
             if(is_passed) {
                 result.push(workspace);
             }
