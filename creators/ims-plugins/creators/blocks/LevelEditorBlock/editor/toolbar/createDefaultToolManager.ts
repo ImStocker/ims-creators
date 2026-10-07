@@ -19,6 +19,7 @@ import type LevelEditorCanvasController from '../LevelEditorCanvasController';
 // import LockTool from './tools/LockTool';
 import UnlockAllTool from './tools/UnlockAllTool';
 import ViewAllTool from './tools/ViewAllTool';
+import GridSettingsTool from './tools/GridSettingsTool';
 // import SelectColorPresetTool from './tools/SelectColorPresetTool';
 // import SelectStrokeColorTool from './tools/SelectStrokeColorTool';
 // import SelectFillColorTool from './tools/SelectFillColorTool';
@@ -55,6 +56,7 @@ export default function createDefaultToolManager(
     // new LockTool(appManager, raw_controller),
     new UnlockAllTool(appManager, raw_controller),
     new ViewAllTool(appManager, raw_controller),
+    new GridSettingsTool(appManager, raw_controller),
     // new SelectColorPresetTool(appManager, raw_controller),
     // new SelectFillColorTool(appManager, raw_controller),
     // new SelectStrokeColorTool(appManager, raw_controller),

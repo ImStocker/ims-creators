@@ -31,6 +31,23 @@ export default {
       colorPreset: 'Color',
       fillColor: 'Fill',
       strokeColor: 'Stroke',
+      gridSettings: 'Grid settings',
+    },
+    grid: {
+      title: 'Grid',
+      width: 'Cell width',
+      height: 'Cell height',
+      mode: 'Snap mode',
+      modeSnapOnly: 'While holding Ctrl',
+      modeStrict: 'Always',
+      snapAll: 'Snap all to grid',
+      snapSelected: 'Snap selected objects to grid',
+    },
+    level: {
+      title: 'Level size',
+      width: 'Width',
+      height: 'Height',
+      unlimited: 'Unlimited',
     },
     sections: {
       properties: 'Properties',

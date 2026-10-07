@@ -3,6 +3,18 @@ import { markRaw, watch } from 'vue';
 
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import { INF_GRID_OBJECT_TYPE, InfiniteGrid } from '../canvas/InfiniteGrid';
+import { LEVEL_FRAME_OBJECT_TYPE, LevelFrame } from '../canvas/LevelFrame';
+import {
+  isSnapActiveForEvent,
+  normalizeGridSettings,
+  roundCoord,
+  roundScale,
+  roundShapePrecision,
+  snapFabricObject,
+  snapShapeToGrid,
+  type GridSettings,
+  type LevelSize,
+} from '../canvas/GridSnap';
 import createDefaultToolManager from './toolbar/createDefaultToolManager';
 import type ToolManager from './toolbar/ToolManager';
 import type Image from '../canvas/Image';
@@ -146,6 +158,189 @@ export default class LevelEditorCanvasController {
         immediate: true,
       },
     );
+    watch(
+      () => this.blockController.gridSettings,
+      (grid) => this._applyGridSettings(grid),
+      {
+        immediate: true,
+      },
+    );
+    watch(
+      () => this.blockController.levelSize,
+      (level_size) => this._updateLevelFrame(level_size),
+      {
+        immediate: true,
+      },
+    );
+  }
+
+  private _applyGridSettings(grid: GridSettings) {
+    const normalized = normalizeGridSettings(grid);
+    const grid_object = this.canvas
+      .getObjects()
+      .find((obj) => obj.type === INF_GRID_OBJECT_TYPE) as
+      | InfiniteGrid
+      | undefined;
+    grid_object?.setCellSize(normalized.width, normalized.height);
+  }
+
+  private _updateLevelFrame(level_size: LevelSize | null) {
+    let frame = this.canvas
+      .getObjects()
+      .find((obj) => obj.type === LEVEL_FRAME_OBJECT_TYPE) as
+      | LevelFrame
+      | undefined;
+
+    if (!level_size) {
+      if (frame) {
+        this.canvas.remove(frame);
+        this.canvas.requestRenderAll();
+      }
+      return;
+    }
+
+    if (frame) {
+      frame.setSize(level_size.width, level_size.height);
+    } else {
+      frame = new LevelFrame({
+        width: level_size.width,
+        height: level_size.height,
+      });
+      this.canvas.add(frame);
+    }
+    // Рамка — сразу за сеткой, перед фигурами. Индекс считается только по
+    // ведущей сетке (без учёта самой рамки), иначе moveObjectTo каждый раз
+    // прыгал бы рамкой туда-обратно через границу фигур.
+    const objects = this.canvas.getObjects();
+    let grid_count = 0;
+    while (
+      grid_count < objects.length &&
+      objects[grid_count].type === INF_GRID_OBJECT_TYPE
+    ) {
+      grid_count++;
+    }
+    this.canvas.moveObjectTo(frame, grid_count);
+    this.canvas.requestRenderAll();
+  }
+
+  /**
+   * Количество фоновых объектов (сетка, рамка уровня) в начале canvas —
+   * стартовый индекс при пересортировке фигур.
+   */
+  private _backgroundBaseIndex(): number {
+    const objects = this.canvas.getObjects();
+    let index = 0;
+    while (
+      index < objects.length &&
+      (objects[index].type === INF_GRID_OBJECT_TYPE ||
+        objects[index].type === LEVEL_FRAME_OBJECT_TYPE)
+    ) {
+      index++;
+    }
+    return index;
+  }
+
+  /**
+   * Активная сетка привязки для жеста или null, если привязка неактивна
+   * (snap-only без Ctrl/Cmd, readonly).
+   */
+  private _getActiveSnapGrid(
+    e?: { ctrlKey?: boolean; metaKey?: boolean } | null,
+  ): GridSettings | null {
+    if (this.readonly) return null;
+    const grid = this.blockController.gridSettings;
+    if (!grid) return null;
+    return isSnapActiveForEvent(grid, e) ? grid : null;
+  }
+
+  /**
+   * Сетка привязки для создания фигуры: strict — всегда, snap-only —
+   * по явному флагу от инструмента (Ctrl на mouse:up).
+   */
+  private _getSnapGridForCreate(snap?: boolean): GridSettings | null {
+    if (this.readonly) return null;
+    if (snap === false) return null;
+    const grid = this.blockController.gridSettings;
+    if (!grid) return null;
+    if (snap === true) return grid;
+    return grid.mode === 'strict' ? grid : null;
+  }
+
+  /**
+   * Привязать фигуры к сетке: позиция + размер, одной операцией undo.
+   * Без params.objectIds — все фигуры верхнего уровня (незаблокированные),
+   * с objectIds — только указанные.
+   */
+  applyGridSnapToAllShapes(
+    grid?: GridSettings,
+    params?: { opId?: number; objectIds?: string[] },
+  ): void {
+    const shapes = this.blockController.shapes;
+    if (!shapes) return;
+
+    const snap_grid = normalizeGridSettings(
+      grid ?? this.blockController.gridSettings,
+    );
+    if (snap_grid.width <= 0 || snap_grid.height <= 0) return;
+
+    const op = params?.opId ?? this.blockController.changer?.makeOpId();
+
+    for (const shape of Object.values(shapes)) {
+      if (!shape.id) continue;
+      if (shape.parentId) continue;
+      if (shape.locked) continue;
+      if (params?.objectIds && !params.objectIds.includes(shape.id)) continue;
+
+      const obj = this.canvas
+        .getObjects()
+        .find(
+          (canvas_obj) =>
+            canvas_obj.id === shape.id &&
+            canvas_obj.type !== INF_GRID_OBJECT_TYPE &&
+            canvas_obj.type !== LEVEL_FRAME_OBJECT_TYPE,
+        );
+      if (!obj) continue;
+
+      // Та же последовательность, что в object:modified: normalize
+      // сворачивает scaleX/scaleY в width/height, и только затем снапит —
+      // иначе «все к сетке» пропустит фигуры с неединичным масштабом
+      // (guard scaled) и не вылечит накопленный мусор width/scale.
+      const before = {
+        scaleX: obj.scaleX ?? 1,
+        scaleY: obj.scaleY ?? 1,
+        skewX: obj.skewX ?? 0,
+        angle: obj.angle ?? 0,
+        width: obj.width,
+        height: obj.height,
+        rx: (obj as fabric.Ellipse).rx,
+        ry: (obj as fabric.Ellipse).ry,
+      };
+      this.normalizeShapeTransform(obj);
+      const normalized =
+        (obj.scaleX ?? 1) !== before.scaleX ||
+        (obj.scaleY ?? 1) !== before.scaleY ||
+        (obj.skewX ?? 0) !== before.skewX ||
+        (obj.angle ?? 0) !== before.angle ||
+        obj.width !== before.width ||
+        obj.height !== before.height ||
+        (obj as fabric.Ellipse).rx !== before.rx ||
+        (obj as fabric.Ellipse).ry !== before.ry;
+
+      const snapped = snapFabricObject(obj, snap_grid, {
+        position: true,
+        size: true,
+      });
+      const changed = normalized || snapped;
+      if (!changed) continue;
+
+      const changes = this.saveShapeState(obj);
+      this.changeShape(shape.id, changes as any, {
+        opId: op,
+        expectPropsChange: false,
+      });
+    }
+
+    this.canvas.requestRenderAll();
   }
 
   private _createSortedShapesCache() {
@@ -464,7 +659,12 @@ export default class LevelEditorCanvasController {
     const current_shape_ids = new Set(shapes ? Object.keys(shapes) : []);
 
     const add_object_to_map = (obj: fabric.FabricObject) => {
-      if (obj.type === INF_GRID_OBJECT_TYPE || obj.type === 'label') return;
+      if (
+        obj.type === INF_GRID_OBJECT_TYPE ||
+        obj.type === LEVEL_FRAME_OBJECT_TYPE ||
+        obj.type === 'label'
+      )
+        return;
 
       fabric_objects_map.set(obj.id, obj);
       if (obj.type === 'group') {
@@ -480,7 +680,12 @@ export default class LevelEditorCanvasController {
     }
 
     for (const obj of fabric_objects_map.values()) {
-      if (obj.type === INF_GRID_OBJECT_TYPE || obj.type === 'label') return;
+      if (
+        obj.type === INF_GRID_OBJECT_TYPE ||
+        obj.type === LEVEL_FRAME_OBJECT_TYPE ||
+        obj.type === 'label'
+      )
+        return;
       if (!current_shape_ids.has(obj.id)) {
         const collection = obj.parent ? obj.parent : this.canvas;
         if (obj.type === 'group') {
@@ -502,6 +707,13 @@ export default class LevelEditorCanvasController {
 
       if (!shape) continue;
 
+      // Пропускаем битые записи модели (нет type или контроллера),
+      // до любых манипуляций со стеком — итерация пропускается целиком.
+      const shape_controller = getShapeControllers(this.appManager).map[
+        shape.type
+      ];
+      if (!shape_controller) continue;
+
       if (shape.type === 'group') {
         previous_objects_stack.pop();
       }
@@ -514,10 +726,6 @@ export default class LevelEditorCanvasController {
       }
 
       const previous_object = previous_objects_stack.pop();
-
-      const shape_controller = getShapeControllers(this.appManager).map[
-        shape.type
-      ];
 
       let existing_object = fabric_objects_map.get(shape.id);
       if (existing_object) {
@@ -532,7 +740,8 @@ export default class LevelEditorCanvasController {
 
           let index: number;
           if (!previous_object) {
-            index = collection === this.canvas ? 1 : 0; // Background grid has a 0 index;
+            index =
+              collection === this.canvas ? this._backgroundBaseIndex() : 0; // Фон (сетка, рамка уровня) занимает начало canvas
           } else {
             index =
               collection.getObjects().indexOf(previous_object) +
@@ -624,7 +833,12 @@ export default class LevelEditorCanvasController {
     return this.sortObjects(
       this.canvas
         .getObjects()
-        .filter((el) => el.type !== 'infgrid' && el.type !== 'label'),
+        .filter(
+          (el) =>
+            el.type !== INF_GRID_OBJECT_TYPE &&
+            el.type !== LEVEL_FRAME_OBJECT_TYPE &&
+            el.type !== 'label',
+        ),
     );
   }
 
@@ -632,7 +846,10 @@ export default class LevelEditorCanvasController {
     const filtered_objects = (collection ?? this.canvas)
       .getObjects()
       .filter(
-        (obj) => obj.type !== INF_GRID_OBJECT_TYPE && obj.type !== 'label',
+        (obj) =>
+          obj.type !== INF_GRID_OBJECT_TYPE &&
+          obj.type !== LEVEL_FRAME_OBJECT_TYPE &&
+          obj.type !== 'label',
       );
 
     const max_index = filtered_objects[filtered_objects.length - 1]?.index ?? 0;
@@ -643,7 +860,10 @@ export default class LevelEditorCanvasController {
     const filtered_objects = (collection ?? this.canvas)
       .getObjects()
       .filter(
-        (obj) => obj.type !== INF_GRID_OBJECT_TYPE && obj.type !== 'label',
+        (obj) =>
+          obj.type !== INF_GRID_OBJECT_TYPE &&
+          obj.type !== LEVEL_FRAME_OBJECT_TYPE &&
+          obj.type !== 'label',
       );
     const min_index = filtered_objects[0]?.index ?? 0;
     return getPreviousIndexWithTimestamp(min_index);
@@ -651,8 +871,16 @@ export default class LevelEditorCanvasController {
 
   createShape(
     shape: LevelEditorShape,
-    params?: { opId?: number; expectPropsChange?: boolean },
+    params?: { opId?: number; expectPropsChange?: boolean; snap?: boolean },
   ) {
+    const snap_grid = this._getSnapGridForCreate(params?.snap);
+    if (snap_grid) {
+      snapShapeToGrid(shape, snap_grid);
+    }
+    // И без сетки: инструменты рисуют по scenePoint, чьи координаты и
+    // размеры содержат FP-мусор (137.33333333333331), который не должен
+    // оседать в модели.
+    roundShapePrecision(shape);
     this._invalidateSortedShapesCache();
     if (!shape.index) {
       shape.index = this.generateNewMaxIndex();
@@ -738,6 +966,7 @@ export default class LevelEditorCanvasController {
 
   convertLevelEditorShapeToFabricObject(shape: LevelEditorShape) {
     const controller = getShapeControllers(this.appManager).map[shape.type];
+    if (!controller) return null;
     return controller.createFabricObject(shape, this.readonly) ?? null;
   }
 
@@ -763,15 +992,15 @@ export default class LevelEditorCanvasController {
       case 'ellipse': {
         const ellipseObj = obj as unknown as fabric.Ellipse;
         params = {
-          rx: ellipseObj.rx,
-          ry: ellipseObj.ry,
+          rx: roundCoord(ellipseObj.rx),
+          ry: roundCoord(ellipseObj.ry),
         } as LevelEditorShapeParamsMap['ellipse'];
         break;
       }
       case 'textbox': {
         params = {
-          width: obj.width,
-          height: obj.height,
+          width: roundCoord(obj.width),
+          height: roundCoord(obj.height),
         };
         break;
       }
@@ -787,8 +1016,8 @@ export default class LevelEditorCanvasController {
           : 0;
         params = {
           points: polygonObj.points.map((p) => ({
-            x: p.x - minX,
-            y: p.y - minY,
+            x: roundCoord(p.x - minX),
+            y: roundCoord(p.y - minY),
           })),
         } as LevelEditorShapeParamsMap['polygon'];
         break;
@@ -800,9 +1029,17 @@ export default class LevelEditorCanvasController {
       }
       case 'image': {
         const imageObj = obj as unknown as Image;
+        // displayingWidth выставляется в конструкторе и в
+        // normalizeShapeTransform; если его нет (изображение ещё не
+        // нормализовалось), отображаемый размер — width × scale.
         params = {
-          width: imageObj.displayingWidth ?? imageObj.width,
-          height: imageObj.displayingHeight ?? imageObj.height,
+          width: roundCoord(
+            imageObj.displayingWidth ?? imageObj.width * (imageObj.scaleX ?? 1),
+          ),
+          height: roundCoord(
+            imageObj.displayingHeight ??
+              imageObj.height * (imageObj.scaleY ?? 1),
+          ),
         };
         break;
       }
@@ -818,26 +1055,31 @@ export default class LevelEditorCanvasController {
       }
       default: {
         params = {
-          width: obj.width,
-          height: obj.height,
+          width: roundCoord(obj.width),
+          height: roundCoord(obj.height),
         } as LevelEditorShapeParamsMap['rect'];
       }
     }
 
-    changes.x = origin_coords.x;
-    changes.y = origin_coords.y;
+    // Округление убирает FP-мусор (499.99999999999994 → 500) от
+    // матричных операций fabric и round-trip'ов left → center → left;
+    // снапленные значения и так кратны ячейке, поэтому не меняются.
+    changes.x = roundCoord(origin_coords.x);
+    changes.y = roundCoord(origin_coords.y);
 
     if (options.scaleX && obj.type !== 'image') {
-      changes.scaleX = options.scaleX;
+      changes.scaleX = roundScale(options.scaleX);
     }
     if (options.scaleY && obj.type !== 'image') {
-      changes.scaleY = options.scaleY;
+      changes.scaleY = roundScale(options.scaleY);
     }
-    if (options.angle) {
-      changes.angle = options.angle;
+    const angle = roundCoord(options.angle);
+    if (angle) {
+      changes.angle = angle;
     }
-    if (options.skewX) {
-      changes.skew = options.skewX;
+    const skew = roundCoord(options.skewX);
+    if (skew) {
+      changes.skew = skew;
     }
     // if (skip_group_matrix_options.scaleX && obj.type !== 'image') {
     //   changes.scaleX = skip_group_matrix_options.scaleX;
@@ -1131,6 +1373,15 @@ export default class LevelEditorCanvasController {
       (canvas, eventParams: fabric.ModifiedEvent) => {
         const obj = eventParams.target;
         if (!obj) return;
+        const snap_grid = this._getActiveSnapGrid(eventParams.e);
+        if (snap_grid) {
+          snapFabricObject(obj, snap_grid, {
+            position: true,
+            axisX: !obj.lockMovementX,
+            axisY: !obj.lockMovementY,
+          });
+          return;
+        }
         obj.set({
           left: Math.round(obj.left ?? 0),
           top: Math.round(obj.top ?? 0),
@@ -1278,6 +1529,7 @@ export default class LevelEditorCanvasController {
         const shape_controller = getShapeControllers(this.appManager).map[
           existing_shape.type
         ];
+        if (!shape_controller) return;
 
         shape_controller.updateDecoration(
           existing_object,
@@ -1293,11 +1545,19 @@ export default class LevelEditorCanvasController {
         const shape = eventParams.target;
         if (!shape) return;
 
+        const snap_grid = this._getActiveSnapGrid(eventParams.e);
+
         let objects: fabric.FabricObject[] = [];
         let group_matrix: fabric.TMat2D | undefined = undefined;
 
         if (shape.type === 'activeselection') {
           const group = shape as fabric.ActiveSelection;
+          if (snap_grid) {
+            // Позиция привязывается по bbox выделения (объект верхнего
+            // уровня), до фиксации group_matrix — члены выделения
+            // сохраняются уже в привязанных координатах группы.
+            snapFabricObject(group, snap_grid, { position: true });
+          }
           group_matrix = group.calcTransformMatrix();
           const group_matrix_options = fabric.util.qrDecompose(group_matrix);
           group.set({
@@ -1325,6 +1585,9 @@ export default class LevelEditorCanvasController {
         const op = this.blockController.changer?.makeOpId();
         objects.forEach((obj) => {
           this.normalizeShapeTransform(obj, group_matrix);
+          if (snap_grid && !group_matrix) {
+            snapFabricObject(obj, snap_grid, { position: true, size: true });
+          }
           const changes = this.saveShapeState(obj);
           this.changeShape(obj.id, changes as any, { opId: op });
         });

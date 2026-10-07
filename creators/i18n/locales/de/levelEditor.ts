@@ -31,6 +31,23 @@ export default {
       colorPreset: 'Farbe',
       fillColor: 'Füllung',
       strokeColor: 'Kontur',
+      gridSettings: 'Raster-Einstellungen',
+    },
+    grid: {
+      title: 'Raster',
+      width: 'Zellenbreite',
+      height: 'Zellenhöhe',
+      mode: 'Einrastmodus',
+      modeSnapOnly: 'Bei gehaltener Strg',
+      modeStrict: 'Immer',
+      snapAll: 'Alles einrasten',
+      snapSelected: 'Ausgewählte einrasten',
+    },
+    level: {
+      title: 'Levelgröße',
+      width: 'Breite',
+      height: 'Höhe',
+      unlimited: 'Unbegrenzt',
     },
     sections: {
       properties: 'Eigenschaften',
