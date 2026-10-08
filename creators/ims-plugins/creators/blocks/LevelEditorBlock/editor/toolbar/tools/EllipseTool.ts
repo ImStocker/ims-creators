@@ -11,6 +11,7 @@ export default class EllipseTool extends ShapeCreationTool {
   name = 'ellipse';
   icon = 'ri-circle-line';
   override exclusiveGroup: string = 'drawing';
+  override supportsMultiInsert = true;
   section: ToolSection = 'draw';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;

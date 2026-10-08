@@ -20,6 +20,7 @@ export type ImagePlacement = {
   y: number;
 };
 
+const PIXILATED_MODE_SIZE_THRESHOLD = 96;
 const AllowedExtensions = new Set(['jpg', 'jpeg', 'png', 'bmp', 'svg', 'gif']);
 
 const MultiFilePlacementOffset = 24;
@@ -174,6 +175,10 @@ export default class ImageTool extends Tool {
       this._loading = true;
       const imageElement = await loadImage(imageURL);
 
+      const pixelated =
+        imageElement.width <= PIXILATED_MODE_SIZE_THRESHOLD &&
+        imageElement.height <= PIXILATED_MODE_SIZE_THRESHOLD;
+
       const image = this.controller.createShape({
         id: uuidv4(),
         type: 'image',
@@ -181,6 +186,7 @@ export default class ImageTool extends Tool {
         y: center.y - imageElement.height / 2,
         params: {
           file: imageFile,
+          pixelated,
         },
       });
       if (image) {

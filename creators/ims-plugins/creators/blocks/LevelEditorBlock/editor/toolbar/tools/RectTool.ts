@@ -10,6 +10,7 @@ export default class RectTool extends ShapeCreationTool {
   name = 'rect';
   icon = 'ri-rectangle-line';
   override exclusiveGroup: string = 'drawing';
+  override supportsMultiInsert = true;
   section: ToolSection = 'draw';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;

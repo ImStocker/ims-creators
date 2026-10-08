@@ -12,6 +12,12 @@ export default abstract class Tool {
   readonly exclusiveGroup?: string;
   readonly isDefaultInGroup?: boolean = false;
   hideWhenDisabled: boolean = false;
+  /**
+   * Инструмент вставки фигуры: при удержании Ctrl не деактивируется после
+   * вставки, позволяя вставлять несколько фигур подряд. Подсказка в
+   * тултипе кнопки показывается только для таких инструментов.
+   */
+  supportsMultiInsert: boolean = false;
 
   abstract section: ToolSection;
 
@@ -50,5 +56,16 @@ export default abstract class Tool {
 
   isLoading() {
     return false;
+  }
+
+  /**
+   * Оставить инструмент активным после вставки: поддерживается только
+   * инструментами с supportsMultiInsert и только при удержании Ctrl/Cmd.
+   */
+  protected shouldKeepActiveAfterInsert(
+    e?: { ctrlKey?: boolean; metaKey?: boolean } | null,
+  ): boolean {
+    if (!this.supportsMultiInsert) return false;
+    return !!(e && (e.ctrlKey || e.metaKey));
   }
 }

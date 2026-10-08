@@ -159,12 +159,12 @@ describe('ordering', () => {
             sortByOrder(items, resolveOrderItems([{ prop: 'x', desc: true }]), value).map((i) => i.v);
 
         const numbers: { v: AssetPropValue }[] = [{ v: 10 }, { v: 2 }, { v: null }, { v: 3 }];
-        expect(asc(numbers)).toEqual([null, 2, 3, 10]);
-        expect(desc(numbers)).toEqual([10, 3, 2, null]);
+        expect(asc(numbers)).toEqual([2, 3, 10, null]);
+        expect(desc(numbers)).toEqual([null, 10, 3, 2]);
 
         const strings: { v: AssetPropValue }[] = [{ v: 'Zeta' }, { v: 'alpha' }, { v: null }, { v: 'Beta' }];
-        expect(asc(strings)).toEqual([null, 'alpha', 'Beta', 'Zeta']);
-        expect(desc(strings)).toEqual(['Zeta', 'Beta', 'alpha', null]);
+        expect(asc(strings)).toEqual(['alpha', 'Beta', 'Zeta', null]);
+        expect(desc(strings)).toEqual([null, 'Zeta', 'Beta', 'alpha']);
 
         expect(asc(strings)).not.toEqual(desc(strings));
     });

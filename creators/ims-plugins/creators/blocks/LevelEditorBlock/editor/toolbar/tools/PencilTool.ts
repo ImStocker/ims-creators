@@ -19,12 +19,17 @@ export default class PencilTool extends Tool {
   name = 'pencil';
   icon = 'ri-pencil-line';
   override exclusiveGroup: string = 'drawing';
+  override supportsMultiInsert = true;
   section: ToolSection = 'draw';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;
 
   private _brush: fabric.PencilBrush | null = null;
   private _pathCreatedDisposer: (() => void) | null = null;
+  private _mouseDownDisposer: (() => void) | null = null;
+  // Ctrl удерживался в момент старта штриха — оставить инструмент
+  // активным после path:created (в самом событии DOM-недоступен).
+  private _keepActiveAfterStroke = false;
 
   override onActivate() {
     const canvas = this.controller.canvas;
@@ -46,6 +51,8 @@ export default class PencilTool extends Tool {
       'path:created',
       this._onPathCreated(),
     );
+    this._keepActiveAfterStroke = false;
+    this._mouseDownDisposer = canvas.on('mouse:down', this._onMouseDown());
   }
 
   override onDeactivate() {
@@ -55,12 +62,32 @@ export default class PencilTool extends Tool {
       this._pathCreatedDisposer();
       this._pathCreatedDisposer = null;
     }
+    if (this._mouseDownDisposer) {
+      this._mouseDownDisposer();
+      this._mouseDownDisposer = null;
+    }
 
     canvas.isDrawingMode = false;
     canvas.freeDrawingBrush = undefined;
     canvas.freeDrawingCursor = 'default';
 
     this._brush = null;
+  }
+
+  private _onMouseDown() {
+    return bindCanvasEvent(
+      (
+        _canvas: fabric.Canvas,
+        eventParams: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+      ) => {
+        // Fabric вызывает 'mouse:down' и в режиме рисования — фиксируем
+        // модификатор в момент старта штриха, к моменту path:created
+        // (onMouseUp кисти) DOM-событие мыши уже недоступно.
+        this._keepActiveAfterStroke = this.shouldKeepActiveAfterInsert(
+          eventParams.e,
+        );
+      },
+    );
   }
 
   private _onPathCreated() {
@@ -102,7 +129,9 @@ export default class PencilTool extends Tool {
           created_object.setCoords();
         }
 
-        this.deactivate();
+        if (!this._keepActiveAfterStroke) {
+          this.deactivate();
+        }
       },
     );
   }

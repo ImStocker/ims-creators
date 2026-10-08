@@ -1,6 +1,7 @@
 import type * as fabric from 'fabric';
 import Tool from './Tool';
 import { bindCanvasEvent, type LevelEditorShape } from '../../../LevelEditor';
+import { isSnapActiveForEvent, snapPoint } from '../../../../canvas/GridSnap';
 
 type Coords = { x: number; y: number };
 
@@ -55,6 +56,11 @@ export default abstract class ShapeCreationTool extends Tool {
       this.onMouseUp(),
     );
     this.controller.canvas.defaultCursor = 'crosshair';
+    // Как и PolygonTool: пока рисуем, клик не должен выделять/перемещать
+    // уже вставленные фигуры (иначе при многократной вставке Ctrl+клик
+    // по предыдущей фигуре вместо новой фигуры сдвигал бы старую).
+    this.controller.canvas.selection = false;
+    this.controller.canvas.skipTargetFind = true;
   }
 
   override onDeactivate() {
@@ -66,6 +72,8 @@ export default abstract class ShapeCreationTool extends Tool {
       if (disposer) disposer();
     });
     this.controller.canvas.defaultCursor = 'default';
+    this.controller.canvas.selection = true;
+    this.controller.canvas.skipTargetFind = false;
   }
 
   onMouseDown() {
@@ -106,13 +114,24 @@ export default abstract class ShapeCreationTool extends Tool {
           }
         }
         if (this._hasMoved && this._shape) {
-          this.updateShape(this._shape, this._start, event.scenePoint);
+          const from = this._maybeSnapPoint(this._start, event.e);
+          const to = this._maybeSnapPoint(event.scenePoint, event.e);
+          this.updateShape(this._shape, from, to);
           canvas.setActiveObject(this._shape);
           this._shape.setCoords();
           canvas.requestRenderAll();
         }
       },
     );
+  }
+
+  private _maybeSnapPoint(
+    point: Coords,
+    e: { ctrlKey?: boolean; metaKey?: boolean },
+  ): Coords {
+    const grid = this.controller.blockController.gridSettings;
+    if (!grid || !isSnapActiveForEvent(grid, e)) return point;
+    return snapPoint(point, grid);
   }
 
   onMouseUp() {
@@ -148,9 +167,11 @@ export default abstract class ShapeCreationTool extends Tool {
         }
         const levelEditorShape = this.createShape(params, this._hasMoved);
 
-        this._shape = this.controller.createShape(levelEditorShape);
+        const grid = this.controller.blockController.gridSettings;
+        const snap = grid ? isSnapActiveForEvent(grid, event.e) : undefined;
 
-        canvas.selection = true;
+        this._shape = this.controller.createShape(levelEditorShape, { snap });
+
         if (this._shape) {
           canvas.setActiveObject(this._shape);
           this.onShapeCreated(this._shape);
@@ -158,7 +179,11 @@ export default abstract class ShapeCreationTool extends Tool {
         }
 
         this.resetState();
-        this.deactivate();
+        // Удержание Ctrl/Cmd после вставки — инструмент остаётся активным
+        // для вставки следующей фигуры (без Ctrl — как раньше, один раз).
+        if (!this.shouldKeepActiveAfterInsert(event.e)) {
+          this.deactivate();
+        }
       },
     );
   }

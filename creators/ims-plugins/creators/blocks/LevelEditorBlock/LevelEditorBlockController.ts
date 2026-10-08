@@ -14,10 +14,18 @@ import { shapeValueToString } from './canvas/DecorationLabel';
 import SelectionManager from './editor/SelectionManager';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
+import {
+  normalizeGridSettings,
+  normalizeLevelSize,
+  type GridSettings,
+  type LevelSize,
+} from './canvas/GridSnap';
 
 export type LevelEditorBlockContentUserData = {};
 export default class LevelEditorBlockController extends BlockEditorController {
   shapes!: Map<string, LevelEditorShape>;
+  gridSettings: GridSettings = normalizeGridSettings(null);
+  levelSize: LevelSize | null = null;
   selectionManager: SelectionManager;
 
   constructor(
@@ -50,6 +58,18 @@ export default class LevelEditorBlockController extends BlockEditorController {
       this.resolvedBlock.computed,
       'objects',
     ) as unknown as Map<string, LevelEditorShape>;
+    this.gridSettings = normalizeGridSettings(
+      extractSubObjectAsPlainValue(this.resolvedBlock.computed, 'grid') as
+        | Partial<GridSettings>
+        | null
+        | undefined,
+    );
+    this.levelSize = normalizeLevelSize(
+      extractSubObjectAsPlainValue(this.resolvedBlock.computed, 'level') as
+        | Partial<LevelSize>
+        | null
+        | undefined,
+    );
   }
 
   get changer(): AssetChanger | null {
@@ -65,6 +85,7 @@ export default class LevelEditorBlockController extends BlockEditorController {
     if (!this.resolvedBlock) {
       return;
     }
+    if (!shape?.id) return;
 
     const prepared_object = assignPlainValueToAssetProps(
       {},
@@ -112,6 +133,9 @@ export default class LevelEditorBlockController extends BlockEditorController {
     if (!this.resolvedBlock) {
       return;
     }
+    // Пустой id создал бы мусорную запись objects\undefined без type,
+    // из-за которой падает getContentItems.
+    if (!shapeId) return;
 
     const prepared_changes = assignPlainValueToAssetProps(
       {},
@@ -119,6 +143,36 @@ export default class LevelEditorBlockController extends BlockEditorController {
       `objects\\${shapeId}`,
     );
 
+    const op = params?.opId ? params.opId : changer.makeOpId();
+    changer.setBlockPropKeys(
+      this.resolvedBlock.assetId,
+      makeBlockRef(this.resolvedBlock),
+      null,
+      prepared_changes,
+      op,
+    );
+  }
+
+  changeGridSettings(data: Partial<GridSettings>, params?: { opId?: number }) {
+    const changer = this.changer;
+    if (!changer || !this.resolvedBlock) return;
+
+    const prepared_changes = assignPlainValueToAssetProps({}, data, 'grid');
+    const op = params?.opId ? params.opId : changer.makeOpId();
+    changer.setBlockPropKeys(
+      this.resolvedBlock.assetId,
+      makeBlockRef(this.resolvedBlock),
+      null,
+      prepared_changes,
+      op,
+    );
+  }
+
+  changeLevelSize(data: Partial<LevelSize>, params?: { opId?: number }) {
+    const changer = this.changer;
+    if (!changer || !this.resolvedBlock) return;
+
+    const prepared_changes = assignPlainValueToAssetProps({}, data, 'level');
     const op = params?.opId ? params.opId : changer.makeOpId();
     changer.setBlockPropKeys(
       this.resolvedBlock.assetId,
@@ -157,13 +211,19 @@ export default class LevelEditorBlockController extends BlockEditorController {
       assert(root_anchor.children);
 
       for (const shape of sorted_shapes) {
+        // Защита от битых записей в модели (например, objects\undefined
+        // от changeShape с пустым id): без id/type это не настоящая фигура.
+        if (!shape || !shape.id || !shape.type) continue;
+
         const shape_controller = getShapeControllers(this.appManager).map[
           shape.type
         ];
 
         const title =
           shapeValueToString(shape.value) ??
-          this.appManager.$t('levelEditor.shapes.' + shape_controller.name);
+          (shape_controller
+            ? this.appManager.$t('levelEditor.shapes.' + shape_controller.name)
+            : String(shape.type));
 
         const menu_item = {
           blockId: this.resolvedBlock.id,
@@ -171,7 +231,7 @@ export default class LevelEditorBlockController extends BlockEditorController {
           title,
           anchor: 'shape-' + shape.id,
           selectable: !shape.parentId,
-          icon: shape_controller.icon ? shape_controller.icon : undefined,
+          icon: shape_controller?.icon ? shape_controller.icon : undefined,
           userData: {
             type: 'shape',
             id: shape.id,
