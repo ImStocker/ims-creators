@@ -53,6 +53,15 @@
             </option>
           </select>
         </label>
+        <div class="LevelEditorToolbarGridSettingsButton-snap-holder">
+          <button
+            type="button"
+            class="is-button LevelEditorToolbarGridSettingsButton-snap"
+            @click="onSnapClick"
+          >
+            {{ snapButtonLabel }}
+          </button>
+        </div>
       </div>
       <div class="LevelEditorToolbarGridSettingsButton-group">
         <div class="LevelEditorToolbarGridSettingsButton-title">
@@ -83,13 +92,6 @@
           />
         </label>
       </div>
-      <button
-        type="button"
-        class="is-button LevelEditorToolbarGridSettingsButton-snap"
-        @click="onSnapClick"
-      >
-        {{ snapButtonLabel }}
-      </button>
     </div>
   </menu-button>
 </template>
@@ -241,7 +243,7 @@ export default defineComponent({
 
 .LevelEditorToolbarGridSettingsButton-form {
   @include ImcEditorToolbar.ImcEditorToolbar-dropdown;
-  min-width: 240px;
+  min-width: 290px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -272,13 +274,14 @@ export default defineComponent({
 
   input,
   select {
-    width: 100px;
+    width: 150px;
     font-size: 12px;
   }
 }
-
+.LevelEditorToolbarGridSettingsButton-snap-holder {
+  padding-top: 10px;
+}
 .LevelEditorToolbarGridSettingsButton-snap {
-  width: 100%;
   padding: 6px 8px;
   font-size: 12px;
   cursor: pointer;
