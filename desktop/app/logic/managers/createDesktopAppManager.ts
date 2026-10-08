@@ -9,6 +9,7 @@ import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import type { BaseAppConfiguration } from '~ims-app-base/logic/configurations/base-app-configuration';
 import CommentManager from '~ims-app-base/logic/managers/CommentManager';
+import DesktopCommentManager from './DesktopCommentManager';
 import type { AppManagerContext } from '~ims-app-base/logic/managers/IAppManager';
 import PluginManager from '~ims-app-base/logic/managers/Plugin/PluginManager';
 import EditorManager from '~ims-app-base/logic/managers/EditorManager';
@@ -76,7 +77,7 @@ export default function createDesktopAppManager(
     new UiPreferenceManager(app_manager),
   );
   app_manager.register(new DialogManager(app_manager));
-  app_manager.register(new CommentManager(app_manager));
+  app_manager.register(CommentManager, new DesktopCommentManager(app_manager));
   app_manager.register(
     LocalFsSyncManager,
     new DesktopLocalFsSyncManager(app_manager),
