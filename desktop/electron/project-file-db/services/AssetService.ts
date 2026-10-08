@@ -14,7 +14,7 @@ import type { Writable } from "node:stream";
 import { HistoryChangeRecord } from "../logic/HistoryChangeRecord";
 import { BLOCK_NAME_META } from "~ims-app-base/logic/constants";
 import type { AssetHistoryDTO } from "~ims-app-base/logic/types/AssetHistory";
-import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, AssetsGraphItem, AssetsGraph, AssetBlockParamsDTO, AssetSetDTO, AssetCreateDTO, AssetsChangeResult, AssetChangeDTO, AssetChangeBatchOpDTO, AssetsBatchChangeResultDTO, AssetWhereParams, AssetDeleteResultDTO, CreateRefDTO, AssetReferencesResult, AssetDeleteRefResultDTO, AssetMoveParams, AssetMoveResult } from "~ims-app-base/logic/types/AssetsType";
+import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, AssetsGraphItem, AssetsGraph, AssetBlockParamsDTO, AssetSetDTO, AssetCreateDTO, AssetsChangeResult, AssetChangeDTO, AssetChangeBatchOpDTO, AssetsBatchChangeResultDTO, AssetWhereParams, AssetDeleteResultDTO, CreateRefDTO, AssetReferencesResult, AssetDeleteRefResultDTO, AssetMoveParams, AssetMoveResult, AssetMoveResultItem } from "~ims-app-base/logic/types/AssetsType";
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
 import type { IProjectDatabaseAsset } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore } from "~ims-app-base/logic/types/ProjectTypes";
@@ -1256,12 +1256,15 @@ export class AssetService implements IProjectDatabaseAsset {
 
         let cur_index: number | null | undefined = undefined;
         let index_step: number = 0;
+        const move_result_map = new Map<string, AssetMoveResultItem>();
         if (params.indexFrom !== undefined || params.indexTo !== undefined) {
-            if (params.indexFrom === null) {
-                cur_index = null
+            if (params.indexTo === null) {
+                cur_index = params.indexFrom ?? null;
+                index_step = 1;
             }
-            else if (params.indexTo === null) {
-                cur_index = params.indexFrom;
+            else if (params.indexFrom === null) {
+                cur_index = params.indexTo !== undefined ? params.indexTo - avail_assets.list.length : null
+                index_step = 1;
             }
             else {
                 const start_and_step = getIndexRangeStartAndStep(
@@ -1280,12 +1283,17 @@ export class AssetService implements IProjectDatabaseAsset {
             const avail_asset = avail_assets_map.get(asset_id)
             if (avail_asset) {
                 const set: AssetSetDTO = {}
+                const avail_asset_result: AssetMoveResultItem = {
+                    id: avail_asset.id,
+                    index: avail_asset.index,
+                    workspaceId: avail_asset.workspaceId
+                }
                 if (cur_index !== undefined) {
-                    avail_asset.index = cur_index;
+                    avail_asset_result.index = cur_index;
                     set.index = cur_index;
                 }
                 if (params.workspaceId !== undefined && avail_asset.workspaceId !== params.workspaceId) {
-                    avail_asset.workspaceId = params.workspaceId;
+                    avail_asset_result.workspaceId = params.workspaceId;
                     set.workspaceId = params.workspaceId;
                 }
                 ops.push({
@@ -1305,11 +1313,11 @@ export class AssetService implements IProjectDatabaseAsset {
         return {
             changeId: res.changeId,
             list: res.updatedIds.map(id => {
-                const avail_asset = avail_assets_map.get(id);
+                const avail_asset_result = move_result_map.get(id);
                 return {
                     id,
-                    index: avail_asset?.index ?? null,
-                    workspaceId: avail_asset?.workspaceId ?? null
+                    index: avail_asset_result?.index ?? null,
+                    workspaceId: avail_asset_result?.workspaceId ?? null
                 }
             }),
             touchedWIds: res.touchedWIds

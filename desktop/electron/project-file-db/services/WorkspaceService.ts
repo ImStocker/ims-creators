@@ -263,45 +263,42 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
                 ids: params.ids,
             }
         });
-        
+
         const tx = new ProjectFileDbTransaction(this.db)
 
-        const generated_indexes = new Map<string, number>();
+        const avail_by_id = new Map(avail_workspaces.list.map((w) => [w.id, w]));
+        const changes = new Map<string, { index?: number | null, parentId?: string | null }>();
         if (params.indexFrom !== undefined || params.indexTo !== undefined){
-            const avail_ids = new Set(avail_workspaces.list.map((w) => w.id));
-            
-            let cur_index: number | null | undefined = undefined;
+            let cur_index: number | null = null;
             let index_step: number = 0;
             if (params.indexFrom !== undefined || params.indexTo !== undefined){
-                if (params.indexFrom === null){
-                    cur_index = null
+                if (params.indexTo === null){
+                    cur_index = params.indexFrom ?? null;
+                    index_step = 1;
                 }
-                else if (params.indexTo === null){
-                    cur_index = params.indexFrom;
+                else if (params.indexFrom === null){
+                    cur_index = params.indexTo !== undefined ? params.indexTo - avail_by_id.size : null;
+                    index_step = 1;
                 }
                 else {
                     const start_and_step = getIndexRangeStartAndStep(
-                        params.indexFrom, params.indexTo, avail_ids.size
+                        params.indexFrom, params.indexTo, avail_by_id.size
                     )
                     cur_index = start_and_step.start;
                     index_step = start_and_step.step;
                 }
             }
 
-            if (avail_ids.size > 0 && cur_index !== null && cur_index !== undefined) {
+            if (avail_by_id.size > 0 && cur_index !== undefined) {
                 for (const workspace_id of params.ids) {
-                    if (avail_ids.has(workspace_id)) {
-                        generated_indexes.set(workspace_id, cur_index);
-                        const workspace_info = avail_workspaces.list.find(w => w.id);
-                        if (!workspace_info){
-                            continue;
-                        }
-                        const new_workspace_info = {
-                            ...workspace_info,
+                    if (avail_by_id.has(workspace_id)) {
+                        changes.set(workspace_id, {
+                            ...changes.get(workspace_id),
                             index: cur_index
+                        });
+                        if (cur_index !== null){
+                            cur_index += index_step;
                         }
-                        tx.changeWorkspace(workspace_info, new_workspace_info)
-                        cur_index += index_step;
                     }
                 }
             }
@@ -310,27 +307,39 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         if (params.parentId !== undefined){
             for (const workspace of avail_workspaces.list){
                 if (workspace.parentId !== params.parentId){
-                    const new_workspace_info = {
-                        ...workspace, 
+                    changes.set(workspace.id, {
+                        ...changes.get(workspace.id),
                         parentId: params.parentId
-                    }
-                    tx.changeWorkspace(workspace, new_workspace_info)
+                    });
                 }
             }
         }
 
-        await tx.commit()        
+        for (const workspace of avail_workspaces.list){
+            const workspace_changes = changes.get(workspace.id);
+            if (!workspace_changes){
+                continue;
+            }
+            tx.changeWorkspace(workspace, {
+                ...workspace,
+                ...workspace_changes
+            })
+        }
+
+        await tx.commit()
         return {
             list: avail_workspaces.list.map(w => {
-                const generated_index = generated_indexes.get(w.id);
+                const workspace_changes = changes.get(w.id);
                 return {
                     id: w.id,
-                    parentId: params.parentId !== undefined ? params.parentId : w.parentId,
-                    index: generated_index !== undefined ? generated_index : w.index
+                    parentId: workspace_changes?.parentId !== undefined ? workspace_changes.parentId : w.parentId,
+                    index: workspace_changes !== undefined && 'index' in workspace_changes
+                        ? (workspace_changes.index ?? null)
+                        : w.index
                 }
             }),
             touchedWIds: tx.touchedWIds
-        };  
+        };
     }
 
     private async _exportToZip(workspaceId: string, targetZip: JSZip, subfolder = ''){

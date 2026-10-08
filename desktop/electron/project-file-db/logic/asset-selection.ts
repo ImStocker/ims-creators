@@ -345,6 +345,9 @@ export function computeSelectionFieldValue(
 /**
  * compareAssetPropValues is a plain comparator (negative when a < b), so a
  * descending item has to flip its sign.
+ *
+ * NULL placement follows SQL ORDER BY defaults so desktop sorts match the
+ * server: ASC => NULLS LAST, DESC => NULLS FIRST.
  */
 export function compareValuesByOrder<T>(
     a: T,
@@ -353,7 +356,14 @@ export function compareValuesByOrder<T>(
     getValue: (subject: T, field: ResolvedSelectionField) => AssetPropValue,
 ): number {
     for (const item of items) {
-        const res = compareAssetPropValues(getValue(a, item) ?? null, getValue(b, item) ?? null);
+        const a_val = getValue(a, item) ?? null;
+        const b_val = getValue(b, item) ?? null;
+        if (a_val === null || b_val === null) {
+            if (a_val === null && b_val === null) continue;
+            const nulls_first = item.desc;
+            return (a_val === null) === nulls_first ? -1 : 1;
+        }
+        const res = compareAssetPropValues(a_val, b_val);
         if (res !== 0) {
             return item.desc ? -res : res;
         }
