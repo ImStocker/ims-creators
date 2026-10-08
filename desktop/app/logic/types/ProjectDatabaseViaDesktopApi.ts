@@ -1,29 +1,79 @@
-import type { AssetHistoryDTO } from "~ims-app-base/logic/types/AssetHistory";
-import type { AssetQueryWhere, AssetsShortResult, AssetsFullResult, AssetsGraph, AssetCreateDTO, AssetWhereParams, AssetDeleteResultDTO, CreateRefDTO, AssetReferencesResult, AssetChangeDTO, AssetsChangeResult, AssetMoveParams, AssetMoveResult, AssetChangeBatchOpDTO, AssetsBatchChangeResultDTO } from "~ims-app-base/logic/types/AssetsType";
-import type { IProjectDatabase, IProjectDatabaseEventHandler, ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
-import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore } from "~ims-app-base/logic/types/ProjectTypes";
-import type { AssetProps, AssetPropsPlainObject } from "~ims-app-base/logic/types/Props";
-import type { AssetPropsSelection } from "~ims-app-base/logic/types/PropsSelection";
-import type { WorkspaceQueryDTOWhere, Workspace, ChangeWorkspaceRequest, WorkspaceMoveParams, WorkspaceMoveResult } from "~ims-app-base/logic/types/Workspaces";
-import { assert } from "~ims-app-base/logic/utils/typeUtils";
-import type DesktopProjectManager from "../managers/DesktopProjectManager";
+import type { AssetHistoryDTO } from '~ims-app-base/logic/types/AssetHistory';
+import type {
+  AssetQueryWhere,
+  AssetsShortResult,
+  AssetsFullResult,
+  AssetsGraph,
+  AssetCreateDTO,
+  AssetWhereParams,
+  AssetDeleteResultDTO,
+  CreateRefDTO,
+  AssetReferencesResult,
+  AssetChangeDTO,
+  AssetsChangeResult,
+  AssetMoveParams,
+  AssetMoveResult,
+  AssetsBatchChangeResultDTO,
+} from '~ims-app-base/logic/types/AssetsType';
+import type {
+  IProjectDatabase,
+  IProjectDatabaseEventHandler,
+  IProjectDatabaseCommentEventArgs,
+  IProjectDatabaseCommentEventHandler,
+  ProjectContentChangeEventArg,
+} from '~ims-app-base/logic/types/IProjectDatabase';
+import type {
+  ApiRequestList,
+  ApiResultListWithTotal,
+  ApiResultListWithMore,
+} from '~ims-app-base/logic/types/ProjectTypes';
+import type {
+  AssetProps,
+  AssetPropsPlainObject,
+} from '~ims-app-base/logic/types/Props';
+import type { AssetPropsSelection } from '~ims-app-base/logic/types/PropsSelection';
+import type {
+  WorkspaceQueryDTOWhere,
+  Workspace,
+  ChangeWorkspaceRequest,
+  WorkspaceMoveParams,
+  WorkspaceMoveResult,
+} from '~ims-app-base/logic/types/Workspaces';
+import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import type ApiManager from '~ims-app-base/logic/managers/ApiManager';
+import type DesktopProjectManager from '../managers/DesktopProjectManager';
+import { io } from 'socket.io-client';
 
 export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
-  constructor(private _projectManager: DesktopProjectManager) {
-    
+  constructor(
+    private _projectManager: DesktopProjectManager,
+    private _apiManager: ApiManager,
+    private _changesWsLink: string,
+  ) {}
+  assetsChangeUndo(
+    params: { changeId: string },
+    options?: { pid?: string },
+  ): Promise<AssetsChangeResult> {
+    const info = this._projectManager.getProjectInfo();
+    assert(info?.localPath, 'Project is not selected');
+    return window.imshost.project.assetsChangeUndo(
+      info.localPath,
+      params,
+      options,
+    );
   }
-  assetsChangeUndo(params: { changeId: string; }, options?: { pid?: string; }): Promise<AssetsChangeResult> {
 
+  assetsChangeBatch(
+    params: { ops: AssetChangeBatchOpDTO[] },
+    options?: { pid?: string },
+  ): Promise<AssetsBatchChangeResultDTO> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.assetsChangeUndo(info.localPath, params, options); 
-   }
-   
-  assetsChangeBatch(params: { ops: AssetChangeBatchOpDTO[]; }, options?: { pid?: string; }): Promise<AssetsBatchChangeResultDTO> {
-
-    const info = this._projectManager.getProjectInfo();
-    assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.assetsChangeBatch(info.localPath, params, options);
+    return window.imshost.project.assetsChangeBatch(
+      info.localPath,
+      params,
+      options,
+    );
   }
 
   assetsGetShort(
@@ -62,11 +112,17 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
   ): Promise<ApiResultListWithTotal<T>> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    if (options?.folded){
-      return window.imshost.project.assetsGetView(info.localPath, query, options);
-    }
-    else {
-      return window.imshost.project.assetsGetView<AssetProps>(info.localPath, query) as Promise<ApiResultListWithTotal<T>>
+    if (options?.folded) {
+      return window.imshost.project.assetsGetView(
+        info.localPath,
+        query,
+        options,
+      );
+    } else {
+      return window.imshost.project.assetsGetView<AssetProps>(
+        info.localPath,
+        query,
+      ) as Promise<ApiResultListWithTotal<T>>;
     }
   }
 
@@ -146,13 +202,16 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
   getAssetLocalPath(asset_id: string): Promise<string | null> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.getAssetLocalPath(info.localPath, asset_id); 
+    return window.imshost.project.getAssetLocalPath(info.localPath, asset_id);
   }
 
   getWorkspaceLocalPathFolder(workspace_id: string): Promise<string | null> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.getWorkspaceLocalPath(info.localPath, workspace_id); 
+    return window.imshost.project.getWorkspaceLocalPath(
+      info.localPath,
+      workspace_id,
+    );
   }
 
   workspacesChange(
@@ -161,13 +220,20 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
   ): Promise<Workspace> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.workspacesChange(info.localPath, workspace_id, params);
+    return window.imshost.project.workspacesChange(
+      info.localPath,
+      workspace_id,
+      params,
+    );
   }
 
   workspacesDelete(workspace_id: string): Promise<void> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
-    return window.imshost.project.workspacesDelete(info.localPath, workspace_id);
+    return window.imshost.project.workspacesDelete(
+      info.localPath,
+      workspace_id,
+    );
   }
 
   workspacesMove(params: WorkspaceMoveParams): Promise<WorkspaceMoveResult> {
@@ -186,15 +252,105 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
       },
     );
 
-    return {
-      cancel: () => {},
-      isConnected() {
-        return false;
+    const listening_comments = new Map<
+      string,
+      {
+        callback: (ev: IProjectDatabaseCommentEventArgs) => void;
+        handler: IProjectDatabaseCommentEventHandler;
+      }[]
+    >();
+    let is_connected = false;
+
+    const socket =
+      pid && this._changesWsLink
+        ? io(this._changesWsLink, {
+            query: {
+              projectId: pid,
+            },
+            auth: (cb) => {
+              this._apiManager.getTokenOrRefresh().then(
+                (res) => {
+                  cb({
+                    token: res,
+                  });
+                },
+                (err) => {
+                  console.error(err);
+                  cb({});
+                },
+              );
+            },
+          })
+        : null;
+
+    socket?.on('connect', () => {
+      is_connected = true;
+      listenContentImpl([...listening_comments.keys()]);
+    });
+
+    socket?.on('disconnect', () => {
+      is_connected = false;
+    });
+
+    socket?.on(
+      'commentChange',
+      async (payload: IProjectDatabaseCommentEventArgs) => {
+        const listeners = listening_comments.get(payload.cId);
+        if (listeners) {
+          for (const listener of listeners) {
+            listener.callback(payload);
+          }
+        }
       },
-      listenContent: (asset_ids: string[], workspace_ids: string[]) => {},
-      listenComment: () => ({
-        cancel: () => {}
-      })
+    );
+
+    function listenContentImpl(comment_ids: string[]) {
+      if (comment_ids.length === 0) {
+        return;
+      }
+      if (is_connected) {
+        socket?.emit('listenContent', {
+          aIds: [],
+          wIds: [],
+          cIds: comment_ids,
+        });
+      }
     }
+
+    return {
+      cancel: () => {
+        socket?.disconnect();
+      },
+      isConnected() {
+        return is_connected;
+      },
+      listenContent: (_asset_ids: string[], _workspace_ids: string[]) => {},
+      listenComment: (
+        comment_id: string,
+        callback: (ev: IProjectDatabaseCommentEventArgs) => void,
+      ): IProjectDatabaseCommentEventHandler => {
+        const exists = listening_comments.get(comment_id);
+        const record = {
+          handler: {
+            cancel: () => {
+              const exists = listening_comments.get(comment_id);
+              if (!exists) {
+                return;
+              }
+              const ind = exists.indexOf(record);
+              if (ind >= 0) exists.splice(ind, 1);
+            },
+          },
+          callback,
+        };
+        if (!exists) {
+          listenContentImpl([comment_id]);
+          listening_comments.set(comment_id, [record]);
+        } else {
+          exists.push(record);
+        }
+        return record.handler;
+      },
+    };
   }
 }

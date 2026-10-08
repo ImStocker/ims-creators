@@ -109,6 +109,10 @@ export default function createDesktopAppManager(
 
   const project_database = new ProjectDatabaseViaDesktopApi(
     desktopProjectManager,
+    apiManager,
+    app_manager.$env.CREATORS_API_CHANGES_WS
+      ? app_manager.$env.CREATORS_API_CHANGES_WS + 'project/changes/subscribe'
+      : '',
   );
 
   app_manager.addInitRoutine(async () => {
