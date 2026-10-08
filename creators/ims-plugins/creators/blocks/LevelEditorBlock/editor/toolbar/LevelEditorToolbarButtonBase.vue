@@ -2,7 +2,7 @@
   <button
     class="is-button is-button-toolbar LevelEditorToolbarButtonBase"
     :class="{ 'state-active': isActive, loading: isLoading }"
-    :title="$t('levelEditor.tools.' + tool.name)"
+    :title="tooltip"
     :disabled="isDisabled || isLoading"
     @click.prevent="$emit('click')"
   >
@@ -38,6 +38,11 @@ export default defineComponent({
     },
     isLoading() {
       return this.tool.isLoading();
+    },
+    tooltip() {
+      const title = this.$t('levelEditor.tools.' + this.tool.name);
+      if (!this.tool.supportsMultiInsert) return title;
+      return `${title} — ${this.$t('levelEditor.tools.holdCtrlHint')}`;
     },
   },
 });

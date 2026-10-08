@@ -5,12 +5,10 @@ export const INF_GRID_OBJECT_TYPE = 'infgrid';
 
 export class InfiniteGrid extends FabricObject {
   static override type = INF_GRID_OBJECT_TYPE;
-  private _cellSize = 20;
+  private _cellWidth = 20;
+  private _cellHeight = 20;
   private _dotRadius = 1;
   private _dotColor: string = '#81818a';
-
-  private _cachedPattern: CanvasPattern | null = null;
-  private _lastZoom = 1;
 
   constructor(options = {}) {
     super(options);
@@ -18,10 +16,22 @@ export class InfiniteGrid extends FabricObject {
     this.evented = false;
   }
 
+  setCellSize(width: number, height: number) {
+    const cell_width = width > 0 ? width : this._cellWidth;
+    const cell_height = height > 0 ? height : this._cellHeight;
+    if (cell_width === this._cellWidth && cell_height === this._cellHeight) {
+      return;
+    }
+    this._cellWidth = cell_width;
+    this._cellHeight = cell_height;
+    this.dirty = true;
+    this.canvas?.requestRenderAll();
+  }
+
   private _createPattern() {
     const temp_canvas = document.createElement('canvas');
-    temp_canvas.width = this._cellSize;
-    temp_canvas.height = this._cellSize;
+    temp_canvas.width = this._cellWidth;
+    temp_canvas.height = this._cellHeight;
 
     const temp_ctx = temp_canvas.getContext('2d');
     if (!temp_ctx) return;

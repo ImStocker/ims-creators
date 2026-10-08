@@ -1,7 +1,7 @@
 {
   "name": "ims-creators-desktop",
   "productName": "ImscDesktop",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "private": true,
   "type": "module",
   "author": "ImStocker <support@cr5.space>",
@@ -159,6 +159,7 @@
     "marked": "^15.0.7",
     "nuxt": "^3.17.3",
     "remixicon": "^4.9.1",
+    "socket.io-client": "^4.8.3",
     "tmp": "^0.2.5",
     "typeorm": "^0.3.28",
     "validator": "^13.15.35",

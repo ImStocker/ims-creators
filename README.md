@@ -11,7 +11,7 @@ Local application to develop and store your game ideas: **edit documents, add cr
 
 ### Write wiki docs
 
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/5987e041-f24f-487a-acae-e3142c5c4227" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/5df25446-4ba3-4ddf-9c05-93839ec239c5" />
 
 Use the block editor to maintain a wiki on the game, use cross-references, Markdown and more.
 
@@ -35,7 +35,7 @@ Describe mechanics, characters, items, and other game elements using a user-frie
 
 ### Synchronize with your game engine
 
-<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/c83cc7da-4266-4b04-ac05-4c7b99c17325" />
+<img width="400" height="auto" alt="image" src="https://github.com/user-attachments/assets/c15802df-8f10-44d4-8c39-49ff002f997c" />
 
 The created objects can be uploaded directly to the game engine in custom JSON or CSV formats and their changes can be tracked via Git.
 

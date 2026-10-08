@@ -15,7 +15,15 @@ export type ImageToolComponentProps = {
   menuList: MenuListItem[];
 };
 
+export type ImagePlacement = {
+  x: number;
+  y: number;
+};
+
+const PIXILATED_MODE_SIZE_THRESHOLD = 96;
 const AllowedExtensions = new Set(['jpg', 'jpeg', 'png', 'bmp', 'svg', 'gif']);
+
+const MultiFilePlacementOffset = 24;
 
 export default class ImageTool extends Tool {
   name = 'image';
@@ -62,7 +70,7 @@ export default class ImageTool extends Tool {
     return this.appManager.get(ProjectManager).getProjectInfo()?.id;
   }
 
-  async processFiles(files: File[]) {
+  async processFiles(files: File[], placement?: ImagePlacement) {
     const files_to_upload: { blob: Blob; name: string }[] = [];
     for (const file of files) {
       const ext = file.name.split('.').pop();
@@ -79,7 +87,7 @@ export default class ImageTool extends Tool {
         });
       }
     }
-    await this.uploadFiles(files_to_upload);
+    await this.uploadFiles(files_to_upload, placement);
   }
   async handleFile(e: any) {
     let files: File[];
@@ -95,6 +103,10 @@ export default class ImageTool extends Tool {
     await this.processFiles(files);
   }
 
+  async addFilesAt(files: File[], placement: ImagePlacement) {
+    await this.processFiles(files, placement);
+  }
+
   private async _selectFiles() {
     if (!document) return;
     this._inputElement = document.createElement('input');
@@ -106,11 +118,18 @@ export default class ImageTool extends Tool {
     this._inputElement.click();
   }
 
-  async uploadFiles(files: { blob: Blob; name: string }[]) {
+  async uploadFiles(
+    files: { blob: Blob; name: string }[],
+    placement?: ImagePlacement,
+  ) {
     this._uploadTotal += files.length;
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
       try {
-        await this.uploadBlob(file.blob, file.name);
+        await this.uploadBlob(
+          file.blob,
+          file.name,
+          this._offsetPlacement(placement, index),
+        );
       } finally {
         this._uploadJob = null;
         this._uploadDone++;
@@ -121,7 +140,9 @@ export default class ImageTool extends Tool {
       this._uploadDone = 0;
     }
   }
-  async uploadBlob(blob: Blob, file_name: string) {
+  async uploadBlob(blob: Blob, file_name: string, placement?: ImagePlacement) {
+    const center = placement ?? this.controller.canvas.getVpCenter();
+
     await this.appManager.get(UiManager).doTask(async () => {
       this._uploadJob = this.appManager
         .get(EditorManager)
@@ -129,25 +150,43 @@ export default class ImageTool extends Tool {
       const res = await this._uploadJob.awaitResult();
       if (!res) return;
 
-      await this._addImageToCanvas(res);
+      await this._addImageToCanvas(res, center);
     });
   }
 
-  private async _addImageToCanvas(imageFile: AssetPropValueFile) {
-    const vpCenter = this.controller.canvas.getVpCenter();
+  private _offsetPlacement(
+    placement: ImagePlacement | undefined,
+    index: number,
+  ): ImagePlacement | undefined {
+    if (!placement) return undefined;
+    return {
+      x: placement.x + index * MultiFilePlacementOffset,
+      y: placement.y + index * MultiFilePlacementOffset,
+    };
+  }
+
+  private async _addImageToCanvas(
+    imageFile: AssetPropValueFile,
+    center: ImagePlacement,
+  ) {
     const imageURL = this.appManager.get(FileManager).getFileUrl(imageFile);
 
     await this.appManager.get(UiManager).doTask(async () => {
       this._loading = true;
       const imageElement = await loadImage(imageURL);
 
+      const pixelated =
+        imageElement.width <= PIXILATED_MODE_SIZE_THRESHOLD &&
+        imageElement.height <= PIXILATED_MODE_SIZE_THRESHOLD;
+
       const image = this.controller.createShape({
         id: uuidv4(),
         type: 'image',
-        x: vpCenter.x - imageElement.width / 2,
-        y: vpCenter.y - imageElement.height / 2,
+        x: center.x - imageElement.width / 2,
+        y: center.y - imageElement.height / 2,
         params: {
           file: imageFile,
+          pixelated,
         },
       });
       if (image) {

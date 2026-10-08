@@ -3,8 +3,8 @@ import ToolManager from './ToolManager';
 import SelectTool from './tools/SelectTool';
 import RectTool from './tools/RectTool';
 import EllipseTool from './tools/EllipseTool';
-// import PencilTool from './tools/PencilTool';
 // import PenTool from './tools/PenTool';
+import PencilTool from './tools/PencilTool';
 import PolygonTool from './tools/PolygonTool';
 // import ZoomTool from './tools/ZoomTool';
 import { reactive } from 'vue';
@@ -19,6 +19,7 @@ import type LevelEditorCanvasController from '../LevelEditorCanvasController';
 // import LockTool from './tools/LockTool';
 import UnlockAllTool from './tools/UnlockAllTool';
 import ViewAllTool from './tools/ViewAllTool';
+import GridSettingsTool from './tools/GridSettingsTool';
 // import SelectColorPresetTool from './tools/SelectColorPresetTool';
 // import SelectStrokeColorTool from './tools/SelectStrokeColorTool';
 // import SelectFillColorTool from './tools/SelectFillColorTool';
@@ -39,7 +40,7 @@ export default function createDefaultToolManager(
     new RectTool(appManager, raw_controller),
     new EllipseTool(appManager, raw_controller),
     new PolygonTool(appManager, raw_controller),
-    // new PencilTool(appManager, controller),
+    new PencilTool(appManager, raw_controller),
     // new PenTool(appManager, controller),
     new ImageTool(appManager, raw_controller),
     new PointerTool(appManager, raw_controller),
@@ -55,6 +56,7 @@ export default function createDefaultToolManager(
     // new LockTool(appManager, raw_controller),
     new UnlockAllTool(appManager, raw_controller),
     new ViewAllTool(appManager, raw_controller),
+    new GridSettingsTool(appManager, raw_controller),
     // new SelectColorPresetTool(appManager, raw_controller),
     // new SelectFillColorTool(appManager, raw_controller),
     // new SelectStrokeColorTool(appManager, raw_controller),

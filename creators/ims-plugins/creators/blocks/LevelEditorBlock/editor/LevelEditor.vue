@@ -2,9 +2,10 @@
   <div
     ref="container"
     class="LevelEditor"
-    @dragover.prevent
+    @dragover.prevent="dragOver($event)"
     @dragenter.prevent
-    @drop.prevent="dragAssetDrop($event)"
+    @dragleave.prevent="dragLeave($event)"
+    @drop.prevent="dragDrop($event)"
   >
     <level-editor-toolbar
       v-if="canvasController"
@@ -35,6 +36,16 @@
     ></level-editor-asset-shape-create>
 
     <canvas ref="canvas"></canvas>
+
+    <drag-overlay
+      :visible="dragEffect !== 0"
+      :error="dragEffect === -1"
+      :text="
+        dragEffect === -1
+          ? $t('dragOverlay.imagesOnly')
+          : $t('dragOverlay.drop')
+      "
+    ></drag-overlay>
   </div>
 </template>
 
@@ -56,6 +67,9 @@ import {
   type SetClickOutsideCancel,
 } from '~ims-app-base/components/utils/ui';
 import LevelEditorSidePropertiesPanel from './side-panel/LevelEditorSidePropertiesPanel.vue';
+import DragOverlay from '~ims-app-base/components/Common/DragOverlay.vue';
+import { nodeContainsElement } from '~ims-app-base/components/utils/DomElementUtils';
+import type ImageTool from './toolbar/tools/ImageTool';
 import type LevelEditorBlockController from '../LevelEditorBlockController';
 
 type PointerTypeSelectorContext = {
@@ -72,6 +86,7 @@ export default defineComponent({
     LevelEditorToolbar,
     LevelEditorSidePropertiesPanel,
     LevelEditorAssetShapeCreate,
+    DragOverlay,
   },
   props: {
     readonly: {
@@ -89,6 +104,7 @@ export default defineComponent({
       containerTracker: null as TrackElementSizeHandler | null,
       droppedAssetContext: null as PointerTypeSelectorContext,
       clickOutside: null as SetClickOutsideCancel | null,
+      dragEffect: 0,
     };
   },
   computed: {
@@ -128,8 +144,9 @@ export default defineComponent({
 
       assert(asset_preview);
 
-      const { x, y } = this.canvasController.canvas.getScenePoint(
-        this.droppedAssetContext.event,
+      const { x, y } = this.canvasController.getScenePointFromClient(
+        this.droppedAssetContext.event.clientX,
+        this.droppedAssetContext.event.clientY,
       );
 
       const common_properties = {
@@ -221,6 +238,64 @@ export default defineComponent({
       }
 
       event.preventDefault();
+    },
+    async dragDrop(event: DragEvent) {
+      this.dragEffect = 0;
+      if (this.readonly) return;
+      if (!event.dataTransfer) return;
+
+      if (event.dataTransfer.types.includes('Files')) {
+        await this.dropImageFiles(event);
+        return;
+      }
+
+      this.dragAssetDrop(event);
+    },
+    async dropImageFiles(event: DragEvent) {
+      if (!this.canvasController) return;
+      if (!event.dataTransfer) return;
+
+      const image_tool = this.canvasController.toolManager.getTool('image') as
+        | ImageTool
+        | undefined;
+      if (!image_tool) return;
+
+      const files = [...event.dataTransfer.files];
+      if (!files.length) return;
+
+      const { x, y } = this.canvasController.getScenePointFromClient(
+        event.clientX,
+        event.clientY,
+      );
+
+      await image_tool.addFilesAt(files, { x, y });
+    },
+    dragOver(event: DragEvent) {
+      const event_dt = event.dataTransfer;
+      if (!event_dt) return;
+
+      if (!event_dt.types.includes('Files')) {
+        this.dragEffect = 0;
+        return;
+      }
+
+      if (this.readonly) {
+        this.dragEffect = 0;
+        event_dt.dropEffect = 'none';
+        return;
+      }
+
+      const are_images = event_dt.items
+        ? [...event_dt.items].some((item) => /^image\/.+$/i.test(item.type))
+        : true;
+
+      this.dragEffect = are_images ? 1 : -1;
+      event_dt.dropEffect = this.dragEffect === 1 ? 'copy' : 'none';
+    },
+    dragLeave(event: DragEvent) {
+      if (!nodeContainsElement(this.$el, event.relatedTarget as Node)) {
+        this.dragEffect = 0;
+      }
     },
     _updateListeners(reset: boolean) {
       if ((this as any)._viewportResizeTimer) {

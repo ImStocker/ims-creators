@@ -90,7 +90,8 @@ export default defineComponent({
 
       const controllers = this.selectedObjects
         .filter((x) => x)
-        .map((obj) => getShapeControllers(this.$getAppManager()).map[obj.type]);
+        .map((obj) => getShapeControllers(this.$getAppManager()).map[obj.type])
+        .filter((controller) => controller);
 
       const all_descriptors = controllers.map((controller) =>
         controller.getPropertyDescriptors(),

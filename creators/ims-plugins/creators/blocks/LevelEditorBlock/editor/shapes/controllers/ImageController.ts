@@ -28,6 +28,7 @@ export default class ImageController extends BaseShapeController<ImageShape> {
 
         selectable: !shape.locked,
         evented: !shape.locked,
+        imageSmoothing: !shape.params.pixelated,
       }),
     );
   }

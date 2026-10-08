@@ -47,27 +47,39 @@ function findNearestEdge(
 
 export type PolygonShape = Extract<LevelEditorShape, { type: 'polygon' }>;
 
+function arePointsEqual(
+  a: { x: number; y: number }[],
+  b: { x: number; y: number }[],
+) {
+  if (a.length !== b.length) return false;
+  return a.every((p, i) => p.x === b[i].x && p.y === b[i].y);
+}
+
 export default class PolygonController extends BaseShapeController<PolygonShape> {
   name = 'polygon';
   icon = 'ri-shape-line';
 
   createFabricObject(shape: PolygonShape, readonly: boolean) {
-    const origin = { x: shape.x, y: shape.y };
-    const absolutePoints = shape.params.points.map((p) => ({
-      x: p.x + origin.x,
-      y: p.y + origin.y,
-    }));
     const poly = markRaw(
-      new fabric.Polygon(absolutePoints, {
-        id: shape.id,
-        index: shape.index,
-        fill: shape.params.fill,
-        stroke: shape.params.stroke,
-        parentId: shape.parentId ?? undefined,
+      new fabric.Polygon(
+        shape.params.points.map((p) => ({ x: p.x, y: p.y })),
+        {
+          id: shape.id,
+          index: shape.index,
+          left: shape.x,
+          top: shape.y,
+          skewX: shape.skew ?? 0,
+          scaleX: shape.scaleX ?? 1,
+          scaleY: shape.scaleY ?? 1,
+          angle: shape.angle ?? 0,
+          fill: shape.params.fill,
+          stroke: shape.params.stroke,
+          parentId: shape.parentId ?? undefined,
 
-        selectable: !shape.locked,
-        evented: !shape.locked,
-      }),
+          selectable: !shape.locked,
+          evented: !shape.locked,
+        },
+      ),
     );
     if (!readonly) {
       this._handlePolygonControls(poly);
@@ -176,8 +188,13 @@ export default class PolygonController extends BaseShapeController<PolygonShape>
       canvasController,
     ) as Partial<fabric.Polygon>;
 
-    if (new_data.params?.points !== undefined) {
-      updates.points = new_data.params.points;
+    const modelPoints = new_data.params?.points;
+    const currentPoints = (existing_object as fabric.Polygon).points;
+    if (
+      modelPoints !== undefined &&
+      !arePointsEqual(modelPoints, currentPoints)
+    ) {
+      updates.points = modelPoints;
     }
     return updates;
   }

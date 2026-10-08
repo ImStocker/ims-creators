@@ -4,6 +4,7 @@ import type BaseShapeController from '../BaseShapeController';
 import EllipseController from './EllipseController';
 import GroupController from './GroupController';
 import ImageController from './ImageController';
+import PencilController from './PencilController';
 import PointerController from './PointerController';
 import PolygonController from './PolygonController';
 import RectController from './RectController';
@@ -17,6 +18,7 @@ export function getShapeControllers(appManager: IAppManager) {
     new PolygonController(appManager),
     new ImageController(appManager),
     new PointerController(appManager),
+    new PencilController(appManager),
     new GroupController(appManager),
   ] as BaseShapeController<LevelEditorShape>[];
   const map: { [name: string]: BaseShapeController<LevelEditorShape> } = {};

@@ -9,6 +9,7 @@ export default class PolygonTool extends Tool {
   name = 'polygon';
   icon = 'ri-shape-line';
   override exclusiveGroup: string = 'drawing';
+  override supportsMultiInsert = true;
   section: ToolSection = 'draw';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;
@@ -87,7 +88,7 @@ export default class PolygonTool extends Tool {
           (event.e instanceof MouseEvent || event.e instanceof PointerEvent) &&
           event.e.button === 2
         ) {
-          this._finishPolygon();
+          this._finishPolygon(this.shouldKeepActiveAfterInsert(event.e));
           return;
         }
       },
@@ -115,7 +116,7 @@ export default class PolygonTool extends Tool {
           const dist = Math.hypot(pointer.x - first.x, pointer.y - first.y);
 
           if (dist < 10) {
-            this._finishPolygon();
+            this._finishPolygon(this.shouldKeepActiveAfterInsert(event.e));
             return;
           }
         }
@@ -175,28 +176,31 @@ export default class PolygonTool extends Tool {
     this.controller.canvas.add(this._previewLine);
   }
 
-  private _finishPolygon() {
+  private _finishPolygon(keepActive: boolean) {
+    let created = false;
     if (this._points.length >= 3) {
-      const origin = this._points[0];
-      const relativePoints = this._points.map((p) => ({
-        x: p.x - origin.x,
-        y: p.y - origin.y,
+      const minX = Math.min(...this._points.map((p) => p.x));
+      const minY = Math.min(...this._points.map((p) => p.y));
+      const localPoints = this._points.map((p) => ({
+        x: p.x - minX,
+        y: p.y - minY,
       }));
       this._cleanUp();
       const polygon = this.controller.createShape({
         id: uuidv4(),
         type: 'polygon',
         params: {
-          points: relativePoints,
+          points: localPoints,
           fill: '#eed81133',
           stroke: '#eed811',
         },
-        x: origin.x,
-        y: origin.y,
+        x: minX,
+        y: minY,
       });
       if (polygon) {
         this.controller.canvas.setActiveObject(polygon);
         polygon.setCoords();
+        created = true;
       }
     } else {
       this._cleanUp();
@@ -204,6 +208,10 @@ export default class PolygonTool extends Tool {
 
     this.controller.canvas.requestRenderAll();
 
-    this.deactivate();
+    // Ctrl/Cmd при завершении — инструмент остаётся активным для следующего
+    // многоугольника; отмена (менее 3 точек) деактивирует всегда.
+    if (!keepActive || !created) {
+      this.deactivate();
+    }
   }
 }

@@ -74,6 +74,18 @@ export async function createWindow(args: WindowArgs) {
           }
           api.shell.showItemInFolder(file_path);
       }
+      else if (url.startsWith('localfile://')) {
+          // Attachment download (local project files): reveal the real file
+          try {
+              const parsed = new URL(url);
+              const raw = parsed.host ? parsed.host + parsed.pathname : parsed.pathname;
+              let file_path = decodeURIComponent(raw);
+              if (/^\/[A-Za-z]:/.test(file_path)) file_path = file_path.substring(1);
+              api.shell.showItemInFolder(file_path);
+          } catch (err) {
+              console.error('localfile url failed', err);
+          }
+      }
       else if (url.match(/.*localhost.*/gi) === null && (url.startsWith('http:') || url.startsWith('https:'))) {
           
           shell.openExternal(url);

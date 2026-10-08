@@ -37,7 +37,7 @@ export const TEXTBOX_DEFAULT_COLOR_PRESET = {
   stroke: '#ffffff',
 };
 
-const COLOR_PRESETS: ColorSet[] = [
+export const COLOR_PRESETS: ColorSet[] = [
   DEFAULT_COLOR_PRESET,
   {
     fill: '#3dee114d',
@@ -324,6 +324,8 @@ export const LOCK_PROPERTY_DESCRIPTORS: ShapePropertyDescriptor[] = [
     editorProps: {
       icon: 'ri-lock-line',
       label: 'lock',
+      checkedIcon: 'ri-lock-unlock-line',
+      checkedLabel: 'unlock',
     },
     get: (shape, _controller) => shape.locked ?? false,
     set: (shape, value, controller) => {

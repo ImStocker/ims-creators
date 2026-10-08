@@ -9,7 +9,7 @@
     @dragover.prevent="dragFileEnter"
     @dragleave.prevent="dragFileLeave"
   >
-    <div v-if="mainItem">
+    <div v-if="displayItem">
       <screenshot-renderer
         :disabled="displayMode !== 'print'"
         :ready="ready"
@@ -18,10 +18,12 @@
         <gallery-block-item
           class="GameObjectGalleryBlock-itemContent"
           :readonly="readonly"
-          :item="mainItem"
-          :files="[mainItem]"
+          :item="displayItem"
+          :files="[displayItem]"
           :allow-caption="false"
-          @delete="deleteImage(mainItem)"
+          :allow-service-name="false"
+          :allow-drop="false"
+          @delete="deleteImage(displayItem)"
         ></gallery-block-item
       ></screenshot-renderer>
     </div>
@@ -58,7 +60,7 @@
             ref="addButton"
             class="GameObjectGalleryBlock-add-button is-button is-button-icon"
             :title="tooltip"
-            @click="show"
+            @click.stop="show"
           >
             <i class="ri-image-fill"></i>
           </button>
@@ -88,6 +90,7 @@ import type {
 } from '~ims-app-base/logic/utils/assets';
 import {
   extractGalleryBlockEntries,
+  isGalleryItemEmpty,
   type GalleryBlockExtractedEntries,
   type GalleryBlockItemObject,
 } from '~ims-plugin-base/blocks/GalleryBlock/GalleryBlock';
@@ -185,6 +188,11 @@ export default defineComponent({
     mainItem() {
       return this.realEntries.list.find((item) => item.key === SET_GALLERY_KEY);
     },
+    displayItem(): GalleryBlockItemObject | null {
+      const item = this.mainItem;
+      if (!item || isGalleryItemEmpty(item)) return null;
+      return { ...item, name: undefined };
+    },
     galleryItems(): GalleryBlockItemObject[] {
       return this.realEntries.list;
     },
@@ -247,6 +255,7 @@ export default defineComponent({
           if (!res) return;
 
           const new_key = SET_GALLERY_KEY;
+          const op = this.assetChanger.makeOpId();
           this.assetChanger.setBlockPropKeys(
             this.resolvedBlock.assetId,
             makeBlockRef(this.resolvedBlock),
@@ -254,10 +263,11 @@ export default defineComponent({
             {
               [`${new_key}\\value`]: res,
               [`${new_key}\\type`]: 'file',
-              [`${new_key}\\index`]: getNextIndexWithTimestamp(
+              [`__slots\\${new_key}\\index`]: getNextIndexWithTimestamp(
                 this.realEntries.maxIndex,
               ),
             },
+            op,
           );
           this.save();
         });
@@ -326,26 +336,23 @@ export default defineComponent({
       const video = await this.$getAppManager()
         .get(DialogManager)
         .show(ExternalLinkDialog, {
-          yesCaption: this.$t('common.dialogs.save'),
-          header: this.$t('assetEditor.galleryBlockAddVideoLinkMessage'),
-          placeholder: this.$t(
-            'assetEditor.galleryBlockAddVideoLinkPlaceholder',
-          ),
-          fileType: 'video',
+          linkKind: 'video',
         });
       if (video) {
         const new_key = SET_GALLERY_KEY;
+        const op = this.assetChanger.makeOpId();
         this.assetChanger.setBlockPropKeys(
           this.resolvedBlock.assetId,
           makeBlockRef(this.resolvedBlock),
           null,
           {
             [`${new_key}\\value`]: video.value,
-            [`${new_key}\\type`]: video.type,
-            [`${new_key}\\index`]: getNextIndexWithTimestamp(
+            [`${new_key}\\type`]: video.itemType,
+            [`__slots\\${new_key}\\index`]: getNextIndexWithTimestamp(
               this.realEntries.maxIndex,
             ),
           },
+          op,
         );
         this.save();
       }
@@ -354,26 +361,23 @@ export default defineComponent({
       const image = await this.$getAppManager()
         .get(DialogManager)
         .show(ExternalLinkDialog, {
-          yesCaption: this.$t('common.dialogs.save'),
-          fileType: 'image',
-          header: this.$t('assetEditor.galleryBlockAddExternalImageMessage'),
-          placeholder: this.$t(
-            'assetEditor.galleryBlockAddExternalImagePlaceholder',
-          ),
+          linkKind: 'image',
         });
       if (image) {
         const new_key = SET_GALLERY_KEY;
+        const op = this.assetChanger.makeOpId();
         this.assetChanger.setBlockPropKeys(
           this.resolvedBlock.assetId,
           makeBlockRef(this.resolvedBlock),
           null,
           {
             [`${new_key}\\value`]: image.value,
-            [`${new_key}\\type`]: image.type,
-            [`${new_key}\\index`]: getNextIndexWithTimestamp(
+            [`${new_key}\\type`]: image.itemType,
+            [`__slots\\${new_key}\\index`]: getNextIndexWithTimestamp(
               this.realEntries.maxIndex,
             ),
           },
+          op,
         );
         this.save();
       }
@@ -385,11 +389,20 @@ export default defineComponent({
       this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
+          const op = this.assetChanger.makeOpId();
           this.assetChanger.deleteBlockPropKey(
             this.resolvedBlock.assetId,
             makeBlockRef(this.resolvedBlock),
             null,
             `${item.key}`,
+            op,
+          );
+          this.assetChanger.deleteBlockPropKey(
+            this.resolvedBlock.assetId,
+            makeBlockRef(this.resolvedBlock),
+            null,
+            `__slots\\${item.key}`,
+            op,
           );
           this.save();
         });

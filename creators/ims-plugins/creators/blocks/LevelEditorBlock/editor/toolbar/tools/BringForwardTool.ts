@@ -3,6 +3,7 @@ import {
   getNextIndexWithTimestamp,
 } from '~ims-app-base/components/Asset/Editor/blockUtils';
 import { INF_GRID_OBJECT_TYPE } from '../../../canvas/InfiniteGrid';
+import { LEVEL_FRAME_OBJECT_TYPE } from '../../../canvas/LevelFrame';
 import type { ToolSection } from '../ToolManager';
 import SelectionRequiredTool from './base/SelectionRequiredTool';
 
@@ -28,7 +29,10 @@ export default class BringForwardTool extends SelectionRequiredTool {
       const collection_objects = collection
         .getObjects()
         .filter(
-          (obj) => obj.type !== INF_GRID_OBJECT_TYPE && obj.type !== 'label',
+          (obj) =>
+            obj.type !== INF_GRID_OBJECT_TYPE &&
+            obj.type !== LEVEL_FRAME_OBJECT_TYPE &&
+            obj.type !== 'label',
         );
 
       const current_pos = collection_objects.indexOf(active_object);

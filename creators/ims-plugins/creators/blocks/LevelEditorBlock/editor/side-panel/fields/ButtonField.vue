@@ -2,18 +2,18 @@
   <button
     class="is-button is-button-text ButtonField"
     :disabled="readonly"
-    @click="$emit('update:model-value', true)"
+    @click="$emit('update:model-value', !modelValue)"
   >
-    <div v-if="icon" class="ButtonField-icon">
-      <i :class="icon"></i>
+    <div v-if="activeIcon" class="ButtonField-icon">
+      <i :class="activeIcon"></i>
     </div>
     <div class="ButtonField-label">
-      {{ $t('levelEditor.properties.fields.' + label) }}
+      {{ $t('levelEditor.properties.fields.' + activeLabel) }}
     </div>
   </button>
 </template>
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, type PropType } from 'vue';
 
 export default defineComponent({
   name: 'ButtonField',
@@ -30,12 +30,28 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    checkedIcon: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    checkedLabel: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
     readonly: {
       type: Boolean,
       default: false,
     },
   },
   emits: ['update:model-value'],
+  computed: {
+    activeIcon() {
+      return this.modelValue ? (this.checkedIcon ?? this.icon) : this.icon;
+    },
+    activeLabel() {
+      return this.modelValue ? (this.checkedLabel ?? this.label) : this.label;
+    },
+  },
 });
 </script>
 <style lang="scss" scoped>

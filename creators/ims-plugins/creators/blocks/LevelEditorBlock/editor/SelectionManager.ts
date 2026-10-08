@@ -37,6 +37,16 @@ export default class SelectionManager {
       .getObjects()
       .filter((obj) => shapeIds.includes(obj.id));
     const sel = new fabric.ActiveSelection(objects_to_select);
+
+    const all_locked =
+      objects_to_select.length > 0 &&
+      objects_to_select.every((o) => this.blockController.shapes[o.id]?.locked);
+    if (all_locked) {
+      sel.set({
+        hasControls: false,
+      });
+    }
+
     this.canvasController.canvas.setActiveObject(sel);
     this.canvasController.canvas.requestRenderAll();
   }

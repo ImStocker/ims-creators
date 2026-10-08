@@ -143,6 +143,7 @@ export default defineNuxtConfig({
 
       AUTH_API_HOST: process.env.AUTH_API_HOST,
       CREATORS_API_HOST: process.env.CREATORS_API_HOST,
+      CREATORS_API_CHANGES_WS: process.env.CREATORS_API_CHANGES_WS,
       FILE_STORAGE_API_HOST: process.env.FILE_STORAGE_API_HOST,
       SUPERVISOR_API_HOST: process.env.SUPERVISOR_API_HOST,
       GAMEMANAGER_API_HOST: process.env.GAMEMANAGER_API_HOST,

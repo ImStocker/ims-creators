@@ -1,5 +1,5 @@
 <template>
-  <dialog-content class="SyncWithCloudDialog" :loading="isLoading">
+  <dialog-content class="SyncWithCloudDialog">
     <div class="Form">
       <div class="Dialog-header">
         {{ $t('desktop.fsSync.menu.syncWithCloud') }}
@@ -25,7 +25,9 @@
             <div class="SyncWithCloudDialog-item-title">
                 {{ $t('desktop.welcome.selectProject') }}
             </div>
+            <div v-if="projectsLoading" class="loaderSpinner SyncWithCloudDialog-loader"></div>
             <ims-select
+                v-else
                 v-model="project"
                 class="WelcomeFormContentCreateProject-Action-ImsSelect"
                 :options="projects.list"
@@ -36,7 +38,7 @@
             </ims-select>
         </div>
       </div>
-      <div v-if="openedTabName === 'exist' && project && errorMessage"
+      <div v-if="openedTabName === 'exist' && errorMessage"
         class="SyncWithCloudDialog-warning">
         <i class="ri-error-warning-fill"></i>
         {{ errorMessage }}
@@ -114,7 +116,8 @@ export default defineComponent({
         list: [] as ProjectShortInfo[],
         total: 0,
       },
-      isLoading: true,
+      projectsLoading: false,
+      projectsLoaded: false,
       errorMessage: null as null | string,
       isBusy: false,
     };
@@ -144,23 +147,37 @@ export default defineComponent({
         }
     }
   },
+  watch: {
+    openedTabName(val: string) {
+      if (val === 'exist') {
+        this.loadProjects();
+      }
+    },
+  },
   async mounted() {
-    this.isLoading = true;
     this.projectTitle = this.projectInfo?.title ?? '';
-    try {
-      this.projects = await this.$getAppManager()
-              .get(ApiManager)
-              .call(Service.CREATORS, HttpMethods.GET, 'app/projects', {});
-      this.errorMessage = null;
-    }
-    catch(err: any){
-      this.errorMessage = err.message;
-    }
-    finally {
-      this.isLoading = false;
-    }
   },
   methods: {
+    async loadProjects(){
+        if(this.projectsLoading || this.projectsLoaded){
+            return;
+        }
+        this.projectsLoading = true;
+        this.errorMessage = null;
+        try {
+          this.projects = await this.$getAppManager()
+                  .get(ApiManager)
+                  .call(Service.CREATORS, HttpMethods.GET, 'app/projects', {});
+          this.errorMessage = null;
+          this.projectsLoaded = true;
+        }
+        catch(err: any){
+          this.errorMessage = err.message;
+        }
+        finally {
+          this.projectsLoading = false;
+        }
+    },
     async save(){
         this.isBusy = true;
         try {
@@ -226,6 +243,10 @@ export default defineComponent({
 }
 .SyncWithCloudDialog-item-input{
     min-height: 40px;
+}
+.SyncWithCloudDialog-loader{
+    font-size: 24px;
+    margin: auto 0;
 }
 .SyncWithCloudDialog-item-title {
   width: 260px;

@@ -1,62 +1,136 @@
 
 import isUUID from 'validator/es/lib/isUUID';
 import type { AssetQueryWhere } from "~ims-app-base/logic/types/AssetsType";
-import { AssetPropWhereOpKind, getAssetPropWhereProp, type AssetPropWhereCondition, type AssetPropWhereOp, type AssetPropWhereOpAnd, type AssetPropWhereValue } from '~ims-app-base/logic/types/PropsWhere';
+import { AssetPropWhereOpKind, getAssetPropWhereProp, type AssetPropWhereCondition, type AssetPropWhereOp, type AssetPropWhereOpAnd } from '~ims-app-base/logic/types/PropsWhere';
 import { escapeRegExp } from "~ims-app-base/logic/utils/stringUtils";
 import type { ProjectFileDb, ProjectFileDbAsset } from "../ProjectFileDb";
-import { AssetPropType, castAssetPropValueToFloat, castAssetPropValueToInt, castAssetPropValueToString, compareAssetPropValues, convertAssetPropsToPlainObject, getAssetPropType, parseAssetNewBlockPropKeyRef, type AssetBlockIdWithName, type AssetPropsPlainObject, type AssetPropsPlainObjectValue, type AssetPropValue } from '~ims-app-base/logic/types/Props';
+import { AssetPropType, castAssetPropPlainObjectValueToString, castAssetPropValueToBoolean, castAssetPropValueToFloat, castAssetPropValueToInt, castAssetPropValueToString, compareAssetPropValues, convertAssetPropsToPlainObject, getAssetPropType, getAssetPropValueLen, isFilledAssetPropValue, parseAssetNewBlockPropKeyRef, type AssetBlockIdWithName, type AssetPropsPlainObject, type AssetPropsPlainObjectValue, type AssetPropValue } from '~ims-app-base/logic/types/Props';
+import { getFieldDescriptor, readFieldDescriptorValue } from '../asset-fields';
 
-function testAssetPropValueByWhereCondition(val: AssetPropValue, where: AssetPropWhereOp): boolean {
-    const oprnd_prop = getAssetPropWhereProp(where.v as AssetPropWhereCondition);
-    if (oprnd_prop) {
-        throw new Error('Operand props not supported')
-    }
-
+function testAssetPropValueByWhereCondition(
+    val: AssetPropValue,
+    where: AssetPropWhereOp,
+    fieldType: AssetPropType | null,
+    operand_value?: AssetPropValue,
+): boolean {
     switch (where.op) {
         case AssetPropWhereOpKind.EQUAL:
         case AssetPropWhereOpKind.EQUAL_NOT:
         case AssetPropWhereOpKind.LESS:
         case AssetPropWhereOpKind.LESS_EQUAL:
         case AssetPropWhereOpKind.MORE:
-        case AssetPropWhereOpKind.MORE_EQUAL:
-            {
-                let converted_val = val;
-                const where_val_type = getAssetPropType(where.v as AssetPropValue);
-                switch (where_val_type) {
-                    case AssetPropType.INTEGER:
-                        converted_val = castAssetPropValueToInt(val);
-                        break
-                    case AssetPropType.FLOAT:
-                        converted_val = castAssetPropValueToFloat(val);
-                        break
-                    case AssetPropType.STRING:
-                        converted_val = castAssetPropValueToString(val);
-                        break
-                }
-
-                const compare = compareAssetPropValues(converted_val, where.v as AssetPropValue);
-                switch (where.op) {
-                    case AssetPropWhereOpKind.EQUAL:
-                        return compare === 0;
-                    case AssetPropWhereOpKind.EQUAL_NOT:
-                        return compare !== 0;
-                    case AssetPropWhereOpKind.LESS:
-                        return compare < 0;
-                    case AssetPropWhereOpKind.LESS_EQUAL:
-                        return compare <= 0;
-                    case AssetPropWhereOpKind.MORE:
-                        return compare > 0;
-                    case AssetPropWhereOpKind.MORE_EQUAL:
-                        return compare >= 0;
-                }
+        case AssetPropWhereOpKind.MORE_EQUAL: {
+            // Operand props compare two fields, so both sides are cast the same way
+            const compare_val = operand_value !== undefined
+                ? operand_value
+                : where.v as AssetPropValue;
+            // A nested plain object has no prop type, and compareAssetPropValues
+            // has no ordering for one, so comparisons must never match it. The
+            // other operators below do define object behaviour (imc_is_filled,
+            // imc_len, imc_to_string), which is why the rule lives here rather
+            // than in the filter loop.
+            if (!getAssetPropType(val)) {
+                return false;
+            }
+            let converted_val = val;
+            switch (getAssetPropType(compare_val)) {
+                case AssetPropType.INTEGER:
+                    converted_val = castAssetPropValueToInt(val);
+                    break
+                case AssetPropType.FLOAT:
+                    converted_val = castAssetPropValueToFloat(val);
+                    break
+                case AssetPropType.STRING:
+                    converted_val = castAssetPropValueToString(val);
+                    break
             }
 
+            const compare = compareAssetPropValues(converted_val, compare_val);
+            switch (where.op) {
+                case AssetPropWhereOpKind.EQUAL:
+                    return compare === 0;
+                case AssetPropWhereOpKind.EQUAL_NOT:
+                    return compare !== 0;
+                case AssetPropWhereOpKind.LESS:
+                    return compare < 0;
+                case AssetPropWhereOpKind.LESS_EQUAL:
+                    return compare <= 0;
+                case AssetPropWhereOpKind.MORE:
+                    return compare > 0;
+                case AssetPropWhereOpKind.MORE_EQUAL:
+                    return compare >= 0;
+                default:
+                    return false;
+            }
+        }
+        case AssetPropWhereOpKind.ANY:
+        case AssetPropWhereOpKind.ANY_NOT: {
+            const values = (where.v ?? []) as AssetPropValue[];
+            const passed = values.some(candidate =>
+                testAssetPropValueByWhereCondition(val, {
+                    op: AssetPropWhereOpKind.EQUAL,
+                    v: candidate,
+                } as AssetPropWhereOp, fieldType),
+            );
+            return where.op === AssetPropWhereOpKind.ANY ? passed : !passed;
+        }
+        case AssetPropWhereOpKind.LIKE:
+        case AssetPropWhereOpKind.LIKE_NOT: {
+            const str = castAssetPropPlainObjectValueToString(val);
+            const passed = new RegExp(escapeRegExp((where.v as string).toString()), 'i').test(str);
+            return where.op === AssetPropWhereOpKind.LIKE ? passed : !passed;
+        }
+        case AssetPropWhereOpKind.MATCH: {
+            const str = castAssetPropPlainObjectValueToString(val);
+            return new RegExp((where.v as string).toString()).test(str);
+        }
+        case AssetPropWhereOpKind.LEN_EQUAL:
+        case AssetPropWhereOpKind.LEN_EQUAL_NOT:
+        case AssetPropWhereOpKind.LEN_LESS:
+        case AssetPropWhereOpKind.LEN_LESS_EQUAL:
+        case AssetPropWhereOpKind.LEN_MORE:
+        case AssetPropWhereOpKind.LEN_MORE_EQUAL: {
+            const len = getAssetPropValueLen(val);
+            if (len === null) return false;
+            const expected = where.v as number;
+            switch (where.op) {
+                case AssetPropWhereOpKind.LEN_EQUAL:
+                    return len === expected;
+                case AssetPropWhereOpKind.LEN_EQUAL_NOT:
+                    return len !== expected;
+                case AssetPropWhereOpKind.LEN_LESS:
+                    return len < expected;
+                case AssetPropWhereOpKind.LEN_LESS_EQUAL:
+                    return len <= expected;
+                case AssetPropWhereOpKind.LEN_MORE:
+                    return len > expected;
+                case AssetPropWhereOpKind.LEN_MORE_EQUAL:
+                    return len >= expected;
+                default:
+                    return false;
+            }
+        }
+        case AssetPropWhereOpKind.EMPTY: {
+            const filled = isFilledAssetPropValue(val);
+            return where.v ? !filled : filled;
+        }
+        case AssetPropWhereOpKind.CHECKED: {
+            // A missing or falsy value is simply not checked, so normalising to
+            // 0/1 is enough to tell checked=true from checked=false
+            return (where.v ? 1 : 0) === (castAssetPropValueToBoolean(val) ? 1 : 0);
+        }
         default: {
             throw new Error('Operator not supported')
         }
     }
 }
 
+
+export type AssetSearchFilterPropFilter = {
+    block: AssetBlockIdWithName,
+    propPath: string[],
+    value: AssetPropWhereOp,
+};
 
 export class AssetSearchFilter {
     private _filterIsSystem: boolean | null = null;
@@ -66,8 +140,9 @@ export class AssetSearchFilter {
     private _subFiltersAnds: AssetSearchFilter[] = [];
     private _subFiltersOrs: AssetSearchFilter[][] = [];
     private _resultNothing: boolean = false;
-    private _propFilters: { block: AssetBlockIdWithName, propPath: string[], value: AssetPropWhereOp }[] = [];
+    private _propFilters: AssetSearchFilterPropFilter[] = [];
     private _propFilterBlocks: AssetBlockIdWithName[] = [];
+    private _operandBlocks = new Map<string, AssetBlockIdWithName>();
 
     static async Create(where: AssetQueryWhere, db: ProjectFileDb) {
         const res = new AssetSearchFilter(where, db);
@@ -158,7 +233,7 @@ export class AssetSearchFilter {
                         blockName: where_key_parsed.blockName
                     },
                     propPath: where_key_parsed.propKey.split("\\"),
-                    value: where_cond_op
+                    value: where_cond_op,
                 })
             }
         }
@@ -169,7 +244,88 @@ export class AssetSearchFilter {
             )) {
                 this._propFilterBlocks.push({ blockId: prop_filter.block.blockId, blockName: prop_filter.block.blockName });
             }
+            // An operand prop read from the same block needs no extra block, but
+            // one from another block has to be resolved before evaluation.
+            const operand_prop = getAssetPropWhereProp(
+                prop_filter.value.v as AssetPropWhereCondition,
+            );
+            if (operand_prop && operand_prop.includes('|')) {
+                const operand_parsed = parseAssetNewBlockPropKeyRef(operand_prop);
+                const operand_block: AssetBlockIdWithName = {
+                    blockId: operand_parsed.blockId,
+                    blockName: operand_parsed.blockName,
+                };
+                this._operandBlocks.set(operand_prop, operand_block);
+                const already_resolved =
+                    operand_parsed.blockId === prop_filter.block.blockId &&
+                    operand_parsed.blockName === prop_filter.block.blockName;
+                if (!already_resolved && !this._propFilterBlocks.some(existing =>
+                    existing.blockId === operand_block.blockId && existing.blockName === operand_block.blockName
+                )) {
+                    this._propFilterBlocks.push(operand_block);
+                }
+            }
         }
+    }
+
+    private _findBlock(asset: ProjectFileDbAsset, block_ref: AssetBlockIdWithName | null) {
+        if (!block_ref) return undefined;
+        return asset.blocks.find(block => {
+            if (block_ref.blockId) return block.id === block_ref.blockId;
+            if (block_ref.blockName) return block.name === block_ref.blockName;
+            return false;
+        });
+    }
+
+    private _readPropFilterValue(
+        asset: ProjectFileDbAsset | null,
+        prop_filter: AssetSearchFilterPropFilter,
+    ): AssetPropsPlainObjectValue {
+        if (!asset) return null;
+        const block = this._findBlock(asset, prop_filter.block);
+        if (!block || !block.computedAt) return null;
+        // computed is stored assigned — convert to plain for the propPath walk
+        let value: AssetPropsPlainObjectValue = block.computed
+            ? convertAssetPropsToPlainObject(block.computed)
+            : null;
+        for (const prop_key_part of prop_filter.propPath) {
+            if (value === null) break;
+            if (typeof value !== 'object') {
+                value = null;
+            }
+            else {
+                const value_type = getAssetPropType(value as AssetPropValue);
+                if (value_type) {
+                    value = null;
+                }
+                else {
+                    value = (value as AssetPropsPlainObject)[prop_key_part];
+                }
+            }
+        }
+        return value;
+    }
+
+    /**
+     * `{op: '<', v: {prop: 'other_field'}}` compares two fields. Block prop
+     * operands have to be resolved before the row is evaluated, so their blocks
+     * are registered alongside the filtered blocks during _init.
+     */
+    private _readOperandValue(
+        asset: ProjectFileDbAsset | null,
+        operand_prop: string,
+        operand_block: AssetBlockIdWithName | null,
+    ): AssetPropsPlainObjectValue {
+        if (!operand_block) {
+            return asset
+                ? readFieldDescriptorValue(asset, getFieldDescriptor(operand_prop))
+                : null;
+        }
+        return this._readPropFilterValue(asset, {
+            block: operand_block,
+            propPath: (parseAssetNewBlockPropKeyRef(operand_prop).propKey).split('\\'),
+            value: { op: AssetPropWhereOpKind.EQUAL, v: null },
+        });
     }
 
     private async *_applySelf(assets: Iterable<ProjectFileDbAsset>): AsyncGenerator<ProjectFileDbAsset> {
@@ -249,44 +405,27 @@ export class AssetSearchFilter {
                 let prop_filter_i = 0;
                 while (is_passed && prop_filter_i < this._propFilters.length) {
                     const prop_filter = this._propFilters[prop_filter_i];
-                    let asset_prop_value: AssetPropsPlainObjectValue = null;
-                    if (partial_full) {
-                        const block = partial_full.blocks.find(b => {
-                            if (prop_filter.block.blockId) return b.id === prop_filter.block.blockId;
-                            if (prop_filter.block.blockName) return b.name === prop_filter.block.blockName;
-                            return false;
-                        });
-                        if (block && block.computedAt) {
-                            // computed is stored assigned — convert to plain for the propPath walk
-                            asset_prop_value = block.computed ? convertAssetPropsToPlainObject(block.computed) : null;
-                        }
-                    }
-                    for (const prop_key_part of prop_filter.propPath) {
-                        if (asset_prop_value === null) break;
-                        if (typeof asset_prop_value !== 'object') {
-                            asset_prop_value = null;
-                        }
-                        else {
-                            const asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
-                            if (asset_prop_value_type) {
-                                asset_prop_value = null;
-                            }
-                            else {
-                                asset_prop_value = (asset_prop_value as AssetPropsPlainObject)[prop_key_part];
-                            }
-                        }
+                    const asset_prop_value = this._readPropFilterValue(partial_full, prop_filter);
+
+                    let operand_value: AssetPropValue | undefined = undefined;
+                    const operand_prop = getAssetPropWhereProp(
+                        prop_filter.value.v as AssetPropWhereCondition,
+                    );
+                    if (operand_prop) {
+                        operand_value = this._readOperandValue(
+                            partial_full,
+                            operand_prop,
+                            this._operandBlocks.get(operand_prop) ?? null,
+                        ) as AssetPropValue;
                     }
 
-                    const final_asset_prop_value_type = getAssetPropType(asset_prop_value as AssetPropValue);
-                    if (!final_asset_prop_value_type) {
-                        is_passed = false;
-                    }
-                    else {
-                        is_passed = testAssetPropValueByWhereCondition(
-                            asset_prop_value as AssetPropValue,
-                            prop_filter.value
-                        );
-                    }
+                    is_passed = testAssetPropValueByWhereCondition(
+                        asset_prop_value as AssetPropValue,
+                        prop_filter.value,
+                        // prop filters are always block props, so they have no declared type
+                        null,
+                        operand_value,
+                    );
 
                     prop_filter_i++;
                 }

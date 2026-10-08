@@ -119,7 +119,9 @@ export default class Pointer extends fabric.Group {
         }
 
         const asset_image_file = asset.mainImage.value as AssetPropValueFile;
-        const image_url = this.appManager.get(FileManager).getFileUrl(asset_image_file);
+        const image_url = this.appManager
+          .get(FileManager)
+          .getFileUrl(asset_image_file);
 
         fabric.FabricImage.fromURL(image_url, undefined).then((img) => {
           if (this.image) {
