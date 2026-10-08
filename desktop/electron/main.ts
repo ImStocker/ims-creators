@@ -1,9 +1,8 @@
-import { app, BrowserWindow, net, protocol, dialog } from 'electron';
+import { app, BrowserWindow, protocol, dialog } from 'electron';
 import type { WindowArgs } from '#bridge/types/WindowArgs';
 import { createWindow } from './window';
 import { initImsHostApi } from './imshost-api';
 import { installExtension } from 'electron-devtools-installer';
-import { pathToFileURL } from 'node:url';
 import autoUpdateManager from './auto-update-manager';
 
 import log from 'electron-log/main';
@@ -11,6 +10,7 @@ import { closeAllProjectDb } from './project-file-db/project-registry';
 import { initMainTokenStorage } from './main-token-storage';
 import { MainAppControllerInstance } from './main-app-controller';
 import { stopMcpServer } from './mcp-server/index';
+import { handleLocalFile } from './local-file-handler';
 
 const VUEDEVTOOLS_ID = 'nhdogjmejiglipccpnnnanhbledajbpd';
 
@@ -46,6 +46,7 @@ async function initApp() {
           bypassCSP: true,
           secure: true,
           supportFetchAPI: true,
+          corsEnabled: false,
         },
       },
     ]);
@@ -80,18 +81,7 @@ async function initApp() {
       initImsHostApi();
       await initMainTokenStorage();
 
-      protocol.handle('localfile', async (request) => {
-        try {
-          const file_path_match = request.url.match(/^localfile:\/\/(.*)$/);
-          if (!file_path_match) return new Response(`Error`, { status: 404 });
-          const file_path = decodeURIComponent(file_path_match[1]);
-          const file_url = pathToFileURL(file_path).toString();
-          return net.fetch(file_url);
-        } catch (err) {
-          log.error(err);
-          return new Response(`Error: ${err}`, { status: 404 });
-        }
-      });
+      protocol.handle('localfile', handleLocalFile);
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

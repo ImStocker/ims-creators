@@ -13,12 +13,12 @@ export default class DesktopFileManager extends FileManager {
       const projectLocalPath = this.appManager
         .get(ProjectManager)
         .getProjectInfo()?.localPath;
-      return (
-        'localfile://' +
-        encodeURIComponent(
-          node_path.join(projectLocalPath ?? '', file.Dir ?? '', file.Title),
-        )
-      );
+      const filePath = node_path
+        .join(projectLocalPath ?? '', file.Dir ?? '', file.Title)
+        .replaceAll('\\', '/');
+      const segments = filePath.split('/');
+      if (segments[0] === '') segments.shift();
+      return 'localfile:///' + segments.map(encodeURIComponent).join('/');
     }
 
     return super.getFileUrl(file, thumbParams);
