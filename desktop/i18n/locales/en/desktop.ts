@@ -172,7 +172,8 @@ export default {
         noPermission: 'You do not have permission to rename this project',
         renameCloudFailed: 'Failed to rename the cloud project',
         location: 'Location',
-        moveButton: 'Move',
+        folderName: 'Folder name',
+        moveButton: 'Change',
         targetExists: 'A folder already exists at the chosen path',
       },
       plugins: {

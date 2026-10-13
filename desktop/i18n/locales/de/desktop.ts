@@ -172,7 +172,8 @@ export default {
         noPermission: 'Sie haben keine Berechtigung, dieses Projekt umzubenennen',
         renameCloudFailed: 'Cloud-Projekt konnte nicht umbenannt werden',
         location: 'Speicherort',
-        moveButton: 'Verschieben',
+        folderName: 'Ordnername',
+        moveButton: 'Aendern',
         targetExists: 'Am gewahlten Pfad existiert bereits ein Ordner',
       },
       plugins: {

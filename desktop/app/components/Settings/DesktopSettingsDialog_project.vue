@@ -51,6 +51,18 @@
             ></SelectFolderForm>
           </div>
         </div>
+        <div class="Form-row">
+          <div class="Form-row-caption">
+            {{ $t('desktop.settings.project.folderName') }}
+          </div>
+          <div class="Form-row-value">
+            <FormInput
+              :value="folderName"
+              :disabled="moving"
+              @input="folderName = $event"
+            ></FormInput>
+          </div>
+        </div>
         <div
           v-if="targetExistsWarning"
           class="DesktopSettingsDialog_project-warning"
@@ -127,6 +139,7 @@ export default defineComponent({
       projectTitle: '',
       saving: false,
       location: '',
+      folderName: '',
       moving: false,
       targetExists: false,
       checkPathDebounce: null as any,
@@ -145,12 +158,12 @@ export default defineComponent({
     originalLocation(): string {
       return splitOsPath(this.originalLocalPath).dir;
     },
-    projectFolderName(): string {
+    originalFolderName(): string {
       return splitOsPath(this.originalLocalPath).name;
     },
     targetPath(): string {
-      if (!this.location || !this.projectFolderName) return '';
-      return joinOsPath(this.location, this.projectFolderName);
+      if (!this.location || !this.folderName) return '';
+      return joinOsPath(this.location, this.folderName);
     },
     targetChanged(): boolean {
       return (
@@ -162,7 +175,12 @@ export default defineComponent({
       return this.targetChanged && this.targetExists;
     },
     canMove(): boolean {
-      return !!this.location && this.targetChanged && !this.targetExists;
+      return (
+        !!this.location &&
+        !!this.folderName &&
+        this.targetChanged &&
+        !this.targetExists
+      );
     },
     renameFolder: {
       get(): boolean {
@@ -182,6 +200,7 @@ export default defineComponent({
         this.$t('desktop.settings.project.renameButton'),
         this.$t('desktop.settings.project.renameFolder'),
         this.$t('desktop.settings.project.location'),
+        this.$t('desktop.settings.project.folderName'),
         this.$t('desktop.settings.project.moveButton'),
       ];
     },
@@ -217,6 +236,12 @@ export default defineComponent({
         this.location = val;
       },
     },
+    originalFolderName: {
+      immediate: true,
+      handler(val: string) {
+        this.folderName = val;
+      },
+    },
     targetPath(new_val: string) {
       if (this.checkPathDebounce) {
         this.checkPathDebounce(new_val);
@@ -226,6 +251,7 @@ export default defineComponent({
   mounted() {
     this.projectTitle = this.originalTitle;
     this.location = this.originalLocation;
+    this.folderName = this.originalFolderName;
     this.$emit('update:isEmpty', this.isEmptyComputed);
     this.checkPathDebounce = debounceForThis(async function (
       this: any,
