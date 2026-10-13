@@ -171,6 +171,9 @@ export default {
         cloudNotFound: 'Cloud-Projekt nicht gefunden',
         noPermission: 'Sie haben keine Berechtigung, dieses Projekt umzubenennen',
         renameCloudFailed: 'Cloud-Projekt konnte nicht umbenannt werden',
+        location: 'Speicherort',
+        moveButton: 'Verschieben',
+        targetExists: 'Am gewahlten Pfad existiert bereits ein Ordner',
       },
       plugins: {
         searchPlugin: 'Suche nach einem Plugin',

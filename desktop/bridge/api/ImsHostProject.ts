@@ -117,8 +117,12 @@ async function renameProjectFolderWithFallback(
     try {
       await fs.promises.rename(oldPath, targetPath);
       return;
-    } catch (err) {
+    } catch (err: any) {
       lastError = err;
+      // Cross-device move cannot be done with rename - fall back to copy+delete
+      if (err && err.code === 'EXDEV') {
+        break;
+      }
       if (!isRetryableRenameError(err)) {
         if (fs.existsSync(targetPath)) return;
         throw err;
@@ -128,7 +132,7 @@ async function renameProjectFolderWithFallback(
   }
 
   log.warn(
-    `Rename: rename of "${oldPath}" -> "${targetPath}" failed with a locked handle, falling back to copy`,
+    `Rename: rename of "${oldPath}" -> "${targetPath}" failed (locked handle or cross-device), falling back to copy`,
   );
   try {
     await fs.promises.cp(oldPath, targetPath, {
@@ -183,6 +187,18 @@ export class ImsHostProject extends ImsHostBase {
     await closeProjectDb(projectPath, this._window);
   }
 
+  private async _relocateProjectFolder(
+    oldPathNorm: string,
+    targetPathNorm: string,
+  ): Promise<void> {
+    await closeMcpSessionsForProject(oldPathNorm);
+    await closeProjectDb(oldPathNorm, this._window);
+    await migrateProjectStorage(oldPathNorm, targetPathNorm);
+    // Mirror project creation: make sure the parent directory exists
+    await fs.promises.mkdir(path.dirname(targetPathNorm), { recursive: true });
+    await renameProjectFolderWithFallback(oldPathNorm, targetPathNorm);
+  }
+
   async renameProject(
     projectPath: string,
     title: string,
@@ -209,10 +225,7 @@ export class ImsHostProject extends ImsHostBase {
       const target_path = path.normalize(path.join(parent_path, folder_name));
 
       if (target_path !== norm_path) {
-        await closeMcpSessionsForProject(norm_path);
-        await closeProjectDb(norm_path, this._window);
-        await migrateProjectStorage(norm_path, target_path);
-        await renameProjectFolderWithFallback(norm_path, target_path);
+        await this._relocateProjectFolder(norm_path, target_path);
         new_path = target_path;
       }
     }
@@ -221,6 +234,38 @@ export class ImsHostProject extends ImsHostBase {
       id,
       title,
       localPath: new_path,
+    };
+  }
+
+  async moveProject(
+    projectPath: string,
+    targetPath: string,
+  ): Promise<LocalProjectInitInfo> {
+    const norm_path = path.normalize(projectPath);
+    const target_path_norm = path.normalize(targetPath);
+
+    const project_db = requestProjectDb(norm_path, this._window);
+    await project_db.init();
+
+    const id = project_db.info.id || null;
+    const title = project_db.info.title ?? '';
+
+    if (target_path_norm === norm_path) {
+      return { id, title, localPath: project_db.localPath };
+    }
+    if (target_path_norm.startsWith(norm_path + path.sep)) {
+      throw new Error('Cannot move a project into itself');
+    }
+    if (fs.existsSync(target_path_norm)) {
+      throw new Error('Target folder already exists');
+    }
+
+    await this._relocateProjectFolder(norm_path, target_path_norm);
+
+    return {
+      id,
+      title,
+      localPath: target_path_norm,
     };
   }
 

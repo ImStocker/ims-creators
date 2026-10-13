@@ -202,6 +202,32 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         await this.openProjectWindow(res.localPath, true);
     }
 
+    async moveCurrentProject(targetPath: string): Promise<void> {
+        const old_path_norm = this._loadedForProjectPath;
+        assert(old_path_norm, 'Project is not loaded');
+
+        const project_info = this.appManager.get(ProjectManager).getProjectInfo();
+        const old_local_path = project_info?.localPath ?? old_path_norm;
+
+        const res = await window.imshost.project.moveProject(
+            old_path_norm,
+            targetPath,
+        );
+
+        this.removeFromProjectList(old_local_path);
+        this.addToProjectListIfNotAdded({
+            id: res.id,
+            title: res.title,
+            localPath: res.localPath,
+        });
+
+        await this._recentProjectsStore.awaitSave();
+
+        await window.imshost.storage.setItem('last-project', res.localPath);
+
+        await this.openProjectWindow(res.localPath, true);
+    }
+
     async renameInProjectList(local_path: string){
         const changing_project = this.recentProjects.find(p => p.localPath === local_path);
         if(!changing_project) return;

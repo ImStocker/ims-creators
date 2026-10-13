@@ -171,6 +171,9 @@ export default {
         cloudNotFound: 'Cloud project was not found',
         noPermission: 'You do not have permission to rename this project',
         renameCloudFailed: 'Failed to rename the cloud project',
+        location: 'Location',
+        moveButton: 'Move',
+        targetExists: 'A folder already exists at the chosen path',
       },
       plugins: {
         searchPlugin: 'Search for a plugin',

@@ -171,6 +171,9 @@ export default {
         cloudNotFound: 'Облачный проект не найден',
         noPermission: 'У вас нет прав на переименование этого проекта',
         renameCloudFailed: 'Не удалось переименовать облачный проект',
+        location: 'Расположение',
+        moveButton: 'Переместить',
+        targetExists: 'По выбранному пути уже существует папка',
       },
       plugins: {
         searchPlugin: 'Введите название плагина',
