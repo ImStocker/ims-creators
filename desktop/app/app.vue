@@ -38,6 +38,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import UiPreferenceManager from '~ims-app-base/logic/managers/UiPreferenceManager';
 import AppToasts from '~ims-app-base/components/Common/AppToasts.vue';
 import DesktopUpdateManager from '#logic/managers/DesktopUpdateManager';
+import { PENDING_PROJECT_RENAMED_TOAST_KEY } from '#logic/managers/DesktopCreatorManager';
 import DesktopAiPanel from '#components/App/DesktopAiPanel.vue';
 
 const appManager = useAppManager();
@@ -80,6 +81,15 @@ onMounted(async () => {
   await appManager.get(UiPreferenceManager).initClient();
   await appManager.get(UiManager).initClient();
   await appManager.get(LocalFsSyncManager).initClient();
+  const pendingProjectRenamed = await window.imshost.storage.getItem<boolean>(
+    PENDING_PROJECT_RENAMED_TOAST_KEY,
+  );
+  if (pendingProjectRenamed) {
+    await window.imshost.storage.removeItem(PENDING_PROJECT_RENAMED_TOAST_KEY);
+    appManager
+      .get(UiManager)
+      .showSuccess(appManager.$t('desktop.settings.project.renamed'));
+  }
   const updateManager = appManager.get(DesktopUpdateManager);
   if (updateManager.isAutoCheckingUpdateEnabled){
     updateManager.checkAndShowNewVersion();

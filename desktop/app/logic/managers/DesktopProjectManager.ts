@@ -7,7 +7,7 @@ import axios from "axios";
 import AuthManager from "~ims-app-base/logic/managers/AuthManager";
 import ApiManager from "~ims-app-base/logic/managers/ApiManager";
 import { HttpMethods, Service } from "~ims-app-base/logic/managers/ApiWorker";
-import type { ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
+import type { ProjectFullInfo, ProjectShortInfo, ApiResultListWithTotal } from "~ims-app-base/logic/types/ProjectTypes";
 import type { ProjectFileDbInitParams } from "~~/electron/project-file-db/ProjectFileDb";
 
 export const availableFilenameRegexp = new RegExp("[^- А-Яа-яa-zA-Z,@.;'`!)(]+", 'g');
@@ -152,5 +152,50 @@ export default class DesktopProjectManager extends ProjectManager{
             throw new Error('Project is not inited')
         }
         await window.imshost.project.importTemplateProject(this._projectLocalPath,template_id);
+    }
+
+    async renameCloudProject(project_id: string, title: string): Promise<void> {
+        const api = this.appManager.get(ApiManager);
+        const user_info = this.appManager.get(AuthManager).getUserInfo();
+
+        const projects_res = await api.call<ApiResultListWithTotal<ProjectShortInfo>>(
+            Service.CREATORS,
+            HttpMethods.GET,
+            'app/projects',
+            {},
+        );
+        const found = projects_res.list.find(p => p.id === project_id);
+        if (!found) {
+            throw new Error(this.appManager.$t('desktop.settings.project.cloudNotFound'));
+        }
+
+        const is_admin = !!found.role?.isAdmin;
+        if (!is_admin) {
+            const cloud_info = await api.call<ProjectFullInfo>(
+                Service.CREATORS,
+                HttpMethods.GET,
+                'project/info',
+                { pid: project_id },
+            );
+            const is_owner =
+                cloud_info?.projectOwnerId != null &&
+                cloud_info.projectOwnerId === user_info?.id;
+            if (!is_owner) {
+                throw new Error(this.appManager.$t('desktop.settings.project.noPermission'));
+            }
+        }
+
+        try {
+            await api.call(
+                Service.CREATORS,
+                HttpMethods.PATCH,
+                `app/projects/${project_id}`,
+                { title },
+            );
+        } catch (err: any) {
+            throw new Error(
+                `${this.appManager.$t('desktop.settings.project.renameCloudFailed')}: ${err?.message ?? err}`,
+            );
+        }
     }
 }

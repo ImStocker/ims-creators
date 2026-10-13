@@ -216,6 +216,10 @@ export class ProjectFileDb {
     await this.fileSystem.destroy();
     this.sync.destroy();
     this.settings.destroy();
+    if (this._dataSource) {
+      await this._dataSource.destroy();
+      this._dataSource = null;
+    }
     this._info = null;
   }
 
@@ -227,6 +231,16 @@ export class ProjectFileDb {
       })
     }
     return this._destroying;
+  }
+
+  async renameTitle(title: string): Promise<void> {
+    assert(this._info, 'ProjectFileDb is not inited');
+    this._info.title = title;
+    await fs.promises.writeFile(
+      path.join(this.localPath, PROJECT_META_INDEX),
+      JSON.stringify(this._info),
+      'utf-8',
+    );
   }
 
   get info() {

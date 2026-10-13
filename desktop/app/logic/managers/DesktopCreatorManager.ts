@@ -20,6 +20,9 @@ import DesktopSyncManager from "./DesktopSyncManager";
 
 const PROJECT_META_INDEX = '.imsc/index.json';
 
+export const PENDING_PROJECT_RENAMED_TOAST_KEY =
+  'pending-project-renamed-toast';
+
 export default class DesktopCreatorManager extends AppSubManagerBase{
     isLoaded = false;
     protected _loadedForProjectId: string | null = null;
@@ -165,6 +168,38 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             this.recentProjects.unshift(project);
         }
         this._addProjectToRecent('projects', this.recentProjects);
+    }
+
+    async renameCurrentProject(title: string, renameFolder: boolean): Promise<void> {
+        const old_path_norm = this._loadedForProjectPath;
+        assert(old_path_norm, 'Project is not loaded');
+
+        const project_info = this.appManager.get(ProjectManager).getProjectInfo();
+        const old_local_path = project_info?.localPath ?? old_path_norm;
+
+        if (project_info?.id) {
+            await this.appManager
+                .get(DesktopProjectManager)
+                .renameCloudProject(project_info.id, title);
+        }
+
+        const res = await window.imshost.project.renameProject(
+            old_path_norm,
+            title,
+            renameFolder,
+        );
+
+        this.removeFromProjectList(old_local_path);
+
+        await this._recentProjectsStore.awaitSave();
+
+        await window.imshost.storage.setItem('last-project', res.localPath);
+        await window.imshost.storage.setItem(
+            PENDING_PROJECT_RENAMED_TOAST_KEY,
+            true,
+        );
+
+        await this.openProjectWindow(res.localPath, true);
     }
 
     async renameInProjectList(local_path: string){

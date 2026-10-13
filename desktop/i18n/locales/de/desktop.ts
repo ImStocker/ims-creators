@@ -125,6 +125,7 @@ export default {
       searchSettings: 'Suche nach Einstellungen',
       groups: {
         common: 'Allgemein',
+        project: 'Projekt',
         sync: 'Synchronisierung',
         plugins: 'Plugins',
         other: 'Andere',
@@ -161,6 +162,16 @@ export default {
         }
       },
       close: 'Schließen',
+      project: {
+        name: 'Projektname',
+        renameFolder: 'Projektordner umbenennen',
+        renameButton: 'Umbenennen',
+        renamed: 'Projekt umbenannt',
+        noProject: 'Kein Projekt geöffnet',
+        cloudNotFound: 'Cloud-Projekt nicht gefunden',
+        noPermission: 'Sie haben keine Berechtigung, dieses Projekt umzubenennen',
+        renameCloudFailed: 'Cloud-Projekt konnte nicht umbenannt werden',
+      },
       plugins: {
         searchPlugin: 'Suche nach einem Plugin',
         uninstallButton: 'Deinstallieren',
