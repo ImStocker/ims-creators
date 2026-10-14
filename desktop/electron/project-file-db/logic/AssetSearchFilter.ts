@@ -154,6 +154,30 @@ export class AssetSearchFilter {
     }
 
     private async _init() {
+        // Сам объект where может быть узлом AND/OR ({op, v}), когда такой узел
+        // вложен внутрь другого узла как элемент его списка подусловий.
+        const where_as_node = this.where as unknown as AssetPropWhereOp;
+        if (
+            where_as_node &&
+            typeof where_as_node === 'object' &&
+            typeof where_as_node.op === 'string' &&
+            Array.isArray(where_as_node.v)
+        ) {
+            if (where_as_node.op === AssetPropWhereOpKind.AND) {
+                for (const v of where_as_node.v) {
+                    this._subFiltersAnds.push(await AssetSearchFilter.Create(v, this.db));
+                }
+            } else if (where_as_node.op === AssetPropWhereOpKind.OR) {
+                const ors: AssetSearchFilter[] = [];
+                for (const v of where_as_node.v) {
+                    ors.push(await AssetSearchFilter.Create(v, this.db));
+                }
+                this._subFiltersOrs.push(ors);
+            } else {
+                this._resultNothing = true;
+            }
+            return;
+        }
         if (this.where.typeids) {
             this._filterTypeIds = typeof this.where.typeids === 'string' ? [this.where.typeids] : this.where.typeids
         }
