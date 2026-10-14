@@ -1,0 +1,105 @@
+{
+ "id": "00000000-712e-4758-a8e6-000000000042",
+ "blocks": [
+  {
+   "id": "00000000-712e-4758-a8e6-420000000001",
+   "name": "info",
+   "title": "[[t:Info]]",
+   "own": true,
+   "type": "props",
+    "props": {
+     "startat": null,
+     "endat": null,
+     "goal": null,
+     "closedat": null,
+     "archivedat": null,
+     "__props": {
+      "startat": {
+       "type": "date",
+       "index": 1,
+       "title": "[[t:SprintStartAt]]"
+      },
+      "endat": {
+       "type": "date",
+       "index": 2,
+       "title": "[[t:SprintEndAt]]"
+      },
+      "goal": {
+       "type": "text",
+       "index": 3,
+       "title": "[[t:SprintGoal]]"
+      },
+      "closedat": {
+       "type": "dateTime",
+       "index": 4,
+       "title": "[[t:SprintClosedAt]]"
+      },
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 5,
+       "title": "[[t:ArchivedAt]]"
+      }
+     }
+    },
+    "computed": {
+     "startat": null,
+     "endat": null,
+     "goal": null,
+     "closedat": null,
+     "archivedat": null,
+     "__props": {
+      "startat": {
+       "type": "date",
+       "index": 1,
+       "title": "[[t:SprintStartAt]]"
+      },
+      "endat": {
+       "type": "date",
+       "index": 2,
+       "title": "[[t:SprintEndAt]]"
+      },
+      "goal": {
+       "type": "text",
+       "index": 3,
+       "title": "[[t:SprintGoal]]"
+      },
+      "closedat": {
+       "type": "dateTime",
+       "index": 4,
+       "title": "[[t:SprintClosedAt]]"
+      },
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 5,
+       "title": "[[t:ArchivedAt]]"
+      }
+     }
+    },
+   "inherited": null,
+   "index": 1,
+   "createdAt": "2026-10-10T12:00:00.000Z",
+   "updatedAt": "2026-10-10T12:00:00.000Z"
+  }
+ ],
+ "isAbstract": true,
+ "projectId": "111112",
+ "references": [],
+ "icon": "calendar-line",
+ "index": null,
+ "name": "sprint",
+ "ownIcon": "calendar-line",
+ "ownTitle": "[[t:Sprint]]",
+ "parentIds": [],
+ "title": "[[t:Sprint]]",
+ "typeIds": [],
+ "workspaceId": "00000000-0000-0000-0000-000000000004",
+  "values": {
+   "info": {
+    "startat": null,
+    "endat": null,
+    "goal": null,
+    "closedat": null,
+    "archivedat": null
+   }
+  }
+}

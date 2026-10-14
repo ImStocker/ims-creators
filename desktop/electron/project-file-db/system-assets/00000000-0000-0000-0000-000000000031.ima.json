@@ -14,20 +14,51 @@
    "createdAt": "2024-09-08T19:30:54.625Z",
    "updatedAt": "2024-09-08T19:30:54.625Z"
   },
-  {
-   "id": "9cbf394f-34e1-4194-b62d-2367d8ab197d",
-   "name": "content",
-   "title": "[[t:Content]]",
-   "own": true,
-   "type": "checklist",
-   "props": {},
-   "computed": {},
-   "inherited": null,
-   "index": 1,
-   "createdAt": "2024-01-23T19:32:52.452Z",
-   "updatedAt": "2024-01-23T19:32:52.452Z"
-  }
- ],
+   {
+    "id": "9cbf394f-34e1-4194-b62d-2367d8ab197d",
+    "name": "content",
+    "title": "[[t:Content]]",
+    "own": true,
+    "type": "checklist",
+    "props": {},
+    "computed": {},
+    "inherited": null,
+    "index": 1,
+    "createdAt": "2024-01-23T19:32:52.452Z",
+    "updatedAt": "2024-01-23T19:32:52.452Z"
+   },
+   {
+    "id": "00000000-0000-0000-0000-310000000001",
+    "name": "info",
+    "title": "[[t:Info]]",
+    "own": true,
+    "type": "props",
+    "props": {
+     "archivedat": null,
+     "__props": {
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 1,
+       "title": "[[t:ArchivedAt]]"
+      }
+     }
+    },
+    "computed": {
+     "archivedat": null,
+     "__props": {
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 1,
+       "title": "[[t:ArchivedAt]]"
+      }
+     }
+    },
+    "inherited": null,
+    "index": 2,
+    "createdAt": "2026-10-14T12:00:00.000Z",
+    "updatedAt": "2026-10-14T12:00:00.000Z"
+   }
+  ],
  "isAbstract": true,
  "projectId": "111112",
  "references": [],
@@ -41,6 +72,9 @@
  "typeIds": [],
  "workspaceId": "00000000-0000-0000-0000-000000000004",
  "values": {
-  "content": {}
+  "content": {},
+  "info": {
+   "archivedat": null
+  }
  }
 }
