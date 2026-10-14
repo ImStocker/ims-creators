@@ -305,5 +305,6 @@ export default {
     debugFromNode: 'Ab diesem Knoten debuggen',
     setServiceName: 'Dienstnamen festlegen',
     serviceNameAlreadyExists: 'Dienstname existiert bereits',
+    setExitName: 'Ausgangsnamen festlegen',
   },
 };

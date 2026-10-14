@@ -1547,6 +1547,23 @@ export class DialogBlockController extends BlockEditorController {
     this.savePropsDelayed();
   }
 
+  async setNodeExitName(nodeId: string): Promise<void> {
+    const node = this.state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const current_subject = (node.data as NodeData | undefined)?.subject ?? '';
+    const result = await this.appManager.get(DialogManager).show(PromptDialog, {
+      header: this.appManager.$t('imsDialogEditor.setExitName'),
+      value: current_subject || undefined,
+    });
+
+    if (result === undefined || result === null) {
+      return; // cancelled
+    }
+
+    this.getNodeDataController(nodeId).setSubject(result);
+  }
+
   getNodeContextMenu(
     nodeIds: string[],
     viewport: ViewportTransform,
@@ -1556,6 +1573,22 @@ export class DialogBlockController extends BlockEditorController {
     const count = nodeIds.length;
     const suffix = count > 1 ? ` (${count})` : '';
     const items: MenuListItem[] = [];
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type === 'end') {
+        return [
+          {
+            name: 'set-exit-name',
+            title: this.appManager.$t('imsDialogEditor.setExitName'),
+            icon: 'ri-edit-line',
+            action: () => this.setNodeExitName(nodeIds[0]),
+          },
+          { type: 'separator', name: 'sep-exit-name' },
+          ...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix),
+        ];
+      }
+    }
 
     if (count === 1 && dialogPlayer) {
       const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
@@ -1619,7 +1652,16 @@ export class DialogBlockController extends BlockEditorController {
       }
     }
 
-    items.push(
+    items.push(...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix));
+    return items;
+  }
+
+  getNodeCopyCutDeleteMenu(
+    nodeIds: string[],
+    viewport: ViewportTransform,
+    suffix = '',
+  ): MenuListItem[] {
+    return [
       {
         name: 'copy',
         title: this.appManager.$t('common.dialogs.copy') + suffix,
@@ -1643,8 +1685,7 @@ export class DialogBlockController extends BlockEditorController {
           }
         },
       },
-    );
-    return items;
+    ];
   }
 
   get readonly() {
