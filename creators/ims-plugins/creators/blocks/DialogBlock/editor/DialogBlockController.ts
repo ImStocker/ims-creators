@@ -175,8 +175,15 @@ export class DialogBlockController extends BlockEditorController {
         const exit_name = parseExitPinId(edge.sourceHandle);
         if (exit_name !== null) {
           const source_node = nodes_to_copy[edge.source];
-          if (!source_node.exits) source_node.exits = {};
-          source_node.exits[exit_name] = edge.target;
+          if (!source_node.options) source_node.options = [];
+          let option = source_node.options.find(
+            (opt) => opt.values?.name === exit_name,
+          );
+          if (!option) {
+            option = { values: { name: exit_name }, next: null };
+            source_node.options.push(option);
+          }
+          option.next = edge.target;
         } else {
           const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
           if (out_m) {
@@ -268,12 +275,6 @@ export class DialogBlockController extends BlockEditorController {
                   obj[key] = id_map.get(val) ?? null;
                 } else if (key === 'next' && typeof val === 'string') {
                   obj[key] = id_map.get(val) ?? null;
-                } else if (key === 'exits' && val && typeof val === 'object') {
-                  for (const exit_name of Object.keys(val)) {
-                    if (typeof val[exit_name] === 'string') {
-                      val[exit_name] = id_map.get(val[exit_name]) ?? null;
-                    }
-                  }
                 } else if (typeof val === 'object') {
                   remap(val);
                 }
