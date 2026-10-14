@@ -16,8 +16,7 @@ import ImageTool from './tools/ImageTool';
 import type { IAppManager } from '~ims-app-base/logic/managers/IAppManager';
 import PointerTool from './tools/PointerTool';
 import type LevelEditorCanvasController from '../LevelEditorCanvasController';
-// import LockTool from './tools/LockTool';
-import UnlockAllTool from './tools/UnlockAllTool';
+import LockTool from './tools/LockTool';
 import ViewAllTool from './tools/ViewAllTool';
 import GridSettingsTool from './tools/GridSettingsTool';
 // import SelectColorPresetTool from './tools/SelectColorPresetTool';
@@ -53,8 +52,7 @@ export default function createDefaultToolManager(
     new GroupTool(appManager, raw_controller),
     new UngroupTool(appManager, raw_controller),
 
-    // new LockTool(appManager, raw_controller),
-    new UnlockAllTool(appManager, raw_controller),
+    new LockTool(appManager, raw_controller),
     new ViewAllTool(appManager, raw_controller),
     new GridSettingsTool(appManager, raw_controller),
     // new SelectColorPresetTool(appManager, raw_controller),

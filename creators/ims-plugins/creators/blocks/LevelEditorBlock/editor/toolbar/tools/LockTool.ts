@@ -1,40 +1,79 @@
 import type { ToolSection } from '../ToolManager';
 import Tool from './base/Tool';
 
+/**
+ * Тулз-переключатель блокировки. Работает с текущей селекцией:
+ * - ничего не выбрано — разблокирует все заблокированные фигуры;
+ * - в селекции есть заблокированные — разблокирует всю селекцию;
+ * - вся селекция разблокирована — блокирует её.
+ *
+ * Иконка и подсказка кнопки реактивно отражают состояние селекции.
+ */
 export default class LockTool extends Tool {
   name = 'lock';
-  icon = 'ri-lock-line';
   component = async () =>
     (await import('../LevelEditorToolbarButton.vue')).default;
   section: ToolSection = 'lock';
 
-  private _disabled: boolean = true;
+  private get _selectedIds(): string[] {
+    return this.controller.blockController.selectionManager.selectedObjectIds;
+  }
 
-  override init() {
-    this.controller.canvas.on('selection:created', () => {
-      this._disabled = false;
-    });
-    this.controller.canvas.on('selection:cleared', () => {
-      this._disabled = true;
-    });
+  private get _actionIsUnlock(): boolean {
+    const selected_ids = this._selectedIds;
+    if (!selected_ids.length) return true;
+    const shapes = this.controller.blockController.shapes;
+    return selected_ids.some((id) => shapes[id]?.locked);
+  }
+
+  override get icon(): string {
+    return this._actionIsUnlock ? 'ri-lock-unlock-line' : 'ri-lock-line';
+  }
+
+  override getTooltipName(): string {
+    return this._actionIsUnlock ? 'unlock' : 'lock';
   }
 
   override onActivate(): void {
-    const canvas_active_objects = this.controller.canvas.getActiveObjects();
-    for (const object of canvas_active_objects) {
-      object.set({
-        selectable: false,
-        evented: false,
-      });
-      this.controller.changeShape(object.id, { locked: true });
+    const selected_ids = [...this._selectedIds];
+
+    if (!selected_ids.length) {
+      this._unlockAll();
+      this.deactivate();
+      return;
     }
-    this.controller.canvas.discardActiveObject();
-    this.controller.canvas.requestRenderAll();
+
+    const target_locked = this._actionIsUnlock === false;
+    const objects = this.controller.sortedCanvasObjects.filter((object) =>
+      selected_ids.includes(object.id),
+    );
+
+    for (const object of objects) {
+      object.set({
+        selectable: !target_locked,
+        evented: !target_locked,
+      });
+      this.controller.changeShape(object.id, { locked: target_locked });
+    }
+
+    if (target_locked) {
+      this.controller.canvas.discardActiveObject();
+      this.controller.canvas.requestRenderAll();
+    }
 
     this.deactivate();
   }
 
-  override isDisabled() {
-    return this._disabled;
+  private _unlockAll(): void {
+    const locked_objects = this.controller.sortedCanvasObjects.filter(
+      (object) => !object.evented && !object.selectable,
+    );
+    for (const object of locked_objects) {
+      object.set({
+        evented: true,
+        selectable: true,
+      });
+      this.controller.changeShape(object.id, { locked: false });
+    }
   }
 }

@@ -40,7 +40,7 @@ export default defineComponent({
       return this.tool.isLoading();
     },
     tooltip() {
-      const title = this.$t('levelEditor.tools.' + this.tool.name);
+      const title = this.$t('levelEditor.tools.' + this.tool.getTooltipName());
       if (!this.tool.supportsMultiInsert) return title;
       return `${title} — ${this.$t('levelEditor.tools.holdCtrlHint')}`;
     },

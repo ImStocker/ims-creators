@@ -26,7 +26,7 @@ export default {
       sendBackward: 'Eine Ebene nach hinten',
       sendToBack: 'In den Hintergrund',
       lock: 'Sperren',
-      unlock: 'Alle entsperren',
+      unlock: 'Entsperren',
       viewAll: 'Alle anzeigen',
       colorPreset: 'Farbe',
       fillColor: 'Füllung',
