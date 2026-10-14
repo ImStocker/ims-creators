@@ -1,6 +1,8 @@
 <template>
   <div
-    v-if="inputParams.length > 0 || outputParams.length > 0"
+    v-if="
+      inputParams.length > 0 || outputParams.length > 0 || exitParams.length > 0
+    "
     class="NodeParametersGrid"
   >
     <ContextMenuZone
@@ -59,25 +61,45 @@
         <i class="ri-error-warning-fill"></i>
       </div>
     </ContextMenuZone>
+    <div
+      v-for="exit_gr of exitParams"
+      :key="'exit-' + exit_gr.name"
+      class="NodeParametersGrid-parameter NodeParametersGrid-exit type-output"
+    >
+      <span class="NodeParametersGrid-exit-caption">
+        <caption-string :value="exit_gr.name"></caption-string>
+      </span>
+      <ExecHandle
+        :id="generateExitPinId(exit_gr.name)"
+        type="source"
+        :position="Position.Right"
+      />
+    </div>
   </div>
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
-import { generateDataPinId } from '../editor/DialogEditor';
+import { Position } from '@vue-flow/core';
+import { generateDataPinId, generateExitPinId } from '../editor/DialogEditor';
 import type { DialogVariable } from '../editor/DialogBlockController';
 import type { ScriptBlockPlainPropValue } from '../logic/nodeStoring';
 import type { NodeDataController } from '../editor/NodeDataController';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+import type { CallScriptExitParam } from '../logic/nodeParams';
 import DataField from './DataField.vue';
+import ExecHandle from './ExecHandle.vue';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
 
 export default defineComponent({
   name: 'NodeParametersGrid',
   components: {
     ContextMenuZone,
     DataField,
+    ExecHandle,
+    CaptionString,
   },
   props: {
     inputParams: {
@@ -86,6 +108,10 @@ export default defineComponent({
     },
     outputParams: {
       type: Array as PropType<DialogVariable[]>,
+      default: () => [],
+    },
+    exitParams: {
+      type: Array as PropType<CallScriptExitParam[]>,
       default: () => [],
     },
     wrongParameterNames: {
@@ -120,6 +146,9 @@ export default defineComponent({
     },
   },
   computed: {
+    Position() {
+      return Position;
+    },
     parametersGrid(): {
       variable: DialogVariable;
       isOutput: boolean;
@@ -163,6 +192,7 @@ export default defineComponent({
   },
   methods: {
     generateDataPinId,
+    generateExitPinId,
     updatePins() {
       for (let i = 0; i < this.inputParams.length; i++) {
         this.nodeDataController.setPinDataType(
@@ -213,5 +243,14 @@ export default defineComponent({
 .NodeParametersGrid-badParam {
   display: inline-block;
   color: var(--color-warning);
+}
+.NodeParametersGrid-exit {
+  position: relative;
+  justify-content: flex-end;
+  text-align: right;
+}
+.NodeParametersGrid-exit-caption {
+  margin-left: 10px;
+  margin-right: 10px;
 }
 </style>

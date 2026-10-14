@@ -12,6 +12,7 @@ import {
   generateDataPinId,
   isEdgeBelongToNode,
   parseDataPinId,
+  parseExitPinId,
 } from './DialogEditor';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
@@ -171,16 +172,23 @@ export class DialogBlockController extends BlockEditorController {
       if (edge.sourceHandle === 'out') {
         nodes_to_copy[edge.source].next = edge.target;
       } else {
-        const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
-        if (out_m) {
-          const options_ind = parseInt(out_m[1]) - 1;
+        const exit_name = parseExitPinId(edge.sourceHandle);
+        if (exit_name !== null) {
           const source_node = nodes_to_copy[edge.source];
-          if (
-            edge.source &&
-            source_node.options &&
-            options_ind < source_node.options.length
-          ) {
-            source_node.options[options_ind].next = edge.target;
+          if (!source_node.exits) source_node.exits = {};
+          source_node.exits[exit_name] = edge.target;
+        } else {
+          const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
+          if (out_m) {
+            const options_ind = parseInt(out_m[1]) - 1;
+            const source_node = nodes_to_copy[edge.source];
+            if (
+              edge.source &&
+              source_node.options &&
+              options_ind < source_node.options.length
+            ) {
+              source_node.options[options_ind].next = edge.target;
+            }
           }
         }
       }
@@ -260,6 +268,12 @@ export class DialogBlockController extends BlockEditorController {
                   obj[key] = id_map.get(val) ?? null;
                 } else if (key === 'next' && typeof val === 'string') {
                   obj[key] = id_map.get(val) ?? null;
+                } else if (key === 'exits' && val && typeof val === 'object') {
+                  for (const exit_name of Object.keys(val)) {
+                    if (typeof val[exit_name] === 'string') {
+                      val[exit_name] = id_map.get(val[exit_name]) ?? null;
+                    }
+                  }
                 } else if (typeof val === 'object') {
                   remap(val);
                 }
@@ -858,6 +872,24 @@ export class DialogBlockController extends BlockEditorController {
       this.state.edges.splice(edge_index, 1);
       this.onEdgeDeleted(edgeId);
     }
+  }
+
+  pruneNodeExitEdges(nodeId: string, allowedSourceHandles: Set<string>): void {
+    let changed = false;
+    const edges = this.state.edges.filter((e) => {
+      if (e.source !== nodeId) return true;
+      const handle = e.sourceHandle ?? '';
+      if (handle === 'out' || parseExitPinId(handle) !== null) {
+        if (!allowedSourceHandles.has(handle)) {
+          changed = true;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (!changed) return;
+    this.state.edges = edges;
+    this.savePropsDelayed();
   }
 
   async deleteNodeById(nodeId: string) {

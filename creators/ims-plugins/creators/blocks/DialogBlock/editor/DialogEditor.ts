@@ -41,6 +41,17 @@ export function parseDataPinId(pin_id: string): {
   };
 }
 
+export const EXIT_PIN_PREFIX = 'out-exit-';
+
+export function generateExitPinId(exit_name: string): string {
+  return EXIT_PIN_PREFIX + exit_name;
+}
+
+export function parseExitPinId(pin_id: string): string | null {
+  if (!pin_id.startsWith(EXIT_PIN_PREFIX)) return null;
+  return pin_id.slice(EXIT_PIN_PREFIX.length);
+}
+
 export type DialogBlockState = {
   nodes: Node[];
   edges: Edge[];
@@ -211,6 +222,14 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
           }
         }
       }
+
+      if (node_plain.exits) {
+        for (const [exit_name, exit_next] of Object.entries(node_plain.exits)) {
+          if (exit_next) {
+            add_flow_edge(generateExitPinId(exit_name), exit_next);
+          }
+        }
+      }
     }
   }
 
@@ -329,16 +348,23 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
     if (edge.sourceHandle === 'out') {
       res.nodes[edge.source].next = edge.target;
     } else {
-      const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
-      if (out_m) {
-        const options_ind = parseInt(out_m[1]) - 1;
+      const exit_name = parseExitPinId(edge.sourceHandle);
+      if (exit_name !== null) {
         const source_node = res.nodes[edge.source];
-        if (
-          edge.source &&
-          source_node.options &&
-          options_ind < source_node.options.length
-        ) {
-          source_node.options[options_ind].next = edge.target;
+        if (!source_node.exits) source_node.exits = {};
+        source_node.exits[exit_name] = edge.target;
+      } else {
+        const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
+        if (out_m) {
+          const options_ind = parseInt(out_m[1]) - 1;
+          const source_node = res.nodes[edge.source];
+          if (
+            edge.source &&
+            source_node.options &&
+            options_ind < source_node.options.length
+          ) {
+            source_node.options[options_ind].next = edge.target;
+          }
         }
       }
     }

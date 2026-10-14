@@ -57,6 +57,9 @@ export type ScriptBlockPlainNode = {
     values?: ScriptBlockPlainProps;
     next: string | null;
   }[];
+  exits?: {
+    [exitName: string]: string | null;
+  };
   params?: {
     in: ScriptBlockPlainVariable[];
     out: ScriptBlockPlainVariable[];
