@@ -48,6 +48,7 @@ import {
 } from '../../electron/mcp-server/index';
 import { storageGetKey, storageSetKey } from '../../electron/storage';
 import { suggestUniqueFilename } from '../../electron/project-file-db/utils/files';
+import { isProjectOpenedInWindow } from '../../electron/project-windows';
 import fs from 'node:fs';
 import path from 'node:path';
 import { MCP_PORT_SETTING_KEY, MCP_AUTO_START_SETTING_KEY } from './ImsHostApp';
@@ -185,6 +186,10 @@ export class ImsHostProject extends ImsHostBase {
   async closeProject(projectPath: string): Promise<void> {
     await closeMcpSessionsForProject(projectPath);
     await closeProjectDb(projectPath, this._window);
+  }
+
+  isProjectOpened(projectPath: string): boolean {
+    return isProjectOpenedInWindow(projectPath, this._window);
   }
 
   private async _relocateProjectFolder(

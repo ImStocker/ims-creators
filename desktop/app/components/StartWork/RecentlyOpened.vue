@@ -6,7 +6,7 @@
       class="RecentlyOpened-Item"
     >
       <block-with-menu
-        :menu-list="getMenuList(project.localPath)"
+        :menu-list="getMenuList(project)"
       >
         <div class="RecentlyOpened-Item-Project" @click="openProject(project)">
           <div class="RecentlyOpened-Item-Project-title" :title="project.title">
@@ -26,7 +26,10 @@ import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import BlockWithMenu from '~ims-app-base/components/Common/BlockWithMenu.vue';
+import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import DesktopCreatorManager from '#logic/managers/DesktopCreatorManager';
+import ProjectRenameDialog from '../Project/ProjectRenameDialog.vue';
+import ProjectMoveDialog from '../Project/ProjectMoveDialog.vue';
 import type { LocalProjectInitInfo } from '#bridge/api/ImsHostProject';
 export default defineComponent({
   name: 'RecentlyOpened',
@@ -42,34 +45,45 @@ export default defineComponent({
     }
   },
   methods: {
-    getMenuList(path: string): MenuListItem[] {
+    getMenuList(project: LocalProjectInitInfo): MenuListItem[] {
       return [
         {
           title: process.platform === "darwin" ? this.$t('desktop.menu.revealInFinder') : this.$t('desktop.menu.revealInFileExplorer'),
           name: 'reveal',
           icon: 'ri-folder-open-line',
-          action: async () => await window.imshost.shell.showFolder(path),
+          action: async () => await window.imshost.shell.showFolder(project.localPath),
         },
         {
           title: this.$t('desktop.menu.renameProject') + '...',
           name: 'rename',
           icon: 'edit',
-          action: () => this.$getAppManager().get(DesktopCreatorManager).renameInProjectList(path),
+          action: () => this.openRenameDialog(project),
         },
-        // {
-        //   title: this.$t('desktop.menu.moveProject'),
-        //   name: 'move',
-        //   icon: 'ri-send-plane-fill',
-        //   action: () => this.$emit('move'),
-        // },
+        {
+          title: this.$t('desktop.menu.moveProject'),
+          name: 'move',
+          icon: 'ri-send-plane-fill',
+          action: () => this.openMoveDialog(project),
+        },
         {
           title: this.$t('desktop.menu.removeProject'),
           name: 'remove',
           icon: 'delete',
           danger: true,
-          action: () => this.$getAppManager().get(DesktopCreatorManager).removeFromProjectList(path),
+          action: () => this.$getAppManager().get(DesktopCreatorManager).removeFromProjectList(project.localPath),
         },
       ];
+    },
+    async openRenameDialog(project: LocalProjectInitInfo){
+      await this.$getAppManager().get(DialogManager).show(ProjectRenameDialog, {
+        localPath: project.localPath,
+        title: project.title ?? '',
+      });
+    },
+    async openMoveDialog(project: LocalProjectInitInfo){
+      await this.$getAppManager().get(DialogManager).show(ProjectMoveDialog, {
+        localPath: project.localPath,
+      });
     },
     async openProject(project: LocalProjectInitInfo){
       await this.$getAppManager().get(DesktopCreatorManager).openProjectWindow(project.localPath);

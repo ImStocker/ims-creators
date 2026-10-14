@@ -175,6 +175,8 @@ export default {
         folderName: 'Folder name',
         moveButton: 'Change',
         targetExists: 'A folder already exists at the chosen path',
+        projectOpened:
+          'This project is currently open. Close it before renaming or moving.',
       },
       plugins: {
         searchPlugin: 'Search for a plugin',

@@ -175,6 +175,8 @@ export default {
         folderName: 'Имя папки',
         moveButton: 'Изменить',
         targetExists: 'По выбранному пути уже существует папка',
+        projectOpened:
+          'Проект сейчас открыт. Закройте его перед переименованием или переносом.',
       },
       plugins: {
         searchPlugin: 'Введите название плагина',

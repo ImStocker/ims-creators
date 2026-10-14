@@ -175,6 +175,8 @@ export default {
         folderName: 'Ordnername',
         moveButton: 'Aendern',
         targetExists: 'Am gewahlten Pfad existiert bereits ein Ordner',
+        projectOpened:
+          'Dieses Projekt ist derzeit geoffnet. Schliessen Sie es vor dem Umbenennen oder Verschieben.',
       },
       plugins: {
         searchPlugin: 'Suche nach einem Plugin',
