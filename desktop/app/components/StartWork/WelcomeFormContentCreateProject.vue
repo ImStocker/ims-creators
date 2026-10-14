@@ -376,9 +376,6 @@ export default defineComponent({
   &:not(:last-child) {
     border-bottom: 1px solid var(--local-border-color);
   }
-  .ValueSwitcher{
-    width: auto;
-  }
 }
 .WelcomeFormContentCreateProject-Action-left,
 .WelcomeFormContentCreateProject-Action-title,
