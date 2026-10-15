@@ -61,226 +61,236 @@
    "title": "[[t:Info]]",
    "own": true,
    "type": "props",
-   "props": {
-    "color": null,
-    "cover": null,
-    "index": null,
-    "result": null,
-    "category": null,
-    "priority": null,
-    "timelogs": [],
-    "watchers": [],
-    "blockedby": [],
-    "actualtime": null,
-    "archivedat": null,
-    "assignedto": null,
-    "taskcolumn": null,
-    "completedat": null,
-    "estimatedsp": null,
-    "scheduledat": null,
-    "estimatedtime": null,
-    "__props": {
-     "color": {
-      "type": "string",
-      "index": 10,
-      "title": "[[t:Color]]"
-     },
-     "cover": {
-      "type": "attachment",
-      "index": 16,
-      "title": "[[t:Cover]]",
-      "params": {
-       "accept": ".jpg, .jpeg, .png"
-      }
-     },
-     "index": {
-      "index": 8,
-      "title": "[[t:Index]]"
-     },
-     "result": {
-      "index": 9,
-      "title": "[[t:Result]]"
-     },
-     "timelogs": {
-      "type": "struct",
-      "index": 1,
-      "title": "[[t:TimeLog]]",
-      "multiple": true,
-      "params": {
-       "type": {
-        "Name": "",
-        "Title": "[[t:TaskTimeLog]]",
-        "AssetId": "00000000-0000-0000-0000-000000000012"
+    "props": {
+     "color": null,
+     "cover": null,
+     "index": null,
+     "result": null,
+     "category": null,
+     "priority": null,
+     "timelogs": [],
+     "watchers": [],
+     "blockedby": [],
+     "actualtime": null,
+     "archivedat": null,
+     "assignedto": null,
+     "taskcolumn": null,
+     "completedat": null,
+     "estimatedsp": null,
+     "scheduledat": null,
+     "estimatedtime": null,
+     "sprint": null,
+     "__props": {
+      "color": {
+       "type": "string",
+       "index": 10,
+       "title": "[[t:Color]]"
+      },
+      "cover": {
+       "type": "attachment",
+       "index": 16,
+       "title": "[[t:Cover]]",
+       "params": {
+        "accept": ".jpg, .jpeg, .png"
        }
-      }
-     },
-     "watchers": {
-      "type": "projectUser",
-      "index": 14,
-      "title": "[[t:Watchers]]",
-      "multiple": true
-     },
-     "category": {
-      "index": 12,
-      "title": "[[t:Category]]"
-     },
-     "priority": {
-      "index": 15,
-      "title": "[[t:Priority]]"
-     },
-     "archivedat": {
-      "type": "buttonDateTime",
-      "index": 7,
-      "title": "[[t:ArchivedAt]]"
-     },
-     "assignedto": {
-      "type": "projectUser",
-      "index": 5,
-      "title": "[[t:AssignedTo]]"
-     },
-     "blockedby": {
-      "index": 18,
-      "title": "[[t:BlockedByTasks]]"
-     },
-     "taskcolumn": {
-      "type": "taskColumn",
-      "index": 3,
-      "title": "[[t:TaskColumn]]"
-     },
-     "actualtime": {
-      "index": 14,
-      "title": "[[t:ActualTime]]"
-     },
-     "completedat": {
-      "type": "buttonDateTime",
-      "index": 6,
-      "title": "[[t:CompletedAt]]"
-     },
-     "scheduledat": {
-      "type": "dateTime",
-      "index": 11,
-      "title": "[[t:ScheduledAt]]"
-     },
-     "estimatedsp": {
-      "index": 17,
-      "title": "[[t:EstimatedSp]]"
-     },
-     "estimatedtime": {
-      "index": 13,
-      "title": "[[t:EstimatedTime]]"
-     }
-    }
-   },
-   "computed": {
-    "color": null,
-    "cover": null,
-    "index": null,
-    "result": null,
-    "category": null,
-    "priority": null,
-    "timelogs": [],
-    "watchers": [],
-    "blockedby": [],
-    "actualtime": null,
-    "archivedat": null,
-    "assignedto": null,
-    "taskcolumn": null,
-    "completedat": null,
-    "estimatedsp": null,
-    "scheduledat": null,
-    "estimatedtime": null,
-    "__props": {
-     "color": {
-      "type": "string",
-      "index": 10,
-      "title": "[[t:Color]]"
-     },
-     "cover": {
-      "type": "attachment",
-      "index": 16,
-      "title": "[[t:Cover]]",
-      "params": {
-       "accept": ".jpg, .jpeg, .png"
-      }
-     },
-     "index": {
-      "index": 8,
-      "title": "[[t:Index]]"
-     },
-     "result": {
-      "index": 9,
-      "title": "[[t:Result]]"
-     },
-     "timelogs": {
-      "type": "struct",
-      "index": 1,
-      "title": "[[t:TimeLog]]",
-      "multiple": true,
-      "params": {
-       "type": {
-        "Name": "",
-        "Title": "[[t:TaskTimeLog]]",
-        "AssetId": "00000000-0000-0000-0000-000000000012"
+      },
+      "index": {
+       "index": 8,
+       "title": "[[t:Index]]"
+      },
+      "result": {
+       "index": 9,
+       "title": "[[t:Result]]"
+      },
+      "timelogs": {
+       "type": "struct",
+       "index": 1,
+       "title": "[[t:TimeLog]]",
+       "multiple": true,
+       "params": {
+        "type": {
+         "Name": "",
+         "Title": "[[t:TaskTimeLog]]",
+         "AssetId": "00000000-0000-0000-0000-000000000012"
+        }
        }
+      },
+      "watchers": {
+       "type": "projectUser",
+       "index": 14,
+       "title": "[[t:Watchers]]",
+       "multiple": true
+      },
+      "category": {
+       "index": 12,
+       "title": "[[t:Category]]"
+      },
+      "priority": {
+       "index": 15,
+       "title": "[[t:Priority]]"
+      },
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 7,
+       "title": "[[t:ArchivedAt]]"
+      },
+      "assignedto": {
+       "type": "projectUser",
+       "index": 5,
+       "title": "[[t:AssignedTo]]"
+      },
+      "blockedby": {
+       "index": 18,
+       "title": "[[t:BlockedByTasks]]"
+      },
+      "sprint": {
+       "index": 19,
+       "title": "[[t:Sprint]]"
+      },
+      "taskcolumn": {
+       "type": "taskColumn",
+       "index": 3,
+       "title": "[[t:TaskColumn]]"
+      },
+      "actualtime": {
+       "index": 14,
+       "title": "[[t:ActualTime]]"
+      },
+      "completedat": {
+       "type": "buttonDateTime",
+       "index": 6,
+       "title": "[[t:CompletedAt]]"
+      },
+      "scheduledat": {
+       "type": "dateTime",
+       "index": 11,
+       "title": "[[t:ScheduledAt]]"
+      },
+      "estimatedsp": {
+       "index": 17,
+       "title": "[[t:EstimatedSp]]"
+      },
+      "estimatedtime": {
+       "index": 13,
+       "title": "[[t:EstimatedTime]]"
       }
-     },
-     "watchers": {
-      "type": "projectUser",
-      "index": 14,
-      "title": "[[t:Watchers]]",
-      "multiple": true
-     },
-     "category": {
-      "index": 12,
-      "title": "[[t:Category]]"
-     },
-     "priority": {
-      "index": 15,
-      "title": "[[t:Priority]]"
-     },
-     "archivedat": {
-      "type": "buttonDateTime",
-      "index": 7,
-      "title": "[[t:ArchivedAt]]"
-     },
-     "assignedto": {
-      "type": "projectUser",
-      "index": 5,
-      "title": "[[t:AssignedTo]]"
-     },
-     "blockedby": {
-      "index": 18,
-      "title": "[[t:BlockedByTasks]]"
-     },
-     "taskcolumn": {
-      "type": "taskColumn",
-      "index": 3,
-      "title": "[[t:TaskColumn]]"
-     },
-     "actualtime": {
-      "index": 14,
-      "title": "[[t:ActualTime]]"
-     },
-     "completedat": {
-      "type": "buttonDateTime",
-      "index": 6,
-      "title": "[[t:CompletedAt]]"
-     },
-     "scheduledat": {
-      "type": "dateTime",
-      "index": 11,
-      "title": "[[t:ScheduledAt]]"
-     },
-     "estimatedsp": {
-      "index": 17,
-      "title": "[[t:EstimatedSp]]"
-     },
-     "estimatedtime": {
-      "index": 13,
-      "title": "[[t:EstimatedTime]]"
      }
-    }
-   },
+    },
+    "computed": {
+     "color": null,
+     "cover": null,
+     "index": null,
+     "result": null,
+     "category": null,
+     "priority": null,
+     "timelogs": [],
+     "watchers": [],
+     "blockedby": [],
+     "actualtime": null,
+     "archivedat": null,
+     "assignedto": null,
+     "taskcolumn": null,
+     "completedat": null,
+     "estimatedsp": null,
+     "scheduledat": null,
+     "estimatedtime": null,
+     "sprint": null,
+     "__props": {
+      "color": {
+       "type": "string",
+       "index": 10,
+       "title": "[[t:Color]]"
+      },
+      "cover": {
+       "type": "attachment",
+       "index": 16,
+       "title": "[[t:Cover]]",
+       "params": {
+        "accept": ".jpg, .jpeg, .png"
+       }
+      },
+      "index": {
+       "index": 8,
+       "title": "[[t:Index]]"
+      },
+      "result": {
+       "index": 9,
+       "title": "[[t:Result]]"
+      },
+      "timelogs": {
+       "type": "struct",
+       "index": 1,
+       "title": "[[t:TimeLog]]",
+       "multiple": true,
+       "params": {
+        "type": {
+         "Name": "",
+         "Title": "[[t:TaskTimeLog]]",
+         "AssetId": "00000000-0000-0000-0000-000000000012"
+        }
+       }
+      },
+      "watchers": {
+       "type": "projectUser",
+       "index": 14,
+       "title": "[[t:Watchers]]",
+       "multiple": true
+      },
+      "category": {
+       "index": 12,
+       "title": "[[t:Category]]"
+      },
+      "priority": {
+       "index": 15,
+       "title": "[[t:Priority]]"
+      },
+      "archivedat": {
+       "type": "buttonDateTime",
+       "index": 7,
+       "title": "[[t:ArchivedAt]]"
+      },
+      "assignedto": {
+       "type": "projectUser",
+       "index": 5,
+       "title": "[[t:AssignedTo]]"
+      },
+      "blockedby": {
+       "index": 18,
+       "title": "[[t:BlockedByTasks]]"
+      },
+      "sprint": {
+       "index": 19,
+       "title": "[[t:Sprint]]"
+      },
+      "taskcolumn": {
+       "type": "taskColumn",
+       "index": 3,
+       "title": "[[t:TaskColumn]]"
+      },
+      "actualtime": {
+       "index": 14,
+       "title": "[[t:ActualTime]]"
+      },
+      "completedat": {
+       "type": "buttonDateTime",
+       "index": 6,
+       "title": "[[t:CompletedAt]]"
+      },
+      "scheduledat": {
+       "type": "dateTime",
+       "index": 11,
+       "title": "[[t:ScheduledAt]]"
+      },
+      "estimatedsp": {
+       "index": 17,
+       "title": "[[t:EstimatedSp]]"
+      },
+      "estimatedtime": {
+       "index": 13,
+       "title": "[[t:EstimatedTime]]"
+      }
+     }
+    },
    "inherited": null,
    "index": 2,
    "createdAt": "2023-10-03T05:45:39.528Z",
@@ -346,7 +356,8 @@
    "completedat": null,
    "estimatedsp": null,
    "scheduledat": null,
-   "estimatedtime": null
+   "estimatedtime": null,
+   "sprint": null
   },
   "description": {},
   "comments": {}
