@@ -18,7 +18,10 @@ export default class DesktopTaskManager extends TaskManager {
     override setTaskIsCompleted(id: string, val: boolean): Promise<void> {
         throw new Error("Method not implemented.");
     }
-    override setTasksAreCompleted(ids: string[], val: boolean): Promise<void> {
+    override setTasksAreCompleted(
+        filter: { ids: string[] }, 
+        val: boolean
+    ): Promise<void> {
         throw new Error("Method not implemented.");
     }
     override showCreateTaskDialog(options?: AssetSetDTO, post_created_hook?: (task: TaskEntity) => Promise<void>): Promise<TaskEntity | undefined> {
@@ -27,19 +30,10 @@ export default class DesktopTaskManager extends TaskManager {
     override openTaskPreviewDialog(taskId: string, options: { deleteRef?: (silent?: boolean) => Promise<boolean> | boolean; }): Promise<void> {
         throw new Error("Method not implemented.");
     }
-    override assignTasksTo(where: TaskQueryDTOWhere, account: AssetPropValueAccount | null): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
     override async getBacklogWorkspaceId(): Promise<string | null> {
         return null;
     }
-    override moveTasksToArchive(where: TaskQueryDTOWhere, setArchived?: boolean): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
     override async getTaskBoardsWorkspaceId(): Promise<string | null> {
-        return null;
-    }
-    override async getFirstColumnOfBoard(board_id: string): Promise<TaskBoardColumn | null> {
         return null;
     }
 }
