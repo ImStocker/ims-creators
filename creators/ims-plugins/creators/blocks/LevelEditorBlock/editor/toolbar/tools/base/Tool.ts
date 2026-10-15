@@ -59,6 +59,14 @@ export default abstract class Tool {
   }
 
   /**
+   * Имя ключа в levelEditor.tools.* для подсказки кнопки. Позволяет
+   * тулзам-переключателям менять текст подсказки реактивно.
+   */
+  getTooltipName(): string {
+    return this.name;
+  }
+
+  /**
    * Оставить инструмент активным после вставки: поддерживается только
    * инструментами с supportsMultiInsert и только при удержании Ctrl/Cmd.
    */

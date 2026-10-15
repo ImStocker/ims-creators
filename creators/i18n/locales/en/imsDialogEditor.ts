@@ -307,5 +307,6 @@ export default {
     debugFromNode: 'Debug from this node',
     setServiceName: 'Set service name',
     serviceNameAlreadyExists: 'Service name already exists',
+    setExitName: 'Set exit name',
   },
 };

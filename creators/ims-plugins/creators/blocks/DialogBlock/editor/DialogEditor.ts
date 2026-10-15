@@ -41,6 +41,17 @@ export function parseDataPinId(pin_id: string): {
   };
 }
 
+export const EXIT_PIN_PREFIX = 'out-exit-';
+
+export function generateExitPinId(exit_name: string): string {
+  return EXIT_PIN_PREFIX + exit_name;
+}
+
+export function parseExitPinId(pin_id: string): string | null {
+  if (!pin_id.startsWith(EXIT_PIN_PREFIX)) return null;
+  return pin_id.slice(EXIT_PIN_PREFIX.length);
+}
+
 export type DialogBlockState = {
   nodes: Node[];
   edges: Edge[];
@@ -181,33 +192,47 @@ export function extractDialogBlockData(props: AssetProps): DialogBlockState {
         add_flow_edge('out', node_plain.next);
       }
       if (Array.isArray(node_plain.options)) {
-        for (let opt_ind = 0; opt_ind < node_plain.options.length; opt_ind++) {
-          const plain_option = node_plain.options[opt_ind];
-          const option: NodeDataOption = {
-            values: {},
-            next: null,
-          };
-          if (plain_option.values) {
-            for (const [key, val] of Object.entries(plain_option.values)) {
-              option.values[key] = val;
-              if (val && (val as ScriptBlockPlainPropValueBind).get) {
-                add_data_bind_edge(
-                  key,
-                  val as ScriptBlockPlainPropValueBind,
-                  opt_ind,
-                );
-              }
+        if (node_plain.type === 'callScript') {
+          for (const plain_option of node_plain.options) {
+            const exit_name = plain_option.values?.name;
+            if (typeof exit_name !== 'string') continue;
+            if (plain_option.next) {
+              add_flow_edge(generateExitPinId(exit_name), plain_option.next);
             }
           }
+        } else {
+          for (
+            let opt_ind = 0;
+            opt_ind < node_plain.options.length;
+            opt_ind++
+          ) {
+            const plain_option = node_plain.options[opt_ind];
+            const option: NodeDataOption = {
+              values: {},
+              next: null,
+            };
+            if (plain_option.values) {
+              for (const [key, val] of Object.entries(plain_option.values)) {
+                option.values[key] = val;
+                if (val && (val as ScriptBlockPlainPropValueBind).get) {
+                  add_data_bind_edge(
+                    key,
+                    val as ScriptBlockPlainPropValueBind,
+                    opt_ind,
+                  );
+                }
+              }
+            }
 
-          node_data.options.push(option);
-          if ((plain_option as any).value) {
-            // Old format 11.04.2025
-            option.values.text = (node_plain.options[opt_ind] as any).value;
-          }
-          const opt_next = node_plain.options[opt_ind].next;
-          if (opt_next) {
-            add_flow_edge('out-' + (opt_ind + 1), opt_next);
+            node_data.options.push(option);
+            if ((plain_option as any).value) {
+              // Old format 11.04.2025
+              option.values.text = (node_plain.options[opt_ind] as any).value;
+            }
+            const opt_next = node_plain.options[opt_ind].next;
+            if (opt_next) {
+              add_flow_edge('out-' + (opt_ind + 1), opt_next);
+            }
           }
         }
       }
@@ -292,7 +317,7 @@ export function convertNodeToPlainNode(node: Node): ScriptBlockPlainNode {
     if ([...Object.keys(node_data.values)].length > 0) {
       node_plain.values = node_data.values;
     }
-    if (node_data.options.length > 0) {
+    if (node_data.options.length > 0 && node.type !== 'callScript') {
       node_plain.options = node_data.options;
     }
     if (node_data.params.in.length > 0 || node_data.params.out.length > 0) {
@@ -329,16 +354,30 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
     if (edge.sourceHandle === 'out') {
       res.nodes[edge.source].next = edge.target;
     } else {
-      const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
-      if (out_m) {
-        const options_ind = parseInt(out_m[1]) - 1;
+      const exit_name = parseExitPinId(edge.sourceHandle);
+      if (exit_name !== null) {
         const source_node = res.nodes[edge.source];
-        if (
-          edge.source &&
-          source_node.options &&
-          options_ind < source_node.options.length
-        ) {
-          source_node.options[options_ind].next = edge.target;
+        if (!source_node.options) source_node.options = [];
+        let option = source_node.options.find(
+          (opt) => opt.values?.name === exit_name,
+        );
+        if (!option) {
+          option = { values: { name: exit_name }, next: null };
+          source_node.options.push(option);
+        }
+        option.next = edge.target;
+      } else {
+        const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
+        if (out_m) {
+          const options_ind = parseInt(out_m[1]) - 1;
+          const source_node = res.nodes[edge.source];
+          if (
+            edge.source &&
+            source_node.options &&
+            options_ind < source_node.options.length
+          ) {
+            source_node.options[options_ind].next = edge.target;
+          }
         }
       }
     }

@@ -24,7 +24,12 @@
             >
             </select-asset-combo-box>
           </div>
-          <ExecHandle id="out" type="source" :position="Position.Right" />
+          <ExecHandle
+            v-if="showOutPin"
+            id="out"
+            type="source"
+            :position="Position.Right"
+          />
         </div>
         <node-parameters-grid
           :dialog-player="dialogPlayer"
@@ -33,6 +38,7 @@
           :play-wait-user="false"
           :output-params="outputParameters"
           :input-params="inputParameters"
+          :exit-params="exitParameters"
           :playing-node-data="playingNodeData"
         ></node-parameters-grid>
       </div>
@@ -58,14 +64,19 @@ import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import type { AssetPropWhere } from '~ims-app-base/logic/types/PropsWhere';
 import { SCRIPT_ASSET_ID } from '~ims-app-base/logic/constants';
 import type { AssetForSelection } from '~ims-app-base/logic/types/AssetsType';
-import { generateDataPinId } from '../editor/DialogEditor';
+import { generateDataPinId, generateExitPinId } from '../editor/DialogEditor';
 import {
   castAssetPropValueToAsset,
   type AssetPropValueAsset,
 } from '~ims-app-base/logic/types/Props';
 
 import { loadCallScriptController } from '../logic/callScriptLoader';
-import { getCallScriptNodeParams } from '../logic/nodeParams';
+import {
+  getCallScriptNodeParams,
+  getCallScriptNodeExits,
+  hasUnnamedExits,
+  type CallScriptExitParam,
+} from '../logic/nodeParams';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import DialogBaseNode from '../parts/DialogBaseNode.vue';
@@ -133,6 +144,14 @@ export default defineComponent({
     outputParameters(): DialogVariable[] {
       return this.callScriptNodeParams.outputParameters;
     },
+    exitParameters(): CallScriptExitParam[] {
+      return getCallScriptNodeExits(this.calledScriptController);
+    },
+    showOutPin(): boolean {
+      const exits = this.exitParameters;
+      if (exits.length === 0) return true;
+      return hasUnnamedExits(this.calledScriptController);
+    },
     callScriptForSelection() {
       if (!this.callScript) return null;
       return {
@@ -177,9 +196,27 @@ export default defineComponent({
       },
       immediate: true,
     },
+    calledScriptController() {
+      this.syncExitEdges();
+    },
   },
   methods: {
     generateDataPinId,
+    syncExitEdges() {
+      if (this.loading) return;
+      // Cannot resolve exits yet (script is set but failed to load) - keep edges
+      if (this.callScript && !this.calledScriptController) return;
+      const allowed = new Set<string>();
+      if (this.calledScriptController) {
+        for (const exit of this.exitParameters) {
+          allowed.add(generateExitPinId(exit.name));
+        }
+      }
+      if (this.showOutPin) {
+        allowed.add('out');
+      }
+      this.dialogController.pruneNodeExitEdges(this.id, allowed);
+    },
     setParamValue(
       param: DialogVariable,
       is_out: boolean,

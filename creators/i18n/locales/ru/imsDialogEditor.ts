@@ -306,5 +306,6 @@ export default {
     debugFromNode: 'Отладить этого узла',
     setServiceName: 'Задать служебное имя',
     serviceNameAlreadyExists: 'Служебное имя уже существует',
+    setExitName: 'Задать имя выхода',
   },
 };

@@ -7,12 +7,56 @@ import type {
   DialogVariable,
   DialogBlockController,
 } from '../editor/DialogBlockController';
+import type { NodeData } from '../editor/NodeDataController';
 
 export type ActionNodeParamsResult = {
   inputParameters: DialogVariable[];
   outputParameters: DialogVariable[];
   ownParamNames: Set<string>;
 };
+
+export type CallScriptExitParam = {
+  name: string;
+};
+
+function getEndNodeExitName(node: { data?: unknown }): string {
+  const subject = (node.data as NodeData | undefined)?.subject ?? '';
+  return String(subject).trim();
+}
+
+export function getCallScriptNodeExits(
+  calledScriptController: DialogBlockController | null,
+): CallScriptExitParam[] {
+  if (!calledScriptController) return [];
+
+  const end_nodes = calledScriptController.state.nodes
+    .filter((node) => node.type === 'end')
+    .sort((a, b) => {
+      const a_index = (a.data as NodeData | undefined)?.index ?? 0;
+      const b_index = (b.data as NodeData | undefined)?.index ?? 0;
+      return a_index - b_index;
+    });
+
+  const res: CallScriptExitParam[] = [];
+  const names = new Set<string>();
+  for (const node of end_nodes) {
+    const name = getEndNodeExitName(node);
+    if (!name || names.has(name)) continue;
+    names.add(name);
+    res.push({ name });
+  }
+  return res;
+}
+
+export function hasUnnamedExits(
+  calledScriptController: DialogBlockController | null,
+): boolean {
+  if (!calledScriptController) return false;
+  return calledScriptController.state.nodes.some((node) => {
+    if (node.type !== 'end') return false;
+    return !getEndNodeExitName(node);
+  });
+}
 
 export function getActionNodeParams(
   params: { in: ScriptBlockPlainVariable[]; out: ScriptBlockPlainVariable[] },

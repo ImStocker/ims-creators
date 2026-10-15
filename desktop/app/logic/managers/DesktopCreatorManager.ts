@@ -1,24 +1,22 @@
-import PromptDialog from "~ims-app-base/components/Common/PromptDialog.vue";
 import AuthManager from "~ims-app-base/logic/managers/AuthManager";
-import DialogManager from "~ims-app-base/logic/managers/DialogManager";
 import { AppSubManagerBase, type IAppManager } from "~ims-app-base/logic/managers/IAppManager";
 import { ProjectRolePulseRights, type AppLoadResult, type ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import type { LocalProjectInitInfo } from "#bridge/api/ImsHostProject";
 import DesktopProjectManager from "./DesktopProjectManager";
-import * as node_path from 'path';
 import SyncStoreCore from "~ims-app-base/logic/types/SyncStoreCore";
 import ApiManager from "~ims-app-base/logic/managers/ApiManager";
 import CreatorAssetManager from "~ims-app-base/logic/managers/CreatorAssetManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
-import type { Workspace } from "~ims-app-base/logic/types/Workspaces";
+import type { Workspace } from '~ims-app-base/logic/types/Workspaces';
 import { DesktopCreatorAssetManager } from "./DesktopCreatorAssetManager";
 import DesktopUiManager from "./DesktopUiManager";
 import UiManager from "~ims-app-base/logic/managers/UiManager";
 import DesktopSyncManager from "./DesktopSyncManager";
 
-const PROJECT_META_INDEX = '.imsc/index.json';
+export const PENDING_PROJECT_RENAMED_TOAST_KEY =
+  'pending-project-renamed-toast';
 
 export default class DesktopCreatorManager extends AppSubManagerBase{
     isLoaded = false;
@@ -167,26 +165,118 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         this._addProjectToRecent('projects', this.recentProjects);
     }
 
-    async renameInProjectList(local_path: string){
-        const changing_project = this.recentProjects.find(p => p.localPath === local_path);
-        if(!changing_project) return;
+    async renameCurrentProject(title: string, renameFolder: boolean): Promise<void> {
+        const old_path_norm = this._loadedForProjectPath;
+        assert(old_path_norm, 'Project is not loaded');
 
-        const new_title = await this.appManager
-            .get(DialogManager)
-            .show(PromptDialog, {
-                header: this.appManager.$t('desktop.menu.renameProject'),
-                message: this.appManager.$t('desktop.welcome.projectName'),
-                yesCaption: this.appManager.$t('common.dialogs.rename'),
-                value: changing_project.title ?? '',
-        });
-        if (new_title) {
-            this.addToProjectListIfNotAdded({...changing_project, title: new_title});
-            await window.imshost.fs.writeFile(node_path.join(local_path, PROJECT_META_INDEX), Buffer.from(JSON.stringify({
-                id: changing_project.id,
-                title: new_title,
-                inited: null
-            }), 'utf-8'))  
+        const project_info = this.appManager.get(ProjectManager).getProjectInfo();
+        const old_local_path = project_info?.localPath ?? old_path_norm;
+
+        if (project_info?.id) {
+            await this.appManager
+                .get(DesktopProjectManager)
+                .renameCloudProject(project_info.id, title);
         }
+
+        const res = await window.imshost.project.renameProject(
+            old_path_norm,
+            title,
+            renameFolder,
+        );
+
+        this.removeFromProjectList(old_local_path);
+
+        await this._recentProjectsStore.awaitSave();
+
+        await window.imshost.storage.setItem('last-project', res.localPath);
+        await window.imshost.storage.setItem(
+            PENDING_PROJECT_RENAMED_TOAST_KEY,
+            true,
+        );
+
+        await this.openProjectWindow(res.localPath, true);
+    }
+
+    async moveCurrentProject(targetPath: string): Promise<void> {
+        const old_path_norm = this._loadedForProjectPath;
+        assert(old_path_norm, 'Project is not loaded');
+
+        const project_info = this.appManager.get(ProjectManager).getProjectInfo();
+        const old_local_path = project_info?.localPath ?? old_path_norm;
+
+        const res = await window.imshost.project.moveProject(
+            old_path_norm,
+            targetPath,
+        );
+
+        this.removeFromProjectList(old_local_path);
+        this.addToProjectListIfNotAdded({
+            id: res.id,
+            title: res.title,
+            localPath: res.localPath,
+        });
+
+        await this._recentProjectsStore.awaitSave();
+
+        await window.imshost.storage.setItem('last-project', res.localPath);
+
+        await this.openProjectWindow(res.localPath, true);
+    }
+
+    async renameProjectInList(
+        local_path: string,
+        title: string,
+        renameFolder: boolean,
+    ): Promise<void> {
+        if (await window.imshost.project.isProjectOpened(local_path)) {
+            throw new Error(
+                this.appManager.$t('desktop.settings.project.projectOpened'),
+            );
+        }
+
+        const res = await window.imshost.project.renameProject(
+            local_path,
+            title,
+            renameFolder,
+        );
+
+        await window.imshost.project.closeProject(res.localPath);
+
+        this.removeFromProjectList(local_path);
+        this.addToProjectListIfNotAdded({
+            id: res.id,
+            title: res.title,
+            localPath: res.localPath,
+        });
+
+        await this._recentProjectsStore.awaitSave();
+    }
+
+    async moveProjectInList(
+        local_path: string,
+        targetPath: string,
+    ): Promise<void> {
+        if (await window.imshost.project.isProjectOpened(local_path)) {
+            throw new Error(
+                this.appManager.$t('desktop.settings.project.projectOpened'),
+            );
+        }
+
+        const res = await window.imshost.project.moveProject(
+            local_path,
+            targetPath,
+        );
+
+        await window.imshost.project.closeProject(res.localPath);
+
+        this.removeFromProjectList(local_path);
+        this.addToProjectListIfNotAdded({
+            id: res.id,
+            title: res.title,
+            localPath: res.localPath,
+        });
+
+        await this._recentProjectsStore.awaitSave();
     }
 
     removeFromProjectList(path: string){

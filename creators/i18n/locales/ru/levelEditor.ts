@@ -26,7 +26,7 @@ export default {
       sendBackward: 'Задвинуть назад',
       sendToBack: 'Поместить на задний план',
       lock: 'Заблокировать',
-      unlock: 'Разблокировать все',
+      unlock: 'Разблокировать',
       viewAll: 'Показать все',
       colorPreset: 'Цвет',
       fillColor: 'Заливка',

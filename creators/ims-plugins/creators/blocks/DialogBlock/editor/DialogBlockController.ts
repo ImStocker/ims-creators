@@ -12,6 +12,7 @@ import {
   generateDataPinId,
   isEdgeBelongToNode,
   parseDataPinId,
+  parseExitPinId,
 } from './DialogEditor';
 import type { AssetChanger } from '~ims-app-base/logic/types/AssetChanger';
 import type { ResolvedAssetBlock } from '~ims-app-base/logic/utils/assets';
@@ -171,16 +172,30 @@ export class DialogBlockController extends BlockEditorController {
       if (edge.sourceHandle === 'out') {
         nodes_to_copy[edge.source].next = edge.target;
       } else {
-        const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
-        if (out_m) {
-          const options_ind = parseInt(out_m[1]) - 1;
+        const exit_name = parseExitPinId(edge.sourceHandle);
+        if (exit_name !== null) {
           const source_node = nodes_to_copy[edge.source];
-          if (
-            edge.source &&
-            source_node.options &&
-            options_ind < source_node.options.length
-          ) {
-            source_node.options[options_ind].next = edge.target;
+          if (!source_node.options) source_node.options = [];
+          let option = source_node.options.find(
+            (opt) => opt.values?.name === exit_name,
+          );
+          if (!option) {
+            option = { values: { name: exit_name }, next: null };
+            source_node.options.push(option);
+          }
+          option.next = edge.target;
+        } else {
+          const out_m = edge.sourceHandle.match(/^out-(\d+)$/);
+          if (out_m) {
+            const options_ind = parseInt(out_m[1]) - 1;
+            const source_node = nodes_to_copy[edge.source];
+            if (
+              edge.source &&
+              source_node.options &&
+              options_ind < source_node.options.length
+            ) {
+              source_node.options[options_ind].next = edge.target;
+            }
           }
         }
       }
@@ -858,6 +873,24 @@ export class DialogBlockController extends BlockEditorController {
       this.state.edges.splice(edge_index, 1);
       this.onEdgeDeleted(edgeId);
     }
+  }
+
+  pruneNodeExitEdges(nodeId: string, allowedSourceHandles: Set<string>): void {
+    let changed = false;
+    const edges = this.state.edges.filter((e) => {
+      if (e.source !== nodeId) return true;
+      const handle = e.sourceHandle ?? '';
+      if (handle === 'out' || parseExitPinId(handle) !== null) {
+        if (!allowedSourceHandles.has(handle)) {
+          changed = true;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (!changed) return;
+    this.state.edges = edges;
+    this.savePropsDelayed();
   }
 
   async deleteNodeById(nodeId: string) {
@@ -1547,6 +1580,23 @@ export class DialogBlockController extends BlockEditorController {
     this.savePropsDelayed();
   }
 
+  async setNodeExitName(nodeId: string): Promise<void> {
+    const node = this.state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const current_subject = (node.data as NodeData | undefined)?.subject ?? '';
+    const result = await this.appManager.get(DialogManager).show(PromptDialog, {
+      header: this.appManager.$t('imsDialogEditor.setExitName'),
+      value: current_subject || undefined,
+    });
+
+    if (result === undefined || result === null) {
+      return; // cancelled
+    }
+
+    this.getNodeDataController(nodeId).setSubject(result);
+  }
+
   getNodeContextMenu(
     nodeIds: string[],
     viewport: ViewportTransform,
@@ -1556,6 +1606,22 @@ export class DialogBlockController extends BlockEditorController {
     const count = nodeIds.length;
     const suffix = count > 1 ? ` (${count})` : '';
     const items: MenuListItem[] = [];
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type === 'end') {
+        return [
+          {
+            name: 'set-exit-name',
+            title: this.appManager.$t('imsDialogEditor.setExitName'),
+            icon: 'ri-edit-line',
+            action: () => this.setNodeExitName(nodeIds[0]),
+          },
+          { type: 'separator', name: 'sep-exit-name' },
+          ...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix),
+        ];
+      }
+    }
 
     if (count === 1 && dialogPlayer) {
       const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
@@ -1619,7 +1685,16 @@ export class DialogBlockController extends BlockEditorController {
       }
     }
 
-    items.push(
+    items.push(...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix));
+    return items;
+  }
+
+  getNodeCopyCutDeleteMenu(
+    nodeIds: string[],
+    viewport: ViewportTransform,
+    suffix = '',
+  ): MenuListItem[] {
+    return [
       {
         name: 'copy',
         title: this.appManager.$t('common.dialogs.copy') + suffix,
@@ -1643,8 +1718,7 @@ export class DialogBlockController extends BlockEditorController {
           }
         },
       },
-    );
-    return items;
+    ];
   }
 
   get readonly() {

@@ -47,6 +47,7 @@ import FormBuilder from '~ims-app-base/components/Form/FormBuilder.vue';
 import DialogContent from '~ims-app-base/components/Dialog/DialogContent.vue';
 import DesktopSettingsDialog_common from './DesktopSettingsDialog_common.vue';
 import DesktopSettingsDialog_other from './DesktopSettingsDialog_other.vue';
+import DesktopSettingsDialog_project from './DesktopSettingsDialog_project.vue';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 import DesktopSettingsDialog_plugins from './DesktopSettingsDialog_plugins.vue';
 import DesktopSettingsDialog_mcp from './DesktopSettingsDialog_mcp.vue';
@@ -65,6 +66,7 @@ export default defineComponent({
     DialogContent,
     FormBuilder,
     DesktopSettingsDialog_common,
+    DesktopSettingsDialog_project,
     FormSearch,
     DesktopSettingsDialog_sync,
     DesktopSettingsDialog_mcp
@@ -84,6 +86,7 @@ export default defineComponent({
         activeTab: 'common',
         search: null,
         emptyTabs: {
+          project: false,
           common: false,
           sync: false,
           other: false,
@@ -106,6 +109,10 @@ export default defineComponent({
     },
     settingsGroupTabs(){
       return [
+        {
+            name: 'project',
+            component: DesktopSettingsDialog_project
+        },
         {
             name: 'common',
             component: DesktopSettingsDialog_common

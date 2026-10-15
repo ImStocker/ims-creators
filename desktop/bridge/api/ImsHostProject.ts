@@ -46,7 +46,11 @@ import {
   startMcpServer,
   closeMcpSessionsForProject,
 } from '../../electron/mcp-server/index';
-import { storageGetKey } from '../../electron/storage';
+import { storageGetKey, storageSetKey } from '../../electron/storage';
+import { suggestUniqueFilename } from '../../electron/project-file-db/utils/files';
+import { isProjectOpenedInWindow } from '../../electron/project-windows';
+import fs from 'node:fs';
+import path from 'node:path';
 import { MCP_PORT_SETTING_KEY, MCP_AUTO_START_SETTING_KEY } from './ImsHostApp';
 import log from 'electron-log/main';
 
@@ -55,6 +59,103 @@ export type LocalProjectInitInfo = {
   title: string;
   localPath: string;
 };
+
+async function migrateProjectStorage(oldPath: string, newPath: string) {
+  const settings = (await storageGetKey<Record<string, unknown>>('settings')) ?? {};
+  if (Object.prototype.hasOwnProperty.call(settings, oldPath)) {
+    settings[newPath] = settings[oldPath];
+    delete settings[oldPath];
+    await storageSetKey('settings', settings);
+  }
+}
+
+const WINDOWS_RENAME_RETRYABLE_CODES = new Set([
+  'EPERM',
+  'EBUSY',
+  'ENOTEMPTY',
+  'EACCES',
+]);
+
+function isRetryableRenameError(err: any): boolean {
+  return (
+    !!err &&
+    typeof err.code === 'string' &&
+    WINDOWS_RENAME_RETRYABLE_CODES.has(err.code)
+  );
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function removeDirWithRetries(
+  dirPath: string,
+  attempts = 6,
+  delayMs = 400,
+): Promise<void> {
+  let lastError: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await fs.promises.rm(dirPath, { recursive: true, force: true });
+      return;
+    } catch (err) {
+      lastError = err;
+      await waitMs(delayMs);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function renameProjectFolderWithFallback(
+  oldPath: string,
+  targetPath: string,
+): Promise<void> {
+  // Give transient holders (watcher teardown, antivirus, indexer) a moment to release
+  await waitMs(200);
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await fs.promises.rename(oldPath, targetPath);
+      return;
+    } catch (err: any) {
+      lastError = err;
+      // Cross-device move cannot be done with rename - fall back to copy+delete
+      if (err && err.code === 'EXDEV') {
+        break;
+      }
+      if (!isRetryableRenameError(err)) {
+        if (fs.existsSync(targetPath)) return;
+        throw err;
+      }
+      await waitMs(300 * (attempt + 1));
+    }
+  }
+
+  log.warn(
+    `Rename: rename of "${oldPath}" -> "${targetPath}" failed (locked handle or cross-device), falling back to copy`,
+  );
+  try {
+    await fs.promises.cp(oldPath, targetPath, {
+      recursive: true,
+      force: true,
+      errorOnExist: false,
+    });
+  } catch (copyErr) {
+    log.error('Rename: copy fallback failed', copyErr);
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError));
+  }
+  try {
+    await removeDirWithRetries(oldPath);
+  } catch (rmErr) {
+    log.warn(
+      `Rename: legacy folder remains in place (clean up manually): ${oldPath}`,
+      rmErr,
+    );
+  }
+}
 
 export class ImsHostProject extends ImsHostBase {
   async initProject(
@@ -85,6 +186,92 @@ export class ImsHostProject extends ImsHostBase {
   async closeProject(projectPath: string): Promise<void> {
     await closeMcpSessionsForProject(projectPath);
     await closeProjectDb(projectPath, this._window);
+  }
+
+  isProjectOpened(projectPath: string): boolean {
+    return isProjectOpenedInWindow(projectPath, this._window);
+  }
+
+  private async _relocateProjectFolder(
+    oldPathNorm: string,
+    targetPathNorm: string,
+  ): Promise<void> {
+    await closeMcpSessionsForProject(oldPathNorm);
+    await closeProjectDb(oldPathNorm, this._window);
+    await migrateProjectStorage(oldPathNorm, targetPathNorm);
+    // Mirror project creation: make sure the parent directory exists
+    await fs.promises.mkdir(path.dirname(targetPathNorm), { recursive: true });
+    await renameProjectFolderWithFallback(oldPathNorm, targetPathNorm);
+  }
+
+  async renameProject(
+    projectPath: string,
+    title: string,
+    renameFolder: boolean,
+  ): Promise<LocalProjectInitInfo> {
+    const norm_path = path.normalize(projectPath);
+    const project_db = requestProjectDb(norm_path, this._window);
+    await project_db.init();
+
+    const id = project_db.info.id || null;
+    await project_db.renameTitle(title);
+
+    let new_path = project_db.localPath;
+    if (renameFolder) {
+      const parent_path = path.dirname(norm_path);
+      const folder_name = suggestUniqueFilename(
+        title,
+        '',
+        (name) => {
+          const candidate_path = path.normalize(path.join(parent_path, name));
+          return candidate_path === norm_path || !fs.existsSync(candidate_path);
+        },
+      );
+      const target_path = path.normalize(path.join(parent_path, folder_name));
+
+      if (target_path !== norm_path) {
+        await this._relocateProjectFolder(norm_path, target_path);
+        new_path = target_path;
+      }
+    }
+
+    return {
+      id,
+      title,
+      localPath: new_path,
+    };
+  }
+
+  async moveProject(
+    projectPath: string,
+    targetPath: string,
+  ): Promise<LocalProjectInitInfo> {
+    const norm_path = path.normalize(projectPath);
+    const target_path_norm = path.normalize(targetPath);
+
+    const project_db = requestProjectDb(norm_path, this._window);
+    await project_db.init();
+
+    const id = project_db.info.id || null;
+    const title = project_db.info.title ?? '';
+
+    if (target_path_norm === norm_path) {
+      return { id, title, localPath: project_db.localPath };
+    }
+    if (target_path_norm.startsWith(norm_path + path.sep)) {
+      throw new Error('Cannot move a project into itself');
+    }
+    if (fs.existsSync(target_path_norm)) {
+      throw new Error('Target folder already exists');
+    }
+
+    await this._relocateProjectFolder(norm_path, target_path_norm);
+
+    return {
+      id,
+      title,
+      localPath: target_path_norm,
+    };
   }
 
   async assetsGetShort(

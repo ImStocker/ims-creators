@@ -26,7 +26,7 @@ export default {
       sendBackward: 'Send backward',
       sendToBack: 'Send to back',
       lock: 'Lock',
-      unlock: 'Unlock all',
+      unlock: 'Unlock',
       viewAll: 'View all',
       colorPreset: 'Color',
       fillColor: 'Fill',

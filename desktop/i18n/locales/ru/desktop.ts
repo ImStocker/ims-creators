@@ -125,6 +125,7 @@ export default {
       searchSettings: 'Поиск настроек',
       groups: {
         common: 'Общие',
+        project: 'Проект',
         sync: 'Синхронизация',
         plugins: 'Плагины',
         other: 'Другое',
@@ -161,6 +162,22 @@ export default {
         }
       },
       close: 'Закрыть',
+      project: {
+        name: 'Название проекта',
+        renameFolder: 'Переименовать папку проекта',
+        renameButton: 'Переименовать',
+        renamed: 'Проект переименован',
+        noProject: 'Проект не открыт',
+        cloudNotFound: 'Облачный проект не найден',
+        noPermission: 'У вас нет прав на переименование этого проекта',
+        renameCloudFailed: 'Не удалось переименовать облачный проект',
+        location: 'Расположение',
+        folderName: 'Имя папки',
+        moveButton: 'Изменить',
+        targetExists: 'По выбранному пути уже существует папка',
+        projectOpened:
+          'Проект сейчас открыт. Закройте его перед переименованием или переносом.',
+      },
       plugins: {
         searchPlugin: 'Введите название плагина',
         uninstallButton: 'Удалить',

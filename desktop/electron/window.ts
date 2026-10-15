@@ -4,6 +4,10 @@ import type { WindowArgs } from '#bridge/types/WindowArgs';
 import path from 'node:path';
 import { registerImsHostWindow, unregisterImsHostWindow } from './imshost-api';
 import { launch } from './shell-utils';
+import {
+  registerWindowProjectPath,
+  unregisterWindowProjectPath,
+} from './project-windows';
 
 const preload = path.join(import.meta.dirname, 'preload.js');
 const distPath = path.join(import.meta.dirname, '../dist-client/public');
@@ -55,6 +59,7 @@ export async function createWindow(args: WindowArgs) {
 
   const api = registerImsHostWindow(win);
   api.window.$setArgs(args);
+  registerWindowProjectPath(win, args.localPath);
   if(args.localPath) {
     win.maximize();
   }
@@ -108,6 +113,7 @@ export async function createWindow(args: WindowArgs) {
 
   win.once('closed', () => {
     unregisterImsHostWindow(win);
+    unregisterWindowProjectPath(win);
   });
 
   win.on('close', (e) => {
