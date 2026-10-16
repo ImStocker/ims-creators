@@ -72,12 +72,54 @@ export class DialogPlayer {
   public timerRemaining = 0;
   public timerDuration = 0;
 
+  public playVariables: Record<string, AssetPropsPlainObjectValue> = {};
+  public playVariablesFrameIndex = -1;
+
   constructor(
     protected appManager: IAppManager,
     protected dialogController: DialogBlockController,
     protected viewportHelper: FlowViewportHelper,
     protected projectContext: IProjectContext,
   ) {}
+
+  refreshPlayVariables() {
+    if (!this._player || !this._playingState || !this._playingState.debug) {
+      this.playVariables = {};
+      this.playVariablesFrameIndex = -1;
+      return;
+    }
+    const controller = this.displayingFrameDialogController;
+    if (!controller) {
+      this.playVariables = {};
+      this.playVariablesFrameIndex = -1;
+      return;
+    }
+    const next: Record<string, AssetPropsPlainObjectValue> = {};
+    for (const v of controller.getVariables()) {
+      next[v.name] =
+        this._player.getVariable(v.name, this.displayingFrameIndex) ?? null;
+    }
+    this.playVariables = next;
+    this.playVariablesFrameIndex = this.displayingFrameIndex;
+  }
+
+  setPlayVariable(name: string, value: AssetPropsPlainObjectValue) {
+    if (
+      !this._player ||
+      !this._playingState ||
+      !this._playingState.debug ||
+      !this.isPlaying
+    ) {
+      return;
+    }
+    this._player.setVariable(name, value, this.displayingFrameIndex);
+    this.refreshPlayVariables();
+  }
+
+  setDisplayingFrameIndex(i: number) {
+    this.displayingFrameIndex = i;
+    this.refreshPlayVariables();
+  }
 
   private _createPlayer() {
     const assetId = this.dialogController.resolvedBlock?.assetId;
@@ -107,6 +149,7 @@ export class DialogPlayer {
           }
         },
         onNodeEnter: ({ nodeId, node }) => this._onNodeEnter(nodeId, node),
+        onStateChange: () => this.refreshPlayVariables(),
         onEnd: () => {
           if (!this._player) {
             return;
@@ -167,6 +210,7 @@ export class DialogPlayer {
           if (this.displayingFrameIndex >= this._player.frames.length) {
             this.displayingFrameIndex = this._player.frames.length - 1;
           }
+          this.refreshPlayVariables();
         },
       },
     });
@@ -383,6 +427,7 @@ export class DialogPlayer {
     if (node_id) {
       this._moveViewportToNode(node_id, this._debugNodeSwitchTime);
     }
+    this.refreshPlayVariables();
   }
 
   goHistoryBack() {
@@ -412,6 +457,7 @@ export class DialogPlayer {
     this._scriptEnded = false;
     const currentNode = this._player.currentFrame.currentNode;
     this.displayingFrameIndex = 0;
+    this.refreshPlayVariables();
     this._player.resume();
     if (currentNode) {
       const option = this._getFirstAvailableChoice(currentNode);
@@ -439,6 +485,7 @@ export class DialogPlayer {
       loadedScript.release();
     }
     this._loadedScripts = new Map();
+    this.refreshPlayVariables();
   }
 
   public async restart() {
@@ -786,6 +833,8 @@ export class DialogPlayer {
     }
 
     ++this._playEpoch;
+    this.displayingFrameIndex = 0;
+    this.refreshPlayVariables();
     this._player.play(node_id);
   }
 

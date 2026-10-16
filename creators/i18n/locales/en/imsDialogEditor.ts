@@ -254,6 +254,7 @@ export default {
       type: 'Type',
       dataType: 'Data type',
       defaultValue: 'Default value',
+      currentValues: 'Current values',
       variables: 'Variables',
       description: 'Description',
       enterName: 'Enter name',

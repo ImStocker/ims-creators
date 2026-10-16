@@ -178,7 +178,7 @@
             v-for="frame of playingFramesInfos"
             :key="frame.id"
             class="DialogEdtior-frameSelector-options-one"
-            @click="dialogPlayer.displayingFrameIndex = frame.frameIndex"
+            @click="dialogPlayer.setDisplayingFrameIndex(frame.frameIndex)"
           >
             <i
               v-if="frame.frameIndex === dialogPlayer.displayingFrameIndex"
@@ -199,6 +199,7 @@
         </template>
         <manage-variables-dropdown
           :dialog-controller="blockControllerMut"
+          :dialog-player="dialogPlayer"
           :readonly="readonlyComp"
         ></manage-variables-dropdown>
       </menu-button>
@@ -1112,7 +1113,6 @@ export default defineComponent({
   --imsde-node-content-bg-color: #444444f6;
   --imsde-node-content-text-color: #eaeaea;
   --imsde-node-selected-color: #999;
-  --imsde-node-playing-color: #f6a100;
 
   --imsde-node-selected-outline-width: 0;
 }

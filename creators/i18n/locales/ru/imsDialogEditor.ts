@@ -253,6 +253,7 @@ export default {
       type: 'Тип',
       dataType: 'Тип данных',
       defaultValue: 'Значение по умолчанию',
+      currentValues: 'Текущие значения',
       variables: 'Переменные',
       description: 'Описание',
       enterName: 'Введите название',

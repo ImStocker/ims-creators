@@ -252,6 +252,7 @@ export default {
       type: 'Typ',
       dataType: 'Datentyp',
       defaultValue: 'Standardwert',
+      currentValues: 'Aktuelle Werte',
       variables: 'Variablen',
       description: 'Beschreibung',
       enterName: 'Namen eingeben',
