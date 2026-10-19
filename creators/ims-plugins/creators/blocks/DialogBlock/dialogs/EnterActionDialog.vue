@@ -238,7 +238,8 @@ export default defineComponent({
 </script>
 <style lang="scss" scoped>
 .EnterActionDialog {
-  width: 700px;
+  width: 100%;
+  max-width: 700px;
 }
 .EnterActionDialog-field-caption {
   text-align: center;

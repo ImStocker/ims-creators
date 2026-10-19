@@ -345,8 +345,11 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
+@use '~ims-app-base/style/devices-mixins';
+
 .ManageCollectionDialog {
-  width: 750px;
+  width: 100%;
+  max-width: 750px;
   height: 70vh;
   display: flex;
   flex-direction: column;
@@ -355,6 +358,13 @@ export default defineComponent({
     flex: 1;
     min-height: 0;
     margin-bottom: 20px;
+  }
+
+  @include devices-mixins.device-type(not-pc) {
+    .ManageCollectionDialog-assets {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
   }
 }
 .ManageCollectionDialog-list {
@@ -365,7 +375,7 @@ export default defineComponent({
   align-items: center;
 }
 .ManageCollectionDialog-assets {
-  min-width: 210px;
+  width: 210px;
   flex-shrink: 0;
 }
 .ManageCollectionDialog-loading {

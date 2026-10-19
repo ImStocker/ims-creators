@@ -137,6 +137,8 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
+@use '~ims-app-base/style/devices-mixins';
+
 .ActionsList {
   height: 100%;
   display: flex;
@@ -162,6 +164,20 @@ export default defineComponent({
   .ActionsList-filters-query {
     min-width: 0;
   }
+
+  @include devices-mixins.device-type(not-pc) {
+    flex-wrap: wrap;
+
+    .ActionsList-filters-group {
+      flex-wrap: wrap;
+    }
+  }
+
+  @include devices-mixins.device-type(mb) {
+    .ActionsList-filters-query {
+      flex: 1 1 100%;
+    }
+  }
 }
 .ActionsList-grid {
   --actions-list-columns: 20px 150px 150px minmax(150px, 1fr) minmax(150px, 1fr)
@@ -171,10 +187,19 @@ export default defineComponent({
   min-height: 0;
   display: flex;
   flex-direction: column;
+
+  @include devices-mixins.device-type(not-pc) {
+    flex: 1;
+    overflow: auto;
+  }
 }
 .ActionsList-content {
   overflow: auto;
   flex: 1;
+
+  @include devices-mixins.device-type(not-pc) {
+    overflow: visible;
+  }
 }
 .ActionsList-empty {
   margin-bottom: 10px;

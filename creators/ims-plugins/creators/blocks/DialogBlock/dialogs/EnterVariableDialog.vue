@@ -191,7 +191,8 @@ export default defineComponent({
 @use '~ims-app-base/style/Form';
 
 .EnterVariableDialog {
-  width: 500px;
+  width: 100%;
+  max-width: 500px;
 }
 .EnterVariableDialog-field-caption {
   text-align: center;

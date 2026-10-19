@@ -170,6 +170,8 @@ export default defineComponent({
 </script>
 <style lang="scss" rel="stylesheet/scss" scoped>
 @use '~ims-app-base/style/Form';
+@use '~ims-app-base/style/devices-mixins';
+
 .VariableList {
   height: 100%;
   display: flex;
@@ -195,6 +197,21 @@ export default defineComponent({
   .VariableList-filters-query {
     min-width: 0;
   }
+
+  @include devices-mixins.device-type(not-pc) {
+    flex-wrap: wrap;
+
+    .VariableList-filters-group {
+      flex: 1;
+      flex-wrap: wrap;
+    }
+  }
+
+  @include devices-mixins.device-type(mb) {
+    .VariableList-filters-query {
+      flex: 1 1 100%;
+    }
+  }
 }
 .VariableList-grid {
   --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;
@@ -203,10 +220,19 @@ export default defineComponent({
   min-height: 0;
   display: flex;
   flex-direction: column;
+
+  @include devices-mixins.device-type(not-pc) {
+    flex: 1;
+    overflow: auto;
+  }
 }
 .VariableList-content {
   overflow: auto;
   flex: 1;
+
+  @include devices-mixins.device-type(not-pc) {
+    overflow: visible;
+  }
 }
 .VariableList-grid-row {
   display: grid;
