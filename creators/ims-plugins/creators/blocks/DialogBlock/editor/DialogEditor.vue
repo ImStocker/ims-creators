@@ -26,7 +26,7 @@
         v-model:edges="blockControllerMut.state.edges"
         :selection-key-code="true"
         :multi-selection-key-code="['Meta', 'Shift', 'Control']"
-        :pan-on-drag="[2]"
+        :pan-on-drag="panOnDragProp"
         :connection-mode="ConnectionMode.Strict"
         :delete-key-code="['Delete', 'Backspace']"
         :edges-updatable="!readonlyComp"
@@ -40,6 +40,7 @@
         @connect="onConnect"
         @edges-change="onEdgesChange"
         @nodes-change="onNodesChange"
+        @pane-ready="onPaneReady"
         @viewport-change-start="viewportHelper.onViewportChangeStart($event)"
         @viewport-change-end="flowViewportTransform = $event"
         @edge-click="onEdgeClick"
@@ -364,6 +365,8 @@ export default defineComponent({
       selectionContextMenu: null as { x: number; y: number } | null,
       viewportHelper,
       dialogPlayer,
+      panOnDragProp: [2] as number[],
+      flowStore: null as VueFlowStore | null,
       isFocused: false,
       clickOutside: null as SetClickOutsideCancel | null,
       mouseDownTime: 0,
@@ -476,6 +479,9 @@ export default defineComponent({
     this.resetFocusedListeners(false);
   },
   methods: {
+    onPaneReady(store: VueFlowStore) {
+      this.flowStore = store;
+    },
     changeNodeType(node_id: string, new_type: string) {
       this.blockControllerMut.changeNodeType(node_id, new_type);
     },
@@ -708,7 +714,21 @@ export default defineComponent({
       }
       this.blockControllerMut.savePropsDelayed();
     },
-    onMouseDown() {
+    onMouseDown(ev: PointerEvent) {
+      // no built-in touch panning in vue-flow (mouse-only panOnDrag) - toggle store per pointer type (bcakmakoglu/vue-flow#1970)
+      if (ev.pointerType === 'touch') {
+        if (this.flowStore) {
+          this.flowStore.panOnDrag.value = true;
+        }
+        const target = ev.target as HTMLElement | null;
+        if (target && target.classList.contains('vue-flow__pane')) {
+          ev.stopPropagation();
+        }
+      } else if (ev.pointerType === 'mouse') {
+        if (this.flowStore) {
+          this.flowStore.panOnDrag.value = [2];
+        }
+      }
       if (this.readonlyComp) {
         return;
       }
