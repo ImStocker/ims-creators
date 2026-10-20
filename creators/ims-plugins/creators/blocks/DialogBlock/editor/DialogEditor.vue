@@ -9,6 +9,8 @@
       class="DialogEditor-wrapper"
       @pointerdown.capture="onMouseDown"
       @pointerup.capture="onMouseUp"
+      @mousedown.capture="onGhostMouseEvent"
+      @click.capture="onGhostMouseEvent"
       @contextmenu.capture="onContextMenu"
       @dragover="onDragOver"
       @drop="onDrop"
@@ -268,7 +270,7 @@ import UiManager from '~ims-app-base/logic/managers/UiManager';
 import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManager';
 import { FlowViewportHelper } from '../../flow-common/FlowViewportHelper';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import { computed } from 'vue';
+import { computed, unref } from 'vue';
 import { DialogPlayer } from '../play/DialogPlayer';
 import DialogPlayToolbar from '../play/DialogPlayToolbar.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
@@ -297,6 +299,24 @@ type CreateNodeContext = {
     handleType: HandleType;
   } | null;
 };
+
+const GHOST_MOUSE_EVENT_WINDOW = 500;
+
+function getEventClientCoords(
+  ev: MouseEvent | TouchEvent,
+): { x: number; y: number } | null {
+  if ('clientX' in ev && 'clientY' in ev) {
+    return { x: ev.clientX, y: ev.clientY };
+  }
+  let touch: Touch | null = null;
+  if ('touches' in ev && ev.touches.length > 0) {
+    touch = ev.touches[0];
+  } else if ('changedTouches' in ev && ev.changedTouches.length > 0) {
+    touch = ev.changedTouches[0];
+  }
+  if (!touch) return null;
+  return { x: touch.clientX, y: touch.clientY };
+}
 
 export default defineComponent({
   name: 'DialogEditor',
@@ -370,6 +390,9 @@ export default defineComponent({
       isFocused: false,
       clickOutside: null as SetClickOutsideCancel | null,
       mouseDownTime: 0,
+      lastTouchEndAt: 0,
+      connectStartClientCoords: null as { x: number; y: number } | null,
+      ghostClickCleanup: null as null | (() => void),
       nodePicker: {
         active: false,
         callback: null as ((nodeId: string) => void) | null,
@@ -477,6 +500,10 @@ export default defineComponent({
   },
   unmounted() {
     this.resetFocusedListeners(false);
+    if (this.ghostClickCleanup) {
+      this.ghostClickCleanup();
+      this.ghostClickCleanup = null;
+    }
   },
   methods: {
     onPaneReady(store: VueFlowStore) {
@@ -715,6 +742,7 @@ export default defineComponent({
       this.blockControllerMut.savePropsDelayed();
     },
     onMouseDown(ev: PointerEvent) {
+      this.lastTouchEndAt = 0; // real interaction started - stop ghost mouse suppression
       // no built-in touch panning in vue-flow (mouse-only panOnDrag) - toggle store per pointer type (bcakmakoglu/vue-flow#1970)
       if (ev.pointerType === 'touch') {
         if (this.flowStore) {
@@ -799,15 +827,102 @@ export default defineComponent({
         allowedTypes: allowed_types,
       };
     },
-    onConnectEnd(ev: any) {
+    onConnectEnd(ev?: MouseEvent | TouchEvent) {
       if (!this.$el) return;
-      if (this.createNodeContext) {
-        const editor_bbox = this.$el.getBoundingClientRect();
-        this.createNodeContext.clickedAt = {
-          x: ev.clientX - editor_bbox.x,
-          y: ev.clientY - editor_bbox.y,
-        };
+      if (ev && 'touches' in ev) {
+        // connection was ended by touch - browsers will synthesize
+        // mouse events after this, suppress them while they arrive
+        this.lastTouchEndAt = Date.now();
+        this.armGhostClickSuppress();
       }
+      if (!this.createNodeContext) return;
+      const client_coords =
+        (ev ? getEventClientCoords(ev) : null) ??
+        this.connectStartClientCoords ??
+        this._getHandleClientCenter();
+      if (!client_coords) return;
+      const editor_bbox = this.$el.getBoundingClientRect();
+      this.createNodeContext.clickedAt = {
+        x: client_coords.x - editor_bbox.left,
+        y: client_coords.y - editor_bbox.top,
+      };
+    },
+    onGhostMouseEvent(ev: MouseEvent) {
+      if (!this.lastTouchEndAt) return;
+      if (Date.now() - this.lastTouchEndAt > GHOST_MOUSE_EVENT_WINDOW) {
+        this.lastTouchEndAt = 0;
+        return;
+      }
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    },
+    armGhostClickSuppress() {
+      if (this.ghostClickCleanup) {
+        this.ghostClickCleanup(); // re-arm with fresh lifetime
+      }
+      // any real gesture (also on teleported dropdowns) starts with
+      // pointerdown - use it to stop suppression; synthesized ghost
+      // events contain no pointerdown, so they stay suppressed
+      const onAnyPointerDown = () => {
+        this.lastTouchEndAt = 0;
+      };
+      const onGhostClick = (e: Event) => {
+        if (
+          !this.lastTouchEndAt ||
+          Date.now() - this.lastTouchEndAt > GHOST_MOUSE_EVENT_WINDOW
+        ) {
+          cleanup();
+          return;
+        }
+        // window capture listeners (e.g. dropdown clickOutside) run before
+        // wrapper handlers - suppress synthesized click here so freshly
+        // opened CreateNodeDropdown is not closed by its own ghost click
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        cleanup();
+      };
+      let removed = false;
+      const cleanup = () => {
+        if (removed) return;
+        removed = true;
+        window.removeEventListener('click', onGhostClick, true);
+        window.removeEventListener('pointerdown', onAnyPointerDown, true);
+        clearTimeout(safetyTimer);
+        this.ghostClickCleanup = null;
+      };
+      const safetyTimer = setTimeout(cleanup, GHOST_MOUSE_EVENT_WINDOW + 500);
+      this.ghostClickCleanup = cleanup;
+      window.addEventListener('click', onGhostClick, true);
+      window.addEventListener('pointerdown', onAnyPointerDown, true);
+    },
+    _getHandleClientCenter(): { x: number; y: number } | null {
+      const connect_params = this.createNodeContext?.connectStartParams;
+      if (!connect_params) return null;
+      const flow = this.$refs['flow'] as VueFlowStore | undefined;
+      const flow_el = flow ? unref(flow.vueFlowRef) : null;
+      if (!flow_el) return null;
+      let node_el: Element | null = null;
+      for (const el of flow_el.querySelectorAll('.vue-flow__node')) {
+        if (el.getAttribute('data-id') === connect_params.nodeId) {
+          node_el = el;
+          break;
+        }
+      }
+      if (!node_el) return null;
+      const handles = node_el.querySelectorAll<HTMLElement>(
+        `.vue-flow__handle.${connect_params.handleType}`,
+      );
+      let target: HTMLElement | null = null;
+      for (const handle of handles) {
+        if (handle.getAttribute('data-handleid') === connect_params.handleId) {
+          target = handle;
+          break;
+        }
+      }
+      if (!target) target = handles[0] ?? null;
+      if (!target) return null;
+      const rect = target.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     },
     onConnect(ev: Connection) {
       this.blockControllerMut.addEdge(
@@ -846,7 +961,22 @@ export default defineComponent({
       }
       return allowed_types;
     },
-    onConnectStart(ev: OnConnectStartParams) {
+    onConnectStart(
+      ev: OnConnectStartParams & { event?: MouseEvent | TouchEvent },
+    ) {
+      if (
+        ev.event &&
+        'clientX' in ev.event &&
+        this.lastTouchEndAt &&
+        Date.now() - this.lastTouchEndAt < GHOST_MOUSE_EVENT_WINDOW
+      ) {
+        // mouse event synthesized by browser right after touch - it would
+        // reset already opened createNodeContext, ignore it
+        return;
+      }
+      this.connectStartClientCoords = ev.event
+        ? getEventClientCoords(ev.event)
+        : null;
       const ev_node_id = ev.nodeId;
       const ev_handle_type = ev.handleType;
       const ev_handle_id = ev.handleId;
@@ -1166,6 +1296,11 @@ export default defineComponent({
 .DialogEditorNode {
   border-radius: 4px;
   border: 1px solid transparent;
+  -webkit-touch-callout: none;
+  input,
+  textarea {
+    -webkit-touch-callout: default;
+  }
   & > div:first-child {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
