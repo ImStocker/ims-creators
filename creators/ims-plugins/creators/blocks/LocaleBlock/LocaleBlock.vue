@@ -54,6 +54,7 @@
         :rows="translationRows"
         :readonly="readonly"
         @change-cells="changeTranslation"
+        @enter="persist"
       >
         <template
           v-for="column of translationColumns"
@@ -148,6 +149,7 @@ export default defineComponent({
       default: () => 'normal',
     },
   },
+  emits: ['save'],
   data() {
     return {
       selectedLanguage: null as null | string,
@@ -402,6 +404,9 @@ export default defineComponent({
       }
 
       return res;
+    },
+    persist() {
+      this.$emit('save');
     },
     changeTranslation(changes: ImcGridChangeCell[]) {
       const language = this.selectedLanguage;
