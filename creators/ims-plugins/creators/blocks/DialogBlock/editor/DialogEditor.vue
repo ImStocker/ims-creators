@@ -1310,9 +1310,17 @@ export default defineComponent({
     border-bottom-right-radius: 4px;
   }
 }
+// ContextMenuZone injects an anchor element before the node content while the
+// context menu is opened, so the corner rounding must not rely on the child position
 .DialogEditorNode-header {
   background: var(--imsde-node-color);
   position: relative;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+.DialogEditorNode-body:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
 }
 
 .DialogEditorNode-body {

@@ -1,17 +1,19 @@
 <template>
   <div class="DialogEndNode DialogEditorNode-wrapper">
-    <div v-if="exitName" class="DialogEndNode-exitName" :title="exitName">
-      {{ exitName }}
-    </div>
-    <ContextMenuZone :menu-list="contextMenuComp">
+    <ContextMenuZone class="DialogEditorNode" :menu-list="contextMenuComp">
       <div
-        class="DialogEndNode-header DialogNode-header DialogEditorNode-header DialogEditorNode"
+        class="DialogEndNode-header DialogNode-header DialogEditorNode-header"
         :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
       >
         <div class="DialogEndNode-header-title">
           <ExecHandle id="in" type="target" :position="Position.Left" />
           <i :class="nodeDescriptor.icon"></i>
-          {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+          <span class="DialogEndNode-caption">
+            {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+          </span>
+        </div>
+        <div v-if="exitName" class="DialogEndNode-exitName" :title="exitName">
+          {{ exitName }}
         </div>
       </div>
     </ContextMenuZone>
@@ -80,21 +82,33 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.DialogEndNode-exitName {
-  padding: 2px 8px;
-  font-size: 10px;
-  color: var(--local-sub-text-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .DialogEndNode-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   padding: 7px 10px;
   font-size: 14px;
 }
 .DialogEndNode-header-title {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
+  // full-bleed row, so the incoming handle stays at the node left edge
+  margin: 0 -10px;
+  padding: 0 10px;
+}
+.DialogEndNode-caption {
+  white-space: nowrap;
+}
+.DialogEndNode-exitName {
+  max-width: 200px;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--imsde-node-header-text-color);
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
