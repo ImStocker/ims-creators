@@ -1577,7 +1577,7 @@ export class DialogBlockController extends BlockEditorController {
 
     this.state = newState; // Change nodes and edges simultaneously to make VueFlow work corretly
 
-    this.savePropsDelayed();
+    this.saveProps();
   }
 
   async setNodeExitName(nodeId: string): Promise<void> {

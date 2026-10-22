@@ -1,23 +1,25 @@
 <template>
-  <DialogBaseNode :node-id="id" :dialog-player="dialogPlayer">
-    <div class="DialogJumpNode DialogEditorNode">
-      <div
-        class="DialogJumpNode-header DialogNode-header DialogEditorNode-header"
-        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-      >
-        <ExecHandle id="in" type="target" :position="Position.Left" />
-        <i :class="nodeDescriptor.icon"></i>
-        {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-      </div>
-      <div class="DialogJumpNode-body DialogEditorNode-body">
-        <NodeSelector
-          v-model="to"
-          :dialog-controller="dialogController"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          :exclude-id="id"
-        />
-      </div>
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogJumpNode DialogEditorNode"
+  >
+    <div
+      class="DialogJumpNode-header DialogNode-header DialogEditorNode-header"
+      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+    >
+      <ExecHandle id="in" type="target" :position="Position.Left" />
+      <i :class="nodeDescriptor.icon"></i>
+      {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+    </div>
+    <div class="DialogJumpNode-body DialogEditorNode-body">
+      <NodeSelector
+        v-model="to"
+        :dialog-controller="dialogController"
+        :node-data-controller="nodeDataController"
+        :readonly="readonly"
+        :exclude-id="id"
+      />
     </div>
   </DialogBaseNode>
 </template>

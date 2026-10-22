@@ -578,7 +578,7 @@ export class GraphBlockController extends BlockEditorController {
 
     if (!result) {
       if (result !== '') return; // cancelled
-      if (isUUID(nodeId), 'loose') return; // no service name to reset, nothing to do
+      if (isUUID(nodeId, 'loose')) return; // no service name to reset, nothing to do
     } else if (result === nodeId) {
       return;
     }
@@ -627,7 +627,7 @@ export class GraphBlockController extends BlockEditorController {
     }
 
     this.state = newState; // Change nodes and edges simultaneously to make VueFlow work corretly
-    this.savePropsDelayed();
+    this.saveProps();
   }
 
   getNodeContextMenu(

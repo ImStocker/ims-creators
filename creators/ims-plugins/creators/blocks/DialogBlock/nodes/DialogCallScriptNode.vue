@@ -1,47 +1,49 @@
 <template>
-  <DialogBaseNode :node-id="id" :dialog-player="dialogPlayer">
-    <div class="DialogCallScriptNode DialogEditorNode">
-      <div
-        class="DialogCallScriptNode-header DialogNode-header DialogEditorNode-header"
-        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-      >
-        <i :class="nodeDescriptor.icon"></i>
-        {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogCallScriptNode DialogEditorNode"
+  >
+    <div
+      class="DialogCallScriptNode-header DialogNode-header DialogEditorNode-header"
+      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+    >
+      <i :class="nodeDescriptor.icon"></i>
+      {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+    </div>
+    <div class="DialogCallScriptNode-body DialogEditorNode-body">
+      <div v-if="loading" class="DialogCallScriptNode-loading">
+        <div class="loaderSpinner"></div>
       </div>
-      <div class="DialogCallScriptNode-body DialogEditorNode-body">
-        <div v-if="loading" class="DialogCallScriptNode-loading">
-          <div class="loaderSpinner"></div>
+      <div class="DialogCallScriptNode-body-main">
+        <ExecHandle id="in" type="target" :position="Position.Left" />
+        <div class="DialogCallScriptNode-content">
+          <select-asset-combo-box
+            class="VariableTypeSelector-selectAsset"
+            :model-value="callScriptForSelection"
+            :where="selectAssetWhere"
+            :has-create-new-option="true"
+            @update:model-value="selectExternalAsset"
+          >
+          </select-asset-combo-box>
         </div>
-        <div class="DialogCallScriptNode-body-main">
-          <ExecHandle id="in" type="target" :position="Position.Left" />
-          <div class="DialogCallScriptNode-content">
-            <select-asset-combo-box
-              class="VariableTypeSelector-selectAsset"
-              :model-value="callScriptForSelection"
-              :where="selectAssetWhere"
-              :has-create-new-option="true"
-              @update:model-value="selectExternalAsset"
-            >
-            </select-asset-combo-box>
-          </div>
-          <ExecHandle
-            v-if="showOutPin"
-            id="out"
-            type="source"
-            :position="Position.Right"
-          />
-        </div>
-        <node-parameters-grid
-          :dialog-player="dialogPlayer"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          :play-wait-user="false"
-          :output-params="outputParameters"
-          :input-params="inputParameters"
-          :exit-params="exitParameters"
-          :playing-node-data="playingNodeData"
-        ></node-parameters-grid>
+        <ExecHandle
+          v-if="showOutPin"
+          id="out"
+          type="source"
+          :position="Position.Right"
+        />
       </div>
+      <node-parameters-grid
+        :dialog-player="dialogPlayer"
+        :node-data-controller="nodeDataController"
+        :readonly="readonly"
+        :play-wait-user="false"
+        :output-params="outputParameters"
+        :input-params="inputParameters"
+        :exit-params="exitParameters"
+        :playing-node-data="playingNodeData"
+      ></node-parameters-grid>
     </div>
   </DialogBaseNode>
 </template>

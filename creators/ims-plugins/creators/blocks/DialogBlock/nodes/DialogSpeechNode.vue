@@ -624,6 +624,7 @@ export default defineComponent({
 .DialogSpeechNode-prop-dataField {
   display: flex;
   align-items: baseline;
+  min-width: 100%;
 }
 .DialogSpeechNode-prop-restore {
   height: fit-content;
