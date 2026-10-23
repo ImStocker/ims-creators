@@ -33,9 +33,11 @@ export function isActionVisible(
   action: ScriptBlockPlainAction,
   filters?: ActionsListFilters | null,
 ) {
+  const query = filters?.query?.toLowerCase() ?? '';
   return (
-    (!filters?.query ||
-      action.name.toLowerCase().includes(filters.query.toLowerCase())) &&
+    (!query ||
+      action.name.toLowerCase().includes(query) ||
+      (action.title ?? '').toLowerCase().includes(query)) &&
     (!filters?.type || action.type === filters.type)
   );
 }

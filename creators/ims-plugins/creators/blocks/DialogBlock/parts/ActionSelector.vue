@@ -87,7 +87,7 @@ export default defineComponent({
           .map((x) => {
             return {
               action: x,
-              title: x.name,
+              title: x.title || x.name,
               key: x.name,
             };
           }),

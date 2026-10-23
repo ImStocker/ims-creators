@@ -84,7 +84,8 @@ import type { DialogPlayer } from '../play/DialogPlayer';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
-import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
+import type { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
+import { getVariableKindIcon } from '../logic/variableKinds';
 import type { AssetPropValue } from '~ims-app-base/logic/types/Props';
 
 export default defineComponent({
@@ -130,18 +131,7 @@ export default defineComponent({
   },
   methods: {
     kindIcon(kind?: ScriptBlockPlainVariableKinds) {
-      switch (kind) {
-        case ScriptBlockPlainVariableKinds.LOCAL:
-          return 'ri-terminal-line';
-        case ScriptBlockPlainVariableKinds.IN:
-          return 'ri-contract-right-line';
-        case ScriptBlockPlainVariableKinds.OUT:
-          return 'ri-expand-right-line';
-        case ScriptBlockPlainVariableKinds.INOUT:
-          return 'ri-expand-horizontal-line';
-        default:
-          return 'ri-global-line';
-      }
+      return getVariableKindIcon(kind);
     },
     getVariableValue(variable: DialogVariable): AssetPropValue {
       if (this.isDebugVariables && this.dialogPlayer) {

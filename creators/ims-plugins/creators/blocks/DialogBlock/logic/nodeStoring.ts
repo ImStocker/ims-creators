@@ -29,6 +29,7 @@ export enum ScriptBlockPlainVariableKinds {
 
 export type ScriptBlockPlainAction = {
   name: string;
+  title?: string | null;
   type: ScriptBlockPlainActionTypes;
   params?: {
     in: ScriptBlockPlainVariable[];

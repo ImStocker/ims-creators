@@ -12,7 +12,8 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
 import SegmentedTabs from '~ims-app-base/components/Common/SegmentedTabs.vue';
-import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
+import type { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
+import { VARIABLE_KINDS } from '../logic/variableKinds';
 
 export default defineComponent({
   name: 'VariableKindSelector',
@@ -46,31 +47,11 @@ export default defineComponent({
           label: this.$t('imsDialogEditor.var.kinds.all'),
           title: this.$t('imsDialogEditor.var.kinds.all'),
         },
-        {
-          key: ScriptBlockPlainVariableKinds.GLOBAL,
-          title: this.$t('imsDialogEditor.var.kinds.global'),
-          icon: 'ri-global-line',
-        },
-        {
-          key: ScriptBlockPlainVariableKinds.LOCAL,
-          title: this.$t('imsDialogEditor.var.kinds.local'),
-          icon: 'ri-terminal-line',
-        },
-        {
-          key: ScriptBlockPlainVariableKinds.IN,
-          title: this.$t('imsDialogEditor.var.kinds.in'),
-          icon: 'ri-contract-right-line',
-        },
-        {
-          key: ScriptBlockPlainVariableKinds.OUT,
-          title: this.$t('imsDialogEditor.var.kinds.out'),
-          icon: 'ri-expand-right-line',
-        },
-        {
-          key: ScriptBlockPlainVariableKinds.INOUT,
-          title: this.$t('imsDialogEditor.var.kinds.in-out'),
-          icon: 'ri-expand-horizontal-line',
-        },
+        ...VARIABLE_KINDS.map((option) => ({
+          key: option.kind,
+          title: this.$t(option.titleKey),
+          icon: option.icon,
+        })),
       ];
       return this.showAll ? items : items.slice(1);
     },

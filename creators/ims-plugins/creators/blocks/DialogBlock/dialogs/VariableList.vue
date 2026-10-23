@@ -14,38 +14,25 @@
         <slot name="prepend-filters"></slot>
       </template>
     </variable-list-filters>
-    <div v-if="filteredVariables.length > 0" class="VariableList-grid">
-      <div class="VariableList-grid-row">
-        <div class="VariableList-grid-column"></div>
-        <div class="VariableList-grid-column">
-          {{ $t('imsDialogEditor.var.name') }}
-        </div>
-        <div class="VariableList-grid-column">
-          {{ $t('imsDialogEditor.var.dataType') }}
-        </div>
-        <div class="VariableList-grid-column">
-          {{ $t('imsDialogEditor.var.defaultValue') }}
-        </div>
-      </div>
-      <sortable-list
-        class="VariableList-content tiny-scrollbars"
-        handle-selector=".VariableListItem-drag"
-        id-key="name"
-        :list="filteredVariables"
-        @update:list="changeList($event)"
-      >
-        <template #default="{ item }">
-          <variable-list-item
-            class="VariableList-item"
-            :variable-controller="collectionController"
-            :variable="item"
-            :show-auto-fill="showAutoFill"
-            :show-kind-control="showKindControl"
-          >
-          </variable-list-item>
-        </template>
-      </sortable-list>
-    </div>
+    <sortable-list
+      v-if="filteredVariables.length > 0"
+      class="VariableList-content tiny-scrollbars"
+      handle-selector=".VariableListItem-drag"
+      id-key="name"
+      :list="filteredVariables"
+      @update:list="changeList($event)"
+    >
+      <template #default="{ item }">
+        <variable-list-item
+          class="VariableList-item"
+          :variable-controller="collectionController"
+          :variable="item"
+          :show-auto-fill="showAutoFill"
+          :show-kind-control="showKindControl"
+        >
+        </variable-list-item>
+      </template>
+    </sortable-list>
     <div v-else-if="!embedded" class="VariableList-empty">
       {{
         $t(
@@ -165,28 +152,10 @@ export default defineComponent({
   &.state-embedded {
     height: auto;
 
-    .VariableList-grid {
-      flex: none;
-      min-height: 0;
-    }
-
     .VariableList-content {
       flex: none;
       overflow: visible;
     }
-  }
-}
-.VariableList-grid {
-  --variable-list-columns: 20px 200px 240px minmax(150px, 1fr) min-content;
-  --variable-list-column-gap: 2px;
-
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-
-  @include devices-mixins.device-type(not-pc) {
-    flex: 1;
-    overflow: auto;
   }
 }
 .VariableList-content {
@@ -197,18 +166,8 @@ export default defineComponent({
     overflow: visible;
   }
 }
-.VariableList-grid-row {
-  display: grid;
-  grid-template-columns: var(--variable-list-columns);
-  color: var(--local-sub-text-color);
-  column-gap: var(--variable-list-column-gap);
-}
 :deep(.SortableList-item) {
-  padding: 5px 0px;
-
-  &:not(:last-child) {
-    border-bottom: 1px dashed var(--local-border-color);
-  }
+  padding: 0;
 }
 .VariableList-empty {
   margin-bottom: 10px;

@@ -13,8 +13,8 @@
       <template #option="{ option }">
         <button v-if="option" class="is-button is-button-dropdown-item">
           <span
-            class="VariableTypeSelector-type-circle"
-            :class="'type-' + option.type"
+            class="VariableTypeSelector-type-circle field-type-dot"
+            :class="typeDotClass(option.type)"
           ></span>
           {{ option.title }}
         </button>
@@ -22,8 +22,8 @@
       <template #selected-option="{ option }">
         <div v-if="option" class="VariableTypeSelector-selected">
           <span
-            class="VariableTypeSelector-type-circle"
-            :class="'type-' + option.type"
+            class="VariableTypeSelector-type-circle field-type-dot"
+            :class="typeDotClass(option.type)"
           ></span>
           {{ option.title }}
         </div>
@@ -55,6 +55,11 @@ import isUUID from 'validator/es/lib/isUUID';
 import type { AssetForSelection } from '~ims-app-base/logic/types/AssetsType';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
 import type { AssetPropWhere } from '~ims-app-base/logic/types/PropsWhere';
+import {
+  VARIABLE_TYPES,
+  getVariableTypeTitleKey,
+  getVariableTypeDotClass,
+} from '../logic/variableTypes';
 
 type VarTypeOpt = {
   type: AssetPropType;
@@ -82,17 +87,10 @@ export default defineComponent({
       return opt ?? null;
     },
     typeOptions(): VarTypeOpt[] {
-      return [
-        AssetPropType.BOOLEAN,
-        AssetPropType.INTEGER,
-        AssetPropType.FLOAT,
-        AssetPropType.TEXT,
-        AssetPropType.STRING,
-        AssetPropType.ASSET,
-      ].map((type) => {
+      return VARIABLE_TYPES.map((type) => {
         return {
           type: type,
-          title: this.$t('imsDialogEditor.var.types.' + type.toString()),
+          title: this.$t(getVariableTypeTitleKey(type)),
         };
       });
     },
@@ -122,6 +120,9 @@ export default defineComponent({
     },
   },
   methods: {
+    typeDotClass(type: AssetPropType): string {
+      return getVariableTypeDotClass(type);
+    },
     setType(opt: VarTypeOpt) {
       if (this.modelValue?.Type !== opt?.type || (this.modelValue && !opt)) {
         this.$emit(
@@ -146,6 +147,8 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+@use '~ims-app-base/style/field-type-dot' as *;
+
 .VariableTypeSelector {
   display: flex;
   gap: 5px;
@@ -160,31 +163,6 @@ export default defineComponent({
   flex: 1;
   overflow: hidden;
   min-width: 120px;
-}
-
-.VariableTypeSelector-type-circle {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  &.type-boolean {
-    background-color: var(--ims-type-boolean-fill);
-  }
-  &.type-float {
-    background-color: var(--ims-type-float-fill);
-  }
-  &.type-integer {
-    background-color: var(--ims-type-integer-fill);
-  }
-  &.type-string {
-    background-color: var(--ims-type-string-fill);
-  }
-  &.type-text {
-    background-color: var(--ims-type-text-fill);
-  }
-  &.type-asset {
-    background-color: var(--ims-type-asset-fill);
-  }
 }
 
 .VariableTypeSelector-selected {

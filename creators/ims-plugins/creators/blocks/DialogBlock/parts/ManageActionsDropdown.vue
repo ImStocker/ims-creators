@@ -16,8 +16,8 @@
         :draggable="!readonly"
         @dragstart="onDragStart($event, action)"
       >
-        <div class="ManageActionsDropdown-list-item-name">
-          {{ action.name }}
+        <div class="ManageActionsDropdown-list-item-name" :title="action.name">
+          {{ action.title || action.name }}
         </div>
         <div class="ManageActionsDropdown-list-item-type">
           <i
@@ -85,8 +85,11 @@ export default defineComponent({
       return this.dialogController.getActions();
     },
     filteredActions() {
-      return this.actions.filter((el) =>
-        el.name.toLowerCase().includes(this.searchQuery.toLowerCase()),
+      const query = this.searchQuery.toLowerCase();
+      return this.actions.filter(
+        (el) =>
+          el.name.toLowerCase().includes(query) ||
+          (el.title ?? '').toLowerCase().includes(query),
       );
     },
     availableActionTypes() {

@@ -14,8 +14,8 @@
       <button v-if="option" class="is-button is-button-dropdown-item">
         <span
           v-if="option.variable"
-          class="VariableSelector-type-circle"
-          :class="'type-' + (option.variable.type?.Type ?? 'any')"
+          class="VariableSelector-type-circle field-type-dot"
+          :class="typeDotClass(option.variable.type)"
         ></span>
         {{ option.title }}
       </button>
@@ -32,6 +32,7 @@ import type {
 } from '../editor/DialogBlockController';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
+import { getVariableTypeDotClass } from '../logic/variableTypes';
 
 type VarOpt = {
   variable: DialogVariable | null;
@@ -96,6 +97,9 @@ export default defineComponent({
     },
   },
   methods: {
+    typeDotClass(type: DialogVariable['type']): string {
+      return getVariableTypeDotClass(type);
+    },
     setVariable(new_val: VarOpt | null) {
       if (new_val && !new_val.variable && new_val.key === VAR_OPT_MANAGE_KEY) {
         assert(this.projectContext, 'Project context is not provided');
@@ -114,31 +118,5 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.VariableSelector-type-circle {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  &.type-boolean {
-    background-color: var(--ims-type-boolean-fill);
-  }
-  &.type-float {
-    background-color: var(--ims-type-float-fill);
-  }
-  &.type-integer {
-    background-color: var(--ims-type-integer-fill);
-  }
-  &.type-string {
-    background-color: var(--ims-type-string-fill);
-  }
-  &.type-text {
-    background-color: var(--ims-type-text-fill);
-  }
-  &.type-asset {
-    background-color: var(--ims-type-asset-fill);
-  }
-  &.type-any {
-    background-color: var(--ims-type-any-fill);
-  }
-}
+@use '~ims-app-base/style/field-type-dot' as *;
 </style>

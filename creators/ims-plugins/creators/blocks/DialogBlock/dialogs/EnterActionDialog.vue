@@ -3,7 +3,19 @@
     <template #content>
       <div class="EnterActionDialog-field">
         <div class="EnterActionDialog-field-caption">
-          {{ $t('imsDialogEditor.actions.enterName') }}
+          {{ $t('imsDialogEditor.actions.enterTitle') }}
+        </div>
+        <div class="EnterActionDialog-field-input">
+          <ims-input
+            :model-value="action.title ?? ''"
+            :placeholder="action.name"
+            @update:model-value="changeTitle"
+          ></ims-input>
+        </div>
+      </div>
+      <div class="EnterActionDialog-field">
+        <div class="EnterActionDialog-field-caption">
+          {{ $t('imsDialogEditor.actions.enterServiceName') }}
         </div>
         <div class="EnterActionDialog-field-input">
           <ims-input v-model="action.name"></ims-input>
@@ -18,8 +30,9 @@
         </div>
         <div class="EnterActionDialog-field-input">
           <action-type-selector
-            v-model="action.type"
+            :model-value="action.type"
             class="EnterActionDialog-selectType"
+            @update:model-value="changeActionType"
           ></action-type-selector>
         </div>
       </div>
@@ -91,6 +104,8 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import EnterVariableDialog from './EnterVariableDialog.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
+import { normalizeAssetPropPart } from '~ims-app-base/logic/types/Props';
+import { withFunctionOutParam } from '../logic/nodeActions';
 
 type DialogProps = {
   initial?: Partial<DialogAction>;
@@ -117,14 +132,19 @@ export default defineComponent({
     },
   },
   data() {
+    let action = {
+      name: this.dialog.state.initial?.name ?? '',
+      title:
+        this.dialog.state.initial?.title ??
+        this.dialog.state.initial?.name ??
+        '',
+      type:
+        this.dialog.state.initial?.type ?? ScriptBlockPlainActionTypes.TRIGGER,
+      params: this.dialog.state.initial?.params ?? null,
+    } as DialogAction;
+    action = withFunctionOutParam(action);
     return {
-      action: {
-        name: this.dialog.state.initial?.name ?? '',
-        type:
-          this.dialog.state.initial?.type ??
-          ScriptBlockPlainActionTypes.TRIGGER,
-        params: this.dialog.state.initial?.params ?? null,
-      } as DialogAction,
+      action,
     };
   },
   computed: {
@@ -145,10 +165,32 @@ export default defineComponent({
     },
   },
   methods: {
+    changeTitle(new_title: string) {
+      const old_auto_name = normalizeAssetPropPart(this.action.title ?? '');
+      const new_auto_name = normalizeAssetPropPart(new_title);
+      if (
+        new_auto_name &&
+        (!this.action.name || this.action.name === old_auto_name)
+      ) {
+        this.action.name = new_auto_name;
+      }
+      this.action.title = new_title;
+    },
+    changeActionType(new_type: ScriptBlockPlainActionTypes) {
+      this.action = withFunctionOutParam({
+        ...this.action,
+        type: new_type,
+      }) as DialogAction;
+    },
     async save() {
-      if (!this.action.name) {
+      const service_name = normalizeAssetPropPart(this.action.name);
+      if (!service_name) {
+        this.$getAppManager()
+          .get(UiManager)
+          .showError(this.$t('imsDialogEditor.actions.nameIsEmpty'));
         return;
       }
+      this.action.name = service_name;
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
@@ -165,6 +207,7 @@ export default defineComponent({
           }
           this.dialog.close({
             ...this.action,
+            title: this.action.title?.trim() ? this.action.title : null,
           });
         });
     },

@@ -13,40 +13,23 @@
         <slot name="prepend-filters"></slot>
       </template>
     </actions-list-filters>
-    <div v-if="filteredActions.length > 0" class="ActionsList-grid">
-      <div class="ActionsList-grid-row">
-        <div class="ActionsList-grid-column"></div>
-        <div class="ActionsList-grid-column">
-          {{ $t('imsDialogEditor.actions.name') }}
-        </div>
-        <div class="ActionsList-grid-column">
-          {{ $t('imsDialogEditor.actions.type') }}
-        </div>
-        <div class="ActionsList-grid-column">
-          {{ $t('imsDialogEditor.actions.inputParameters') }}
-        </div>
-        <div class="ActionsList-grid-column">
-          {{ $t('imsDialogEditor.actions.outputParameters') }}
-        </div>
-        <div class="ActionsList-grid-column"></div>
-      </div>
-      <sortable-list
-        class="ActionsList-content tiny-scrollbars"
-        handle-selector=".ActionsListItem-drag"
-        id-key="name"
-        :list="filteredActions"
-        @update:list="changeList($event)"
-      >
-        <template #default="{ item }">
-          <actions-list-item
-            class="ActionsList-item"
-            :actions-controller="collectionController"
-            :action="item"
-          >
-          </actions-list-item>
-        </template>
-      </sortable-list>
-    </div>
+    <sortable-list
+      v-if="filteredActions.length > 0"
+      class="ActionsList-content tiny-scrollbars"
+      handle-selector=".ActionsListItem-drag"
+      id-key="name"
+      :list="filteredActions"
+      @update:list="changeList($event)"
+    >
+      <template #default="{ item }">
+        <actions-list-item
+          class="ActionsList-item"
+          :actions-controller="collectionController"
+          :action="item"
+        >
+        </actions-list-item>
+      </template>
+    </sortable-list>
     <div v-else-if="!embedded" class="ActionsList-empty">
       {{
         $t(
@@ -126,29 +109,10 @@ export default defineComponent({
   &.state-embedded {
     height: auto;
 
-    .ActionsList-grid {
-      flex: none;
-      min-height: 0;
-    }
-
     .ActionsList-content {
       flex: none;
       overflow: visible;
     }
-  }
-}
-.ActionsList-grid {
-  --actions-list-columns: 20px 150px 150px minmax(150px, 1fr) minmax(150px, 1fr)
-    20px;
-  --actions-list-column-gap: 2px;
-
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-
-  @include devices-mixins.device-type(not-pc) {
-    flex: 1;
-    overflow: auto;
   }
 }
 .ActionsList-content {
@@ -165,16 +129,6 @@ export default defineComponent({
   color: var(--local-sub-text-color);
 }
 :deep(.SortableList-item) {
-  padding: 5px 0px;
-
-  &:not(:last-child) {
-    border-bottom: 1px dashed var(--local-border-color);
-  }
-}
-.ActionsList-grid-row {
-  display: grid;
-  grid-template-columns: var(--actions-list-columns);
-  color: var(--local-sub-text-color);
-  column-gap: var(--actions-list-column-gap);
+  padding: 0;
 }
 </style>
