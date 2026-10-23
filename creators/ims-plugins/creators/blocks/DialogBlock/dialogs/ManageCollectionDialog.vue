@@ -8,43 +8,49 @@
     <template #content>
       <div class="ManageCollectionDialog-list">
         <component
-          :is="dialog.state.viewComponent"
-          v-if="collectionController && !controllerLoading"
+          :is="dialog.state.filtersComponent"
+          v-if="dialog.state.filtersComponent"
           v-model:filters="filters"
-          :collection-controller="collectionController"
-          v-bind="dialog.state.viewComponentProps"
-        >
-          <template #prepend-filters>
-            <ims-select
-              v-if="currentAssetId && tabs.length > 1"
-              v-model="currentAssetId"
-              class="ManageCollectionDialog-assets"
-              :options="tabs"
-              label-prop="title"
-              value-prop="id"
-              :reduce="(opt) => opt.id"
-            ></ims-select>
-          </template>
-        </component>
-        <div
-          v-else-if="controllerLoading"
-          class="ManageCollectionDialog-loading"
-        >
-          <div class="loaderSpinner"></div>
+          class="ManageCollectionDialog-filters"
+        />
+        <div class="ManageCollectionDialog-groups tiny-scrollbars">
+          <section
+            v-for="group of groups"
+            :key="group.assetId"
+            class="ManageCollectionDialog-group"
+          >
+            <div class="ManageCollectionDialog-group-header">
+              <div class="ManageCollectionDialog-group-title">
+                {{ group.title }}
+              </div>
+            </div>
+            <component
+              :is="dialog.state.viewComponent"
+              v-model:filters="filters"
+              :collection-controller="group.controller"
+              :show-filters="false"
+              embedded
+              v-bind="dialog.state.viewComponentProps"
+            />
+            <button
+              type="button"
+              class="ManageCollectionDialog-addButton"
+              :class="{
+                loading: creatingGroupAssetId === group.assetId,
+              }"
+              :disabled="creatingGroupAssetId !== null"
+              @click="addEntity(group)"
+            >
+              <i class="ri-add-box-fill"></i>
+              {{ createButtonCaption }}
+            </button>
+          </section>
         </div>
       </div>
     </template>
     <template #footer>
       <div class="Form-row-buttons">
         <div class="Form-row-buttons-center use-buttons-action">
-          <button
-            type="button"
-            class="is-button"
-            :class="{ loading: creationLoading }"
-            @click="addEntity"
-          >
-            {{ createButtonCaption }}
-          </button>
           <button
             type="button"
             class="is-button accent"
@@ -70,12 +76,9 @@ import CreatorAssetManager from '~ims-app-base/logic/managers/CreatorAssetManage
 import type { AssetShort } from '~ims-app-base/logic/types/AssetsType';
 import { AssetBlockEditorVM } from '~ims-app-base/logic/vm/AssetBlockEditorVM';
 import type { IDialogCollectionController } from '../editor/DialogVariableController';
-import ValueSwitcher from '~ims-app-base/components/Common/ValueSwitcher.vue';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import ProjectManager from '~ims-app-base/logic/managers/ProjectManager';
-import ImsSelect from '~ims-app-base/components/Common/ImsSelect.vue';
-import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
 
 type DialogProps = {
   header: string;
@@ -92,18 +95,25 @@ type DialogProps = {
   ) => IDialogCollectionController;
   viewComponent: Component;
   viewComponentProps?: Record<string, any>;
+  filtersComponent?: Component;
   initialFilters?: Record<string, any>;
 };
 
 type DialogResult = void;
 
+type CollectionGroup = {
+  assetId: string;
+  controllerAssetId: string;
+  title: string;
+  controller: IDialogCollectionController;
+  externalAssetBlockEditor: AssetBlockEditorVM | null;
+  isLocalCopy: boolean;
+};
+
 export default defineComponent({
   name: 'ManageCollectionDialog',
   components: {
     DialogContent,
-    ValueSwitcher,
-    ImsSelect,
-    FormSearch,
   },
   provide() {
     return {
@@ -118,16 +128,11 @@ export default defineComponent({
   },
   data() {
     return {
-      parentAssetShorts: [] as AssetShort[],
-      currentAssetId: null as string | null,
-      collectionController: null as null | IDialogCollectionController,
+      groups: [] as CollectionGroup[],
       dialogLoadDone: false,
       dialogLoadingError: null as string | null,
-      externalAssetBlockEditor: null as null | AssetBlockEditorVM,
       saveDone: true,
-      creationLoading: false,
-      controllerLoading: false,
-      needSaveBlockIds: [] as string[],
+      creatingGroupAssetId: null as string | null,
       filters: this.dialog.state.initialFilters
         ? { ...this.dialog.state.initialFilters }
         : ({} as Record<string, any>),
@@ -148,47 +153,6 @@ export default defineComponent({
         return this.dialog.state.createButtonCaption({ filters: this.filters });
       } else return this.dialog.state.createButtonCaption;
     },
-    tabs() {
-      if (!this.resolvedBlock) {
-        return [];
-      }
-      const default_option = {
-        id: this.resolvedBlock.assetId,
-        title: this.$t('imsDialogEditor.var.currentScript'),
-      };
-
-      const res = [default_option];
-      for (const p_asset of this.parentAssetShorts) {
-        res.push({
-          id: p_asset.id,
-          title:
-            p_asset.id === SCRIPT_ASSET_ID
-              ? this.$t('imsDialogEditor.var.baseScript')
-              : this.$t('imsDialogEditor.var.ofScript', {
-                  script: convertTranslatedTitle(
-                    p_asset.title ?? '',
-                    (key: any) => this.$t(key),
-                  ),
-                }),
-        });
-      }
-
-      return res;
-    },
-  },
-  watch: {
-    async currentAssetId() {
-      if (!this.resolvedBlock) {
-        return;
-      }
-      if (this.currentAssetId) {
-        this.externalAssetBlockEditor?.saveChanges();
-        this.$getAppManager()
-          .get(CreatorAssetManager)
-          .getAssetInstance(this.resolvedBlock.assetId, true);
-        await this.createCollectionController(this.currentAssetId);
-      }
-    },
   },
   async mounted() {
     await this.loadDialog();
@@ -200,7 +164,7 @@ export default defineComponent({
       }
 
       this.saveDone = false;
-      await this.externalAssetBlockEditor?.saveChanges();
+      await this.saveExternalEditors();
       this.$getAppManager()
         .get(CreatorAssetManager)
         .getAssetInstance(this.resolvedBlock.assetId, true);
@@ -208,18 +172,18 @@ export default defineComponent({
       this.dialog.close();
     },
 
-    async addEntity() {
-      this.creationLoading = true;
+    async addEntity(group: CollectionGroup) {
+      if (this.creatingGroupAssetId) {
+        return;
+      }
+      this.creatingGroupAssetId = group.assetId;
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
-          if (!this.collectionController) {
-            return;
-          }
-          if (this.currentAssetId === SCRIPT_ASSET_ID) {
+          if (group.assetId === SCRIPT_ASSET_ID && !group.isLocalCopy) {
             const base_asset = await this.$getAppManager()
               .get(CreatorAssetManager)
-              .getAssetInstance(this.currentAssetId);
+              .getAssetInstance(group.controllerAssetId);
             if (!base_asset) return;
             if (base_asset.projectId !== this.projectInfo?.id) {
               let target_workspace_id: string | null = null;
@@ -260,10 +224,16 @@ export default defineComponent({
                     isAbstract: base_asset.isAbstract,
                   },
                 });
-              await this.createCollectionController(result.ids[0]);
+              const local_copy = await this.createGroup(result.ids[0]);
+              if (!local_copy) return;
+              group.controller = local_copy.controller;
+              group.externalAssetBlockEditor =
+                local_copy.externalAssetBlockEditor;
+              group.controllerAssetId = local_copy.controllerAssetId;
+              group.isLocalCopy = true;
             }
           }
-          const new_variable = await this.collectionController.createEntity(
+          const new_entity = await group.controller.createEntity(
             this.dialog.state.createEntityInitalVals
               ? this.dialog.state.createEntityInitalVals({
                   filters: this.filters,
@@ -271,70 +241,113 @@ export default defineComponent({
               : {},
           );
 
-          if (!new_variable) return;
-          this.collectionController?.addEntity(new_variable);
+          if (!new_entity) return;
+          group.controller.addEntity(new_entity);
         });
-      this.creationLoading = false;
+      this.creatingGroupAssetId = null;
     },
-    async createCollectionController(asset_id: string) {
+
+    async saveExternalEditors() {
+      for (const group of this.groups) {
+        if (!group.externalAssetBlockEditor) continue;
+        await group.externalAssetBlockEditor.saveChanges();
+        this.$getAppManager()
+          .get(CreatorAssetManager)
+          .getAssetInstance(group.controllerAssetId, true);
+      }
+    },
+
+    async createGroup(
+      asset_id: string,
+      asset_short?: AssetShort,
+    ): Promise<CollectionGroup | null> {
       const resolvedBlock = this.resolvedBlock;
       if (!resolvedBlock) {
-        return;
+        return null;
       }
 
-      this.controllerLoading = true;
       if (asset_id === resolvedBlock.assetId) {
-        this.collectionController = this.dialog.state.getCollectionController(
-          this.dialogController,
-        );
-      } else {
-        const asset_full = await this.$getAppManager()
-          .get(CreatorAssetManager)
-          .getAssetInstance(asset_id);
-        if (!asset_full) return;
-        asset_full.activate();
-        const asset_block_editor = AssetBlockEditorVM.CreateInstance(
-          this.$getAppManager(),
-          asset_full,
-        );
-        const controller = new DialogBlockController(
-          this.$getAppManager(),
-          () =>
-            asset_block_editor
-              .resolveBlocks()
-              .list.find(
-                (b) =>
-                  (b.name ? b.name === resolvedBlock.name : false) ||
-                  b.id === resolvedBlock.id,
-              ) ?? null,
-        );
-        controller.postCreate();
-
-        controller.mountEditor(asset_block_editor);
-        this.externalAssetBlockEditor = asset_block_editor as any;
-        this.collectionController =
-          this.dialog.state.getCollectionController(controller);
+        return {
+          assetId: asset_id,
+          controllerAssetId: asset_id,
+          title: this.$t('imsDialogEditor.var.currentScript'),
+          controller: this.dialog.state.getCollectionController(
+            this.dialogController,
+          ),
+          externalAssetBlockEditor: null,
+          isLocalCopy: false,
+        };
       }
-      this.controllerLoading = false;
+
+      const asset_full = await this.$getAppManager()
+        .get(CreatorAssetManager)
+        .getAssetInstance(asset_id);
+      if (!asset_full) return null;
+      asset_full.activate();
+      const asset_block_editor = AssetBlockEditorVM.CreateInstance(
+        this.$getAppManager(),
+        asset_full,
+      );
+      const controller = new DialogBlockController(
+        this.$getAppManager(),
+        () =>
+          asset_block_editor
+            .resolveBlocks()
+            .list.find(
+              (b) =>
+                (b.name ? b.name === resolvedBlock.name : false) ||
+                b.id === resolvedBlock.id,
+            ) ?? null,
+      );
+      controller.postCreate();
+      controller.mountEditor(asset_block_editor);
+
+      return {
+        assetId: asset_id,
+        controllerAssetId: asset_id,
+        title: this.getGroupTitle(asset_id, asset_short),
+        controller: this.dialog.state.getCollectionController(controller),
+        externalAssetBlockEditor: asset_block_editor,
+        isLocalCopy: false,
+      };
     },
+
+    getGroupTitle(asset_id: string, asset_short?: AssetShort) {
+      if (asset_id === SCRIPT_ASSET_ID) {
+        return this.$t('imsDialogEditor.var.baseScript');
+      }
+      return this.$t('imsDialogEditor.var.ofScript', {
+        script: convertTranslatedTitle(asset_short?.title ?? '', (key: any) =>
+          this.$t(key),
+        ),
+      });
+    },
+
     async loadDialog() {
       try {
         assert(this.resolvedBlock?.assetId);
-        this.currentAssetId = this.resolvedBlock.assetId;
+        const current_group = await this.createGroup(
+          this.resolvedBlock.assetId,
+        );
+        if (current_group) {
+          this.groups.push(current_group);
+        }
+
         const asset_short = await this.$getAppManager()
           .get(CreatorAssetManager)
           .getAssetShortViaCache(this.resolvedBlock.assetId);
-        assert(asset_short);
-        const parent_assets: AssetShort[] = [];
-        for (const type_id of asset_short.typeIds) {
-          const parent_asset = await this.$getAppManager()
-            .get(CreatorAssetManager)
-            .getAssetShortViaCache(type_id);
-          if (!parent_asset) continue;
-          parent_assets.push(parent_asset);
+        if (asset_short) {
+          for (const type_id of [...asset_short.typeIds].reverse()) {
+            const parent_asset = await this.$getAppManager()
+              .get(CreatorAssetManager)
+              .getAssetShortViaCache(type_id);
+            if (!parent_asset) continue;
+            const group = await this.createGroup(type_id, parent_asset);
+            if (group) {
+              this.groups.push(group);
+            }
+          }
         }
-        this.parentAssetShorts = parent_assets;
-        this.createCollectionController(this.resolvedBlock.assetId);
       } catch (err: any) {
         this.dialogLoadingError = err;
       } finally {
@@ -348,8 +361,8 @@ export default defineComponent({
 @use '~ims-app-base/style/devices-mixins';
 
 .ManageCollectionDialog {
-  width: 100%;
-  max-width: 750px;
+  max-width: 100%;
+  width: 750px;
   height: 70vh;
   display: flex;
   flex-direction: column;
@@ -361,24 +374,75 @@ export default defineComponent({
   }
 
   @include devices-mixins.device-type(not-pc) {
-    .ManageCollectionDialog-assets {
-      flex: 1 1 100%;
-      min-width: 0;
-    }
   }
 }
 .ManageCollectionDialog-list {
   height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .ManageCollectionDialog-filters {
+  flex-shrink: 0;
+  padding-bottom: 10px;
+}
+.ManageCollectionDialog-groups {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ManageCollectionDialog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ManageCollectionDialog-group-header {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
-.ManageCollectionDialog-assets {
-  width: 210px;
-  flex-shrink: 0;
+.ManageCollectionDialog-group-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
 }
-.ManageCollectionDialog-loading {
-  margin-bottom: 20px;
+.ManageCollectionDialog-addButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1.5px dashed var(--local-border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--local-sub-text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  i {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: var(--local-text-color);
+    border-color: var(--local-border-color);
+    background: var(--button-bg-color-hover);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
 }
 </style>

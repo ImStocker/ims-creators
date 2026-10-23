@@ -234,7 +234,11 @@ export default {
       deleteActionConfirm: 'Are you sure want to delete action?',
       atLeastOneOutputParam:
         'An action with the «Function» type requires at least one output parameter',
-      all: 'All',
+      types: {
+        triggers: 'Triggers',
+        functions: 'Functions',
+        all: 'All',
+      },
     },
     var: {
       manageVariables: 'Manage variables',
@@ -246,6 +250,11 @@ export default {
       deleteVariable: 'Delete variable',
       deleteVariableConfirm: 'Are you sure want to delete variable?',
       createVariable: 'Create variable',
+      createGlobalVariable: 'Add global variable',
+      createLocalVariable: 'Add local variable',
+      createInVariable: 'Add input variable',
+      createOutVariable: 'Add output variable',
+      createInOutVariable: 'Add input/output variable',
       variableAlreadyExists: 'Variable already exists',
       nameIsEmpty: 'Name is empty',
       noVariablesYet: 'You have no variables yet',
@@ -272,6 +281,7 @@ export default {
         asset: 'Asset',
       },
       kinds: {
+        all: 'All',
         global: 'Global',
         local: 'Local',
         in: 'In',

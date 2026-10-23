@@ -1,107 +1,84 @@
 <template>
-  <value-switcher
+  <segmented-tabs
     v-model="ownModelValue"
     class="VariableKindSelector"
-    :options="visibleOptions"
-    label-prop="title"
-    value-prop="value"
-  >
-    <template #[moreSlotName]="{ option }">
-      <menu-button class="VariableKindSelector-more">
-        <template #button="{ toggle }">
-          <button
-            :title="option.title"
-            class="VariableKindSelector-more-button is-button is-button-value-switcher"
-            :class="{ selected: isMoreOptionsButtonSelected }"
-            @click="toggle"
-          >
-            <i v-if="!isMoreOptionsButtonSelected" class="ri-more-2-fill"></i>
-            <div v-else>
-              {{ moreOptions.find((el) => el.name === ownModelValue)?.title }}
-              <i class="ri-more-2-fill"></i>
-            </div>
-          </button>
-        </template>
-        <menu-list :menu-list="moreOptions"></menu-list>
-      </menu-button>
-    </template>
-  </value-switcher>
+    variant="raised"
+    :style="{
+      '--SegmentedTabs-item-gap': '2px',
+    }"
+    :items="items"
+  />
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
-import ValueSwitcher from '~ims-app-base/components/Common/ValueSwitcher.vue';
-import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
+import SegmentedTabs from '~ims-app-base/components/Common/SegmentedTabs.vue';
 import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
-import MenuList from '~ims-app-base/components/Common/MenuList.vue';
-import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
-
-const MORE_KINDS = ['in', 'out', 'in-out'] as ScriptBlockPlainVariableKinds[];
-const MORE_OPTION_KEY = '__more__';
 
 export default defineComponent({
   name: 'VariableKindSelector',
   components: {
-    ValueSwitcher,
-    MenuButton,
-    MenuList,
+    SegmentedTabs,
   },
   props: {
     modelValue: {
-      type: String as PropType<ScriptBlockPlainVariableKinds>,
-      default: ScriptBlockPlainVariableKinds.GLOBAL,
+      type: [String, null] as PropType<ScriptBlockPlainVariableKinds | null>,
+      default: null,
+    },
+    showAll: {
+      type: Boolean,
+      default: true,
     },
   },
   emits: ['update:model-value'],
   computed: {
     ownModelValue: {
       get() {
-        return this.modelValue ?? ScriptBlockPlainVariableKinds.GLOBAL;
+        return this.modelValue ?? null;
       },
-      set(val: ScriptBlockPlainVariableKinds) {
+      set(val: ScriptBlockPlainVariableKinds | null) {
         this.$emit('update:model-value', val);
       },
     },
-    moreSlotName() {
-      return 'option-wrapper-' + MORE_OPTION_KEY;
-    },
-    visibleOptions() {
-      return [
+    items() {
+      const items = [
         {
+          key: null,
+          label: this.$t('imsDialogEditor.var.kinds.all'),
+          title: this.$t('imsDialogEditor.var.kinds.all'),
+        },
+        {
+          key: ScriptBlockPlainVariableKinds.GLOBAL,
           title: this.$t('imsDialogEditor.var.kinds.global'),
-          value: ScriptBlockPlainVariableKinds.GLOBAL,
+          icon: 'ri-global-line',
         },
         {
+          key: ScriptBlockPlainVariableKinds.LOCAL,
           title: this.$t('imsDialogEditor.var.kinds.local'),
-          value: ScriptBlockPlainVariableKinds.LOCAL,
+          icon: 'ri-terminal-line',
         },
         {
-          title: this.$t('imsDialogEditor.var.kinds.more'),
-          value: MORE_OPTION_KEY,
+          key: ScriptBlockPlainVariableKinds.IN,
+          title: this.$t('imsDialogEditor.var.kinds.in'),
+          icon: 'ri-contract-right-line',
+        },
+        {
+          key: ScriptBlockPlainVariableKinds.OUT,
+          title: this.$t('imsDialogEditor.var.kinds.out'),
+          icon: 'ri-expand-right-line',
+        },
+        {
+          key: ScriptBlockPlainVariableKinds.INOUT,
+          title: this.$t('imsDialogEditor.var.kinds.in-out'),
+          icon: 'ri-expand-horizontal-line',
         },
       ];
-    },
-    isMoreOptionsButtonSelected() {
-      return this.moreOptions.find((el) => el.name === this.ownModelValue);
-    },
-    moreOptions(): MenuListItem[] {
-      return MORE_KINDS.map((k) => ({
-        title: this.$t('imsDialogEditor.var.kinds.' + k),
-        name: k,
-        action:
-          this.ownModelValue === k
-            ? undefined
-            : () => {
-                this.ownModelValue = k;
-              },
-      }));
+      return this.showAll ? items : items.slice(1);
     },
   },
 });
 </script>
 <style lang="scss" scoped>
-.VariableKindSelector-more-button {
-  --button-outline-color: transparent !important;
-  border-radius: 0 var(--ValueSwitcher-border-radius)
-    var(--ValueSwitcher-border-radius) 0;
+.VariableKindSelector {
+  flex-shrink: 0;
 }
 </style>

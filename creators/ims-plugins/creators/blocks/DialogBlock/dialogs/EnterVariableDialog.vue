@@ -38,6 +38,7 @@
           <variable-kind-selector
             v-model="variable.kind"
             class="EnterVariableDialog-selectKind"
+            :show-all="false"
           ></variable-kind-selector>
         </div>
       </div>

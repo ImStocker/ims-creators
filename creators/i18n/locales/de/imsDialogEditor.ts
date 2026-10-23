@@ -232,7 +232,11 @@ export default {
       deleteActionConfirm: 'Möchtest du die Aktion wirklich löschen?',
       atLeastOneOutputParam:
         'Eine Aktion vom Typ «Funktion» benötigt mindestens einen Ausgabeparameter',
-      all: 'Alle',
+      types: {
+        triggers: 'Trigger',
+        functions: 'Funktionen',
+        all: 'Alle',
+      },
     },
     var: {
       manageVariables: 'Variablen verwalten',
@@ -244,6 +248,11 @@ export default {
       deleteVariable: 'Variable löschen',
       deleteVariableConfirm: 'Möchtest du die Variable wirklich löschen?',
       createVariable: 'Variable erstellen',
+      createGlobalVariable: 'Globale Variable hinzufügen',
+      createLocalVariable: 'Lokale Variable hinzufügen',
+      createInVariable: 'Eingabevariable hinzufügen',
+      createOutVariable: 'Ausgabevariable hinzufügen',
+      createInOutVariable: 'Eingabe-/Ausgabevariable hinzufügen',
       variableAlreadyExists: 'Variable existiert bereits',
       nameIsEmpty: 'Name ist leer',
       noVariablesYet: 'Du hast noch keine Variablen',
@@ -270,6 +279,7 @@ export default {
         asset: 'Asset',
       },
       kinds: {
+        all: 'Alle',
         global: 'Global',
         local: 'Lokal',
         in: 'Eingabe',

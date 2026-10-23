@@ -54,6 +54,8 @@ import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
+import ActionsListFilters from '../dialogs/ActionsListFilters.vue';
+import VariableListFilters from '../dialogs/VariableListFilters.vue';
 import type { IDialogCollectionController } from './DialogVariableController';
 import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import { nodeVariableAdd } from '../logic/nodeVariables';
@@ -1147,9 +1149,28 @@ export class DialogBlockController extends BlockEditorController {
       dialogController: this,
       projectContext,
       header: this.appManager.$t('imsDialogEditor.var.manageVariables'),
-      createButtonCaption: this.appManager.$t(
-        'imsDialogEditor.var.createVariable',
-      ),
+      createButtonCaption: ({ filters }) => {
+        switch (filters.kind) {
+          case ScriptBlockPlainVariableKinds.GLOBAL:
+            return this.appManager.$t(
+              'imsDialogEditor.var.createGlobalVariable',
+            );
+          case ScriptBlockPlainVariableKinds.LOCAL:
+            return this.appManager.$t(
+              'imsDialogEditor.var.createLocalVariable',
+            );
+          case ScriptBlockPlainVariableKinds.IN:
+            return this.appManager.$t('imsDialogEditor.var.createInVariable');
+          case ScriptBlockPlainVariableKinds.OUT:
+            return this.appManager.$t('imsDialogEditor.var.createOutVariable');
+          case ScriptBlockPlainVariableKinds.INOUT:
+            return this.appManager.$t(
+              'imsDialogEditor.var.createInOutVariable',
+            );
+          default:
+            return this.appManager.$t('imsDialogEditor.var.createVariable');
+        }
+      },
       createEntityInitalVals: ({ filters }) => {
         return { kind: filters.kind };
       },
@@ -1170,7 +1191,7 @@ export class DialogBlockController extends BlockEditorController {
         createEntity: async (initial) =>
           await nodeVariableAdd(
             this.appManager,
-            this.getOwnVariables(),
+            dialogController.getOwnVariables(),
             {
               alreadyExist: this.appManager.$t(
                 'imsDialogEditor.var.variableAlreadyExists',
@@ -1184,6 +1205,7 @@ export class DialogBlockController extends BlockEditorController {
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/VariableList.vue')),
       ),
+      filtersComponent: markRaw(VariableListFilters),
       viewComponentProps: {
         showKindControl: true,
       },
@@ -1232,9 +1254,9 @@ export class DialogBlockController extends BlockEditorController {
             .show(EnterActionDialog, {
               initial,
               validate: (action) => {
-                const list = this.getActions().some(
-                  (a) => a.name === action.name,
-                );
+                const list = dialogController
+                  .getActions()
+                  .some((a) => a.name === action.name);
                 if (list) {
                   throw new Error(
                     this.appManager.$t(
@@ -1251,6 +1273,7 @@ export class DialogBlockController extends BlockEditorController {
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/ActionsList.vue')),
       ),
+      filtersComponent: markRaw(ActionsListFilters),
       initialFilters: {
         type: actionType,
       },

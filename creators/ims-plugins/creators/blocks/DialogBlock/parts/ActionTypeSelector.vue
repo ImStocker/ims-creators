@@ -1,43 +1,27 @@
 <template>
-  <value-switcher
+  <segmented-tabs
     v-model="ownModelValue"
     class="ActionTypeSelector"
-    :options="availableActionTypes"
-    label-prop="title"
-    value-prop="value"
-  >
-    <template #option="{ option }">
-      <div class="ActionTypeSelector-option">
-        <i
-          v-if="option.icon"
-          :class="option.icon"
-          class="ActionTypeSelector-option-icon"
-        ></i>
-        <div class="ActionTypeSelector-option-title">
-          {{ option.title }}
-        </div>
-      </div>
-    </template>
-  </value-switcher>
+    variant="raised"
+    :style="{
+      '--SegmentedTabs-item-gap': '2px',
+    }"
+    :items="items"
+  />
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
+import SegmentedTabs from '~ims-app-base/components/Common/SegmentedTabs.vue';
 import type { ScriptBlockPlainActionTypes } from '../logic/nodeStoring';
-import { getAvailableActionTypes } from '../logic/nodeActions';
-import ValueSwitcher from '~ims-app-base/components/Common/ValueSwitcher.vue';
 
 export default defineComponent({
   name: 'ActionTypeSelector',
   components: {
-    ValueSwitcher,
+    SegmentedTabs,
   },
   props: {
     modelValue: {
       type: [String, null] as PropType<ScriptBlockPlainActionTypes | null>,
-      required: true,
-    },
-    nullable: {
-      type: Boolean,
       default: null,
     },
   },
@@ -45,28 +29,37 @@ export default defineComponent({
   computed: {
     ownModelValue: {
       get() {
-        return this.modelValue;
+        return this.modelValue ?? null;
       },
       set(val: ScriptBlockPlainActionTypes | null) {
         this.$emit('update:model-value', val);
       },
     },
-    availableActionTypes() {
-      const res = getAvailableActionTypes((key: string) => this.$t(key));
-      if (this.nullable) {
-        res.unshift({
-          title: this.$t('imsDialogEditor.actions.all'),
-          value: null,
-        });
-      }
-      return res;
+    items() {
+      return [
+        {
+          key: null,
+          label: this.$t('imsDialogEditor.actions.types.all'),
+          title: this.$t('imsDialogEditor.actions.types.all'),
+        },
+        {
+          key: 'trigger',
+          title: this.$t('imsDialogEditor.actions.types.triggers'),
+          icon: 'ri-flashlight-fill',
+        },
+        {
+          key: 'function',
+          title: this.$t('imsDialogEditor.actions.types.functions'),
+          icon: 'ri-formula',
+        },
+      ];
     },
   },
 });
 </script>
 <style lang="scss" scoped>
-.ActionTypeSelector-option {
-  display: flex;
-  gap: 5px;
+.ActionTypeSelector {
+  flex-shrink: 0;
+  height: 36px;
 }
 </style>

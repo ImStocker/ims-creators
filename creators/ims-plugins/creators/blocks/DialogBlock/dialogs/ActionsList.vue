@@ -1,22 +1,18 @@
 <template>
-  <div class="ActionsList">
-    <div class="ActionsList-filters">
-      <div class="ActionsList-filters-group">
+  <div
+    v-if="filteredActions.length > 0 || !embedded"
+    class="ActionsList"
+    :class="{ 'state-embedded': embedded }"
+  >
+    <actions-list-filters
+      v-if="showFilters"
+      :filters="filters"
+      @update:filters="$emit('update:filters', $event)"
+    >
+      <template #prepend-filters>
         <slot name="prepend-filters"></slot>
-        <action-type-selector
-          :model-value="filters?.type ?? null"
-          class="ActionsList-filters-type"
-          nullable
-          @update:model-value="changeFilters('type', $event)"
-        ></action-type-selector>
-      </div>
-      <form-search
-        v-if="actionsList && actionsList.length"
-        class="ActionsList-filters-query"
-        :value="filters?.query ?? ''"
-        @change="changeFilters('query', $event)"
-      ></form-search>
-    </div>
+      </template>
+    </actions-list-filters>
     <div v-if="filteredActions.length > 0" class="ActionsList-grid">
       <div class="ActionsList-grid-row">
         <div class="ActionsList-grid-column"></div>
@@ -51,7 +47,7 @@
         </template>
       </sortable-list>
     </div>
-    <div v-else class="ActionsList-empty">
+    <div v-else-if="!embedded" class="ActionsList-empty">
       {{
         $t(
           'imsDialogEditor.actions.' +
@@ -65,28 +61,21 @@
 import { defineComponent, type PropType } from 'vue';
 import type { IDialogCollectionController } from '../editor/DialogVariableController';
 import ActionsListItem from './ActionsListItem.vue';
-import type {
-  ScriptBlockPlainAction,
-  ScriptBlockPlainActionTypes,
-} from '../logic/nodeStoring';
+import type { ScriptBlockPlainAction } from '../logic/nodeStoring';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
-import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
-import { getAvailableActionTypes } from '../logic/nodeActions';
-import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
-
-type ActionsListFilters = {
-  query?: string;
-  type?: ScriptBlockPlainActionTypes;
-};
+import ActionsListFilters from './ActionsListFilters.vue';
+import {
+  isActionVisible,
+  type ActionsListFilters as ActionsListFiltersType,
+} from './collectionItemFilters';
 
 export default defineComponent({
   name: 'ActionsList',
   components: {
     ActionsListItem,
     SortableList,
-    FormSearch,
-    ActionTypeSelector,
+    ActionsListFilters,
   },
   props: {
     collectionController: {
@@ -94,8 +83,16 @@ export default defineComponent({
       required: true,
     },
     filters: {
-      type: [Object, null] as PropType<ActionsListFilters | null>,
+      type: [Object, null] as PropType<ActionsListFiltersType | null>,
       default: null,
+    },
+    showFilters: {
+      type: Boolean,
+      default: true,
+    },
+    embedded: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ['update:filters'],
@@ -104,28 +101,10 @@ export default defineComponent({
       return this.collectionController.getEntities();
     },
     filteredActions() {
-      return this.actionsList.filter(
-        (a) =>
-          (!this.filters?.query ||
-            a.name.toLowerCase().includes(this.filters.query.toLowerCase())) &&
-          (this.filters?.type ? a.type === this.filters.type : true),
-      );
-    },
-    availableActionTypes() {
-      return getAvailableActionTypes((key: string) => this.$t(key));
+      return this.actionsList.filter((a) => isActionVisible(a, this.filters));
     },
   },
   methods: {
-    changeFilters<N extends keyof ActionsListFilters>(
-      name: N,
-      val: ActionsListFilters[N],
-    ) {
-      const newFilters = {
-        ...this.filters,
-        [name]: val,
-      };
-      this.$emit('update:filters', newFilters);
-    },
     async changeList(reordered_actions: ScriptBlockPlainAction[]) {
       await this.$getAppManager()
         .get(UiManager)
@@ -143,39 +122,18 @@ export default defineComponent({
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.ActionsList-filters {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
 
-  .ActionsList-filters-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+  &.state-embedded {
+    height: auto;
 
-  .ActionsList-filters-type {
-    --ValueSwitcher-border-radius: 8px;
-  }
-
-  .ActionsList-filters-query {
-    min-width: 0;
-  }
-
-  @include devices-mixins.device-type(not-pc) {
-    flex-wrap: wrap;
-
-    .ActionsList-filters-group {
-      flex-wrap: wrap;
+    .ActionsList-grid {
+      flex: none;
+      min-height: 0;
     }
-  }
 
-  @include devices-mixins.device-type(mb) {
-    .ActionsList-filters-query {
-      flex: 1 1 100%;
+    .ActionsList-content {
+      flex: none;
+      overflow: visible;
     }
   }
 }

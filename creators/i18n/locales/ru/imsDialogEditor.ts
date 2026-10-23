@@ -233,7 +233,11 @@ export default {
       deleteActionConfirm: 'Вы уверены, что хотите удалить действие?',
       atLeastOneOutputParam:
         'Для действия с типом "функция" необходим как минимум один выходной параметр',
-      all: 'Все',
+      types: {
+        triggers: 'Триггеры',
+        functions: 'Функции',
+        all: 'Все',
+      },
     },
     var: {
       manageVariables: 'Управлять переменными',
@@ -245,6 +249,11 @@ export default {
       deleteVariable: 'Удалить переменную',
       deleteVariableConfirm: 'Вы уверены, что хотите удалить переменную?',
       createVariable: 'Создать переменную',
+      createGlobalVariable: 'Добавить глобальную переменную',
+      createLocalVariable: 'Добавить локальную переменную',
+      createInVariable: 'Добавить входную переменную',
+      createOutVariable: 'Добавить выходную переменную',
+      createInOutVariable: 'Добавить входную/выходную переменную',
       variableAlreadyExists: 'Переменная уже существует',
       nameIsEmpty: 'Название не задано',
       noVariablesYet: 'У вас пока нет переменных',
@@ -271,6 +280,7 @@ export default {
         asset: 'Элемент',
       },
       kinds: {
+        all: 'Все',
         global: 'Глобальные',
         local: 'Локальные',
         in: 'Входные',

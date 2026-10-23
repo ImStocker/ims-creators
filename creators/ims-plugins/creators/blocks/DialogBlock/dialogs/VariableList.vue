@@ -1,22 +1,19 @@
 <template>
-  <div class="VariableList">
-    <div class="VariableList-filters">
-      <div class="VariableList-filters-group">
+  <div
+    v-if="filteredVariables.length > 0 || !embedded"
+    class="VariableList"
+    :class="{ 'state-embedded': embedded }"
+  >
+    <variable-list-filters
+      v-if="showFilters"
+      :filters="filters"
+      :show-search="showSearch"
+      @update:filters="$emit('update:filters', $event)"
+    >
+      <template #prepend-filters>
         <slot name="prepend-filters"></slot>
-        <variable-kind-selector
-          v-if="showKindControl"
-          :model-value="filters?.kind"
-          class="VariableList-filters-kind"
-          @update:model-value="changeFilters('kind', $event)"
-        ></variable-kind-selector>
-      </div>
-      <form-search
-        v-if="filteredVariables && filteredVariables.length && showSearch"
-        class="VariableList-filters-query"
-        :value="filters?.query ?? ''"
-        @change="changeFilters('query', $event)"
-      ></form-search>
-    </div>
+      </template>
+    </variable-list-filters>
     <div v-if="filteredVariables.length > 0" class="VariableList-grid">
       <div class="VariableList-grid-row">
         <div class="VariableList-grid-column"></div>
@@ -49,7 +46,7 @@
         </template>
       </sortable-list>
     </div>
-    <div v-else class="VariableList-empty">
+    <div v-else-if="!embedded" class="VariableList-empty">
       {{
         $t(
           'imsDialogEditor.var.' +
@@ -69,25 +66,21 @@ import type { IDialogVariableController } from '../editor/DialogVariableControll
 import VariableListItem from './VariableListItem.vue';
 import SortableList from '~ims-app-base/components/Common/SortableList.vue';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
+import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
+import VariableListFilters from './VariableListFilters.vue';
 import {
-  ScriptBlockPlainVariableKinds,
-  type ScriptBlockPlainVariable,
-} from '../logic/nodeStoring';
-import FormSearch from '~ims-app-base/components/Form/FormSearch.vue';
-import VariableKindSelector from '../parts/VariableKindSelector.vue';
+  isVariableVisible,
+  type VariableListFilters as VariableListFiltersType,
+} from './collectionItemFilters';
 
-export type VariableListFilters = {
-  query?: string;
-  kind?: ScriptBlockPlainVariableKinds;
-};
+export type { VariableListFilters } from './collectionItemFilters';
 
 export default defineComponent({
   name: 'VariableList',
   components: {
     VariableListItem,
     SortableList,
-    FormSearch,
-    VariableKindSelector,
+    VariableListFilters,
   },
   props: {
     collectionController: {
@@ -106,8 +99,16 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    showFilters: {
+      type: Boolean,
+      default: true,
+    },
+    embedded: {
+      type: Boolean,
+      default: false,
+    },
     filters: {
-      type: [Object, null] as PropType<VariableListFilters | null>,
+      type: [Object, null] as PropType<VariableListFiltersType | null>,
       default: null,
     },
   },
@@ -117,14 +118,8 @@ export default defineComponent({
       return this.collectionController.getEntities();
     },
     filteredVariables() {
-      return this.variableList.filter(
-        (v) =>
-          (!this.filters?.query ||
-            v.title.toLowerCase().includes(this.filters.query.toLowerCase())) &&
-          (!this.filters?.kind ||
-            v.kind === this.filters?.kind ||
-            (this.filters?.kind === ScriptBlockPlainVariableKinds.GLOBAL &&
-              v.kind === undefined)),
+      return this.variableList.filter((v) =>
+        isVariableVisible(v, this.filters),
       );
     },
   },
@@ -132,16 +127,6 @@ export default defineComponent({
     await this.loadVariablesAssetKinds();
   },
   methods: {
-    changeFilters<N extends keyof VariableListFilters>(
-      name: N,
-      val: VariableListFilters[N],
-    ) {
-      const newFilters = {
-        ...this.filters,
-        [name]: val,
-      };
-      this.$emit('update:filters', newFilters);
-    },
     async changeList(reordered_variables: ScriptBlockPlainVariable[]) {
       await this.$getAppManager()
         .get(UiManager)
@@ -176,40 +161,18 @@ export default defineComponent({
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-.VariableList-filters {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
 
-  .VariableList-filters-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+  &.state-embedded {
+    height: auto;
 
-  .VariableList-filters-kind {
-    width: auto;
-    --ValueSwitcher-border-radius: 8px;
-  }
-  .VariableList-filters-query {
-    min-width: 0;
-  }
-
-  @include devices-mixins.device-type(not-pc) {
-    flex-wrap: wrap;
-
-    .VariableList-filters-group {
-      flex: 1;
-      flex-wrap: wrap;
+    .VariableList-grid {
+      flex: none;
+      min-height: 0;
     }
-  }
 
-  @include devices-mixins.device-type(mb) {
-    .VariableList-filters-query {
-      flex: 1 1 100%;
+    .VariableList-content {
+      flex: none;
+      overflow: visible;
     }
   }
 }
