@@ -215,6 +215,7 @@ export default {
       enterName: 'Namen eingeben',
       enterTitle: 'Titel eingeben',
       enterServiceName: 'Dienstnamen eingeben',
+      serviceName: 'Dienstname',
       selectType: 'Typ auswählen',
       inputParameters: 'Eingabeparameter',
       inputParamsAlreadyExists: 'Eingabeparameter existiert bereits',
@@ -232,6 +233,9 @@ export default {
       duplicateAction: 'Aktion duplizieren',
       deleteAction: 'Aktion löschen',
       deleteActionConfirm: 'Möchtest du die Aktion wirklich löschen?',
+      duplicateFunction: 'Funktion duplizieren',
+      deleteFunction: 'Funktion löschen',
+      deleteFunctionConfirm: 'Möchtest du die Funktion wirklich löschen?',
       atLeastOneOutputParam:
         'Eine Aktion vom Typ «Funktion» benötigt mindestens einen Ausgabeparameter',
       types: {

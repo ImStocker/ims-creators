@@ -1,9 +1,5 @@
 <template>
-  <dropdown-element
-    class="ActionParameterDropdown"
-    :shown="true"
-    @update:shown="onShown"
-  >
+  <div class="ActionParameterDropdown">
     <div class="ActionParameterDropdown-content">
       <div class="ActionParameterDropdown-field">
         <div class="ActionParameterDropdown-caption">
@@ -29,12 +25,11 @@
         ></variable-type-selector>
       </div>
     </div>
-  </dropdown-element>
+  </div>
 </template>
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue';
 import type { ScriptBlockPlainVariable } from '../logic/nodeStoring';
-import DropdownElement from '~ims-app-base/components/Common/DropdownElement.vue';
 import ImsTextInput from '~ims-app-base/components/Common/ImsTextInput.vue';
 import VariableTypeSelector from '../parts/VariableTypeSelector.vue';
 
@@ -43,7 +38,6 @@ export type ActionParameterDropdownFocus = 'title' | 'type';
 export default defineComponent({
   name: 'ActionParameterDropdown',
   components: {
-    DropdownElement,
     ImsTextInput,
     VariableTypeSelector,
   },
@@ -76,11 +70,6 @@ export default defineComponent({
         ...change,
       });
     },
-    onShown(shown: boolean) {
-      if (!shown) {
-        this.$emit('close');
-      }
-    },
   },
 });
 </script>
@@ -94,9 +83,6 @@ export default defineComponent({
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  background: var(--local-bg-color);
-  border: 1px solid var(--local-border-color);
-  border-radius: 8px;
 }
 
 .ActionParameterDropdown-field {

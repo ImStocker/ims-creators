@@ -216,11 +216,12 @@ export default {
       enterName: 'Введите название',
       enterTitle: 'Введите заголовок',
       enterServiceName: 'Введите служебное имя',
+      serviceName: 'Служебное имя',
       selectType: 'Выберите тип',
       inputParameters: 'Входные параметры',
       inputParamsAlreadyExists: 'Входной параметр уже существует',
       addInputParameter: 'Добавить входной параметр',
-      outputParameters: 'Выходной параметр',
+      outputParameters: 'Выходные параметры',
       outputParamsAlreadyExists: 'Выходной параметр уже существует',
       addOutputParameter: 'Добавить выходной параметр',
       noActionsYet: 'У вас пока нет действий',
@@ -233,6 +234,9 @@ export default {
       duplicateAction: 'Дублировать действие',
       deleteAction: 'Удалить действие',
       deleteActionConfirm: 'Вы уверены, что хотите удалить действие?',
+      duplicateFunction: 'Дублировать функцию',
+      deleteFunction: 'Удалить функцию',
+      deleteFunctionConfirm: 'Вы уверены, что хотите удалить функцию?',
       atLeastOneOutputParam:
         'Для действия с типом "функция" необходим как минимум один выходной параметр',
       types: {

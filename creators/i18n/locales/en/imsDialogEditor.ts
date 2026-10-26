@@ -217,6 +217,7 @@ export default {
       enterName: 'Enter name',
       enterTitle: 'Enter title',
       enterServiceName: 'Enter service name',
+      serviceName: 'Service name',
       selectType: 'Select type',
       inputParameters: 'Input parameters',
       inputParamsAlreadyExists: 'Input parameter already exists',
@@ -234,6 +235,9 @@ export default {
       duplicateAction: 'Duplicate action',
       deleteAction: 'Delete action',
       deleteActionConfirm: 'Are you sure want to delete action?',
+      duplicateFunction: 'Duplicate function',
+      deleteFunction: 'Delete function',
+      deleteFunctionConfirm: 'Are you sure want to delete function?',
       atLeastOneOutputParam:
         'An action with the «Function» type requires at least one output parameter',
       types: {
