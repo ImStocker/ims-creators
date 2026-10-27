@@ -16,6 +16,18 @@
           {{ exitName }}
         </div>
       </div>
+      <div
+        v-if="inputParameters.length > 0"
+        class="DialogEndNode-body DialogEditorNode-body"
+      >
+        <node-parameters-grid
+          :dialog-player="dialogPlayer"
+          :node-data-controller="nodeDataController"
+          :readonly="readonly"
+          :input-params="inputParameters"
+          :playing-node-data="playingNodeData"
+        ></node-parameters-grid>
+      </div>
     </ContextMenuZone>
   </div>
 </template>
@@ -27,15 +39,20 @@ import type { NodeDescriptor } from './NodeDescriptor';
 import type { NodeDataController } from '../editor/NodeDataController';
 import type { DialogBlockController } from '../editor/DialogBlockController';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
+import type { DialogVariable } from '../editor/DialogBlockController';
+import type { ScriptPlayNode } from '../play/ScriptPlayNode';
+import type { DialogPlayer } from '../play/DialogPlayer';
 import { castAssetPropValueToString } from '~ims-app-base/logic/types/Props';
 import ExecHandle from '../parts/ExecHandle.vue';
 import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 
 export default defineComponent({
   name: 'DialogEndNode',
   components: {
     ExecHandle,
     ContextMenuZone,
+    NodeParametersGrid,
   },
   props: {
     id: {
@@ -62,10 +79,25 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    playingNodeData: {
+      type: [Object, null] as PropType<ScriptPlayNode> | null,
+      default: null,
+    },
+    dialogPlayer: {
+      type: Object as PropType<DialogPlayer>,
+      required: true,
+    },
   },
   computed: {
     Position() {
       return Position;
+    },
+    inputParameters(): DialogVariable[] {
+      return this.dialogController
+        .getVariables()
+        .filter(
+          (v) => v.kind && ['out', 'in-out'].includes(v.kind),
+        );
     },
     exitName() {
       return castAssetPropValueToString(this.nodeDataController.subject);
@@ -100,6 +132,9 @@ export default defineComponent({
 }
 .DialogEndNode-caption {
   white-space: nowrap;
+}
+.DialogEndNode-body {
+  padding: 0;
 }
 .DialogEndNode-exitName {
   max-width: 200px;

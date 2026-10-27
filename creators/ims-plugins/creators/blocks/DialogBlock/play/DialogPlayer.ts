@@ -134,17 +134,9 @@ export class DialogPlayer {
     const loadedScript = this._loadedScripts.get(assetId);
     assert(loadedScript);
 
-    const defaultVariableValues = this.dialogController.getVariables().reduce(
-      (acc, variable) => {
-        acc[variable.name] = variable.default;
-        return acc;
-      },
-      {} as Record<string, AssetPropValue>,
-    );
-
     return new ImscScriptPlayer(loadedScript.graph as ImscScriptGraph, {
       scriptId: assetId,
-      initialVariables: defaultVariableValues,
+      initialVariables: {},
       events: {
         onSpeech: ({ speech, node }) => this._onSpeech(speech, node),
         onChance: (chanceEvent) => this._onChance(chanceEvent),

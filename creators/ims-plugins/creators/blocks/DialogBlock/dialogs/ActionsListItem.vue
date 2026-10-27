@@ -820,7 +820,7 @@ export default defineComponent({
 }
 
 .ActionsListItem-iconButton {
-  color: var(--local-sub-text-color);
+  color: var(--local-text-color);
 }
 
 .ActionsListItem-title {
