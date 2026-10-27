@@ -4,8 +4,6 @@ import { HttpMethods, Service, type AuthTokenInfo } from "~ims-app-base/logic/ma
 import AuthManager, { type AvatarEntity } from "~ims-app-base/logic/managers/AuthManager";
 import DialogManager from "~ims-app-base/logic/managers/DialogManager";
 import type { IAppManager } from "~ims-app-base/logic/managers/IAppManager";
-import { EntityCache } from "~ims-app-base/logic/types/EntityCache";
-import assert from 'assert';
 import type { ProjectLicense } from "~ims-app-base/logic/types/ProjectTypes";
 import DesktopSyncManager from "./DesktopSyncManager";
 
@@ -14,42 +12,42 @@ import DesktopSyncManager from "./DesktopSyncManager";
 
 export default class DesktopAuthManager extends AuthManager{
     private readonly _apiManager: ApiManager;
-    private _avatarsCache: EntityCache<AvatarEntity> | undefined;
-    private _avatarReloadEpoch: number = 0;
 
     constructor(app_manager: IAppManager) {
         super(app_manager);
         this._apiManager = app_manager.get(ApiManager);
     }
 
-    async init() {
-        this._avatarsCache = new EntityCache<AvatarEntity>({
-            key: 'id',
-            ttl: 1000 * 60 * 10,
-            loadFunc: async (userIds) => {
-                assert(this._avatarsCache, 'Not inited');
+    override async init() {
+        await super.init();
+    }
 
-                const res: { haveIds: number[] } = await this._apiManager.call(
-                    Service.AUTH,
-                    HttpMethods.POST,
-                    'auth/avatar/have',
-                    {
-                        userIds: userIds.map((u) => parseInt(u)),
-                    },
-                );
-                const all_avatars: AvatarEntity[] = [];
-                const haveIdsSet = new Set(res.haveIds);
-                for (const userId of userIds) {
-                    const ent: AvatarEntity = {
-                        id: userId,
-                        hasAvatar: haveIdsSet.has(parseInt(userId)),
-                    };
-                    all_avatars.push(ent);
-                }
-                this._avatarsCache.addToCacheMany(all_avatars);
-                return all_avatars;
+    protected override async loadAvatars(userIds: string[]): Promise<AvatarEntity[]> {
+        const res: { haveIds: number[] } = await this._apiManager.call(
+            Service.AUTH,
+            HttpMethods.POST,
+            'auth/avatar/have',
+            {
+                userIds: userIds.map((u) => parseInt(u)),
             },
-        });
+        );
+        const all_avatars: AvatarEntity[] = [];
+        const haveIdsSet = new Set(res.haveIds);
+        const host = this.appManager.$env.AUTH_API_HOST ?? '/';
+        for (const userId of userIds) {
+            const hasAvatar = haveIdsSet.has(parseInt(userId));
+            const ent: AvatarEntity = {
+                id: userId,
+                hasAvatar,
+                url: hasAvatar
+                    ? (size: number, epoch: number) =>
+                          `${host}auth/avatar/${size}/${userId}` +
+                          (epoch ? '?' + epoch : '')
+                    : (_size: number, _epoch: number) => '',
+            };
+            all_avatars.push(ent);
+        }
+        return all_avatars;
     }
 
 
@@ -127,26 +125,6 @@ export default class DesktopAuthManager extends AuthManager{
         return (await this.ensureValidUserInfo()) ?? null;
     }
 
-    override async getAvatar(user_id: string, size: number): Promise<string | null> {
-        assert(this._avatarsCache);
-        const res = await this._avatarsCache.getElement(user_id);
-        if (!res || !res.hasAvatar) return null;
-        return (
-        `${this.appManager.$env.AUTH_API_HOST ?? '/'}auth/avatar/${size}/${user_id}` +
-        (this._avatarReloadEpoch ? '?' + this._avatarReloadEpoch : '')
-        );
-    }
-
-    override getAvatarSync(user_id: string, size: number): string | null | undefined {
-        assert(this._avatarsCache);
-        const res = this._avatarsCache.getElementSync(user_id);
-        if (!res) return res;
-        if (!res.hasAvatar) return null;
-        return (
-        `${this.appManager.$env.AUTH_API_HOST ?? '/'}auth/avatar/${size}/${user_id}` +
-        (this._avatarReloadEpoch ? '?' + this._avatarReloadEpoch : '')
-        );
-    }
 
     async getUserLicense(): Promise<{
         list: ProjectLicense[];
