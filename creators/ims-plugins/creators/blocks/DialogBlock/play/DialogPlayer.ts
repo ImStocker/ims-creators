@@ -112,7 +112,13 @@ export class DialogPlayer {
     ) {
       return;
     }
-    this._player.setVariable(name, value, this.displayingFrameIndex);
+    // imsc-script ships its own Props copy, where AssetPropValue has no ['']
+    // structure marker — cast at this boundary (debug play-variable path only)
+    this._player.setVariable(
+      name,
+      value as Parameters<ImscScriptPlayer['setVariable']>[1],
+      this.displayingFrameIndex,
+    );
     this.refreshPlayVariables();
   }
 

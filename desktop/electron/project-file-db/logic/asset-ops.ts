@@ -6,6 +6,7 @@ import {
   extractRemapParentProps,
   remapAssetProps,
   convertAssetPropsToPlainObject,
+  finishMergeInheritedProps,
   type AssetProps,
   type AssetPropsPlainObject,
 } from '~ims-app-base/logic/types/Props';
@@ -142,7 +143,7 @@ export function formBlockComputed(
     }
   }
   block_computed = { ...block_computed, ...normalProps };
-  return block_computed;
+  return finishMergeInheritedProps(block_computed);
 }
 
 /**
