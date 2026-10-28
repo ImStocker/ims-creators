@@ -734,10 +734,10 @@ export class DialogBlockController extends BlockEditorController {
           if (toHandleDataMatch.optionIndex !== undefined) {
             const opt = to_node_data.options[toHandleDataMatch.optionIndex];
             if (opt) {
-              opt.values[toHandleDataMatch.param] = null;
+              delete opt.values[toHandleDataMatch.param];
             }
           } else {
-            to_node_data.values[toHandleDataMatch.param] = null;
+            delete to_node_data.values[toHandleDataMatch.param];
           }
         }
       }
@@ -873,8 +873,10 @@ export class DialogBlockController extends BlockEditorController {
   deleteEdgeById(edgeId: string) {
     const edge_index = this.state.edges.findIndex((edge) => edge.id === edgeId);
     if (edge_index >= 0) {
-      this.state.edges.splice(edge_index, 1);
+      // Clean up bound values while the edge is still in state
+      // (onEdgeDeleted looks the edge up by id)
       this.onEdgeDeleted(edgeId);
+      this.state.edges.splice(edge_index, 1);
     }
   }
 
