@@ -31,26 +31,32 @@
         </div>
       </template>
       <div v-if="needAuth || needLicense">
-        <div class="WelcomeFormContentCreateProject-message">
-          {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
-          <button v-if="needLicense && userInfo" 
-            class="is-button accent" 
-            @click="buyLicense()">
-            {{$t('desktop.welcome.buy')}}
-          </button>
+        <div v-if="!needAuth && licenseLoading" class="WelcomeFormContentCreateProject-message WelcomeFormContentCreateProject-licenseLoading">
+          <div class="loaderSpinner"></div>
+          {{ $t('desktop.welcome.checkingLicense') }}
         </div>
-        <login-form v-if="needAuth"
-            class="WelcomeFormContentStart-login"
-            :open-external="true"
-        />
-        <div class="WelcomeFormContentCreateProject-create" v-if="userInfo">
-          <button 
-            v-if="userInfo && needLicense"
-            class="is-button accent"
-            @click="logout">
-              {{ $t('desktop.welcome.loginToAnotherAccount') }}
-          </button>
-        </div>
+        <template v-else>
+          <div class="WelcomeFormContentCreateProject-message">
+            {{ $t('desktop.welcome.' + (needAuth ? 'needAuth' : 'needLicense')) }}
+            <button v-if="needLicense && userInfo" 
+              class="is-button accent" 
+              @click="buyLicense()">
+              {{$t('desktop.welcome.buy')}}
+            </button>
+          </div>
+          <login-form v-if="needAuth"
+              class="WelcomeFormContentStart-login"
+              :open-external="true"
+          />
+          <div class="WelcomeFormContentCreateProject-create" v-if="userInfo">
+            <button 
+              v-if="userInfo && needLicense"
+              class="is-button accent"
+              @click="logout">
+                {{ $t('desktop.welcome.loginToAnotherAccount') }}
+            </button>
+          </div>
+        </template>
       </div>
       <template v-else>
         <template v-if="step === 1">
@@ -183,6 +189,7 @@ export default defineComponent({
       currentProjectTemplateId: '',
       step: 1,
       loading: false,
+      licenseLoading: false,
       hasWarning: false,
       checkPathDebounce: null as any,
       userLicenses: {
@@ -215,7 +222,7 @@ export default defineComponent({
     const savedLocation = await window.imshost.storage.getItem<string>(LAST_PROJECT_LOCATION_STORAGE_KEY);
     this.params.projectLocation = savedLocation || await window.imshost.shell.getDocumentsFolder();
     if(this.params.projectType === 'cloud'){
-      await this.updateUserLicense();
+      this.updateUserLicense();
     }
     this.params = {
       ...this.params,
@@ -279,6 +286,10 @@ export default defineComponent({
       }
     },
     async updateUserLicense(){
+      if(!this.userInfo){
+        return;
+      }
+      this.licenseLoading = true;
       try{
         this.userLicenses = await this.$getAppManager()
             .get<DesktopAuthManager>(AuthManager)
@@ -288,6 +299,9 @@ export default defineComponent({
         if(this.params.projectType !== 'cloud'){
           this.$getAppManager().get(UiManager).showError(this.$t('desktop.welcome.dataNotLoad') + ':'+ err.message);
         }
+      }
+      finally{
+        this.licenseLoading = false;
       }
     },
     async checkExistsProject(val: string){
@@ -302,9 +316,13 @@ export default defineComponent({
       if(await this.checkExistsProject(this.projectPath)) {
         return;
       }
-      await this.updateUserLicense();
-      if(this.needLicense) {
-        return;
+      // License is only required for cloud projects; skip the network check
+      // for local ones so creation doesn't depend on internet connectivity.
+      if(this.params.projectType === 'cloud') {
+        await this.updateUserLicense();
+        if(this.needLicense) {
+          return;
+        }
       }
       await this.$getAppManager()
         .get(UiManager)
@@ -432,6 +450,10 @@ export default defineComponent({
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.WelcomeFormContentCreateProject-licenseLoading{
+  justify-content: center;
+  gap: 8px;
 }
 .WelcomeFormContentStart-login{
   padding: 0 !important;

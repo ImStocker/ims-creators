@@ -88,6 +88,7 @@ export default {
       sameProjectTitle: 'Projekt mit diesem Namen existiert bereits unter diessem Pfad',
       needAuth: 'Um ein Cloud-Projekt zu erstellen, müssen Sie mit ihrem PRO-Account angemeldet sein',
       needLicense: 'Bitte erwerben Sie eine PRO-Lizenz, um ein Cloud-Projekt zu erstellen',
+      checkingLicense: 'Ihre Lizenz wird überprüft...',
       buy: 'Kaufen',
       dataNotLoad: 'Es gab ein Problem beim Laden Ihrer Daten',
       loginToAnotherAccount: 'Melden Sie sich mit einem anderen Account an'
