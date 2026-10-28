@@ -131,7 +131,7 @@ export default defineComponent({
         if(this.projectInfo?.id && !this.inProcess && this.onPause){
           list.push({
             title: this.$t('desktop.fsSync.menu.resume'),
-            icon: 'ri-clipboard-fill',
+            icon: 'ri-play-fill',
             action: async () => {
               await this.$getAppManager().get(DesktopSyncManager).resumeSyncProject()
               this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.resumeEnd'));

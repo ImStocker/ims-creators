@@ -120,6 +120,10 @@ export class ProjectFileDbTransaction{
             if (oldEntry && oldEntry.id !== newEntry.id) {
                 // Id changed (conflict resolution): the old id must not linger
                 this.db.workspace.workspaces.delete(oldEntry.id);
+                // Children must follow the id change — nothing else re-points
+                // already-inserted descendants (assets.workspaceId, nested
+                // workspaces.parentId) when a workspace is re-identified at runtime.
+                this._repointChildrenAfterIdChange(oldEntry.id, newEntry.id);
             }
             this.db.workspace.workspaces.replace(newEntry);
             // The claim is content-owned: never drop it when a change was
@@ -229,6 +233,28 @@ export class ProjectFileDbTransaction{
     }
 
     
+    /**
+     * Enforce "a workspace's children point at its CURRENT id": when a
+     * workspace id changes at runtime (conflict resolution during a watcher
+     * re-load), re-point every collection asset whose workspaceId and every
+     * nested workspace whose parentId still references the old id. Ops are
+     * appended to this transaction, so the changes are marked not-synced,
+     * serialized and emitted like any other change.
+     */
+    private _repointChildrenAfterIdChange(oldId: string, newId: string) {
+        for (const asset of this.db.asset.assets.iterate()) {
+            if (asset.workspaceId === oldId) {
+                this.changeAsset(asset, { ...asset, workspaceId: newId });
+            }
+        }
+        for (const workspace of this.db.workspace.workspaces.iterate()) {
+            if (workspace.parentId === oldId) {
+                this.changeWorkspace(workspace, { ...workspace, parentId: newId });
+            }
+        }
+    }
+
+
     private async _deleteAssetFileFromFilesystem(asset: ProjectFileDbAsset){
         if (!asset.localName) return;
         const local_path = getAssetLocalPath(asset, this.db)

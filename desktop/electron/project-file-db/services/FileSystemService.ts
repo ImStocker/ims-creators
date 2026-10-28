@@ -823,7 +823,7 @@ export class FileSystemService{
             existing.asset.id = new_id;
             existing.asset.idClaimedAt = stamp;
             try {
-                await this._rewriteAssetFile(existing.absPath, new_id, stamp);
+                await this._rewriteAssetFile(existing.absPath, new_id, stamp, existing.asset.workspaceId);
                 await this._registryMarkResolved(new_id, stamp, existing.relPath);
             }
             catch (err: any) {
@@ -846,7 +846,7 @@ export class FileSystemService{
         asset.id = new_id;
         asset.idClaimedAt = stamp;
         try {
-            await this._rewriteAssetFile(absolute_path, new_id, stamp);
+            await this._rewriteAssetFile(absolute_path, new_id, stamp, asset.workspaceId);
             await this._registryMarkResolved(new_id, stamp, this._relPortablePath(absolute_path));
         }
         catch (err: any) {
@@ -900,8 +900,10 @@ export class FileSystemService{
      * Raw rewrite of an asset file: identity under `__meta` (new format) or
      * top-level (legacy flat `.ima.json`). Files without a recognized
      * on-disk identity (plain json / markdown) are in-memory only.
+     * Legacy flat files also carry a positional `workspaceId` — keep it in
+     * sync so the on-disk state matches the collection.
      */
-    private async _rewriteAssetFile(file_path: string, new_id: string | null, claim_stamp: number | null): Promise<void> {
+    private async _rewriteAssetFile(file_path: string, new_id: string | null, claim_stamp: number | null, workspace_id?: string | null): Promise<void> {
         await this.expectFsChange([file_path], async () => {
             const raw = JSON.parse(await fs.promises.readFile(file_path, 'utf8'));
             const has_meta_id = raw && typeof raw.__meta === 'object' && raw.__meta !== null && typeof raw.__meta.id === 'string';
@@ -916,6 +918,9 @@ export class FileSystemService{
                         ...(typeof raw.__meta === 'object' && raw.__meta !== null ? raw.__meta : {}),
                         idClaimedAt: claim_stamp,
                     };
+                }
+                if (workspace_id !== undefined && raw.workspaceId !== workspace_id) {
+                    raw.workspaceId = workspace_id;
                 }
             }
             else {
@@ -1042,6 +1047,49 @@ export class FileSystemService{
                 log.error('id-claim: write-back failed', key, err.message);
             }
         }
+    }
+
+    /**
+     * Path-based invariant sweep for a folder that just resolved its
+     * workspace: every asset file under it must resolve, in the collection,
+     * to the folder's final workspace id. Rows inserted before the folder was
+     * known (file events batched ahead of the folder event) or surviving an
+     * id swap are re-attached explicitly per file — instead of relying on the
+     * exist-lookup miss — via the standard load+claim path, so replace-by-id
+     * heals stale rows and ids stay stable.
+     */
+    private async _sweepFolderAssetFiles(
+        tx: ProjectFileDbTransaction,
+        folder_abs_path: string,
+        workspace_id: string,
+        root_path: string,
+    ): Promise<void> {
+        const walk = async (dir: string): Promise<void> => {
+            let items: fs.Dirent[];
+            try {
+                items = await fs.promises.readdir(dir, { withFileTypes: true });
+            }
+            catch {
+                return; // vanished mid-copy — nothing to reconcile
+            }
+            for (const item of items) {
+                if (item.name.startsWith('.')) continue;
+                const abs = node_path.join(dir, item.name);
+                if (item.isDirectory()) {
+                    await walk(abs);
+                    continue;
+                }
+                if (!ASSET_EXT_TEST_REGEXP.test(item.name)) continue;
+                const local_path = node_path.relative(root_path, abs);
+                const row = this.db.asset.findByLocalPath(local_path);
+                if (row && row.workspaceId === workspace_id) continue;
+                const entry = await this._loadFile(abs, workspace_id, root_path);
+                if (entry?.type === 'asset') {
+                    tx.changeAsset(row, entry.asset);
+                }
+            }
+        };
+        await walk(folder_abs_path);
     }
 
     // ─── Id-claim registry (`id_claims` table, machine-local) ─────────────────
@@ -1247,6 +1295,15 @@ export class FileSystemService{
                         for (const e of loaded_new_dir.content.assets){
                             await upsertAsset(e.localPath, e.entry)
                         }
+                        // Invariant sweep: descendant rows inserted before this
+                        // folder was known (files batched ahead of the folder
+                        // event) must not keep a stale workspace id.
+                        await this._sweepFolderAssetFiles(
+                            tx,
+                            event.path,
+                            loaded_new_dir.workspace.id,
+                            root_path
+                        )
                     }
                     else {
                         const new_entry = await this._loadFile(

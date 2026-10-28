@@ -30,7 +30,7 @@ export default {
         resyncAll: 'Пересинхронизировать полностью',
         syncWithCloud: 'Синхронизировать с облаком',
         syncWithCloudEnd: 'Синхронизация с облаком завершена',
-        syncWithCloudConnectSuccess: 'Проект успешно привязан у облаку',
+        syncWithCloudConnectSuccess: 'Проект успешно привязан к облаку',
         openInCloud: 'Открыть в облаке',
         repeat: 'Повторить',
         pauseSyncing: 'Приостановить синхронизацию',

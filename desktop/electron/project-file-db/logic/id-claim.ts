@@ -34,9 +34,63 @@ export type ClaimResolution =
  * Keeper selection chain (portable only, no filesystem birthtime):
  * 1. an explicit claim assertion beats a file predating the field;
  * 2. the earlier claim wins;
- * 3. binary (code-unit) path comparison — deterministic on every clone.
+ * 3. a name that extends the OTHER claimant's name with a copy marker loses —
+ *    checked relationally («starts with the other name + ` - <anything>` or
+ *    ` (<number>)`»), so every localization (`X - 2`, `X - копия`,
+ *    `X - Copy (2)`, …) is caught without enumerating suffixes; Explorer-style
+ *    copies always displace, so the ORIGINAL keeps the identity in both the
+ *    cold-load and the runtime paths (the runtime asymmetry already works
+ *    this way; without this rule `'X - 2/…' < 'X/…'` would make the copy win);
+ * 4. binary (code-unit) path comparison — deterministic on every clone.
  * Returns < 0 when `a` should keep the id.
  */
+
+// A copy marker after another claimant's name: ` - <anything>` (the app's
+// `X - 2`, Explorer's `X - Copy`, ru `X - копия`, with or without a trailing
+// number — digits are intentionally optional so digitless localizations
+// match) or a trailing `(<number>)`.
+const COPY_TAIL_REGEXP = /^(?: - .*|\s*\(\d+\))$/;
+
+const META_SUFFIX_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i;
+const ASSET_SUFFIX_REGEXP = /\.(ima\.json|json|md)$/i;
+
+/**
+ * The claimant's identity path as segments: extensions stripped, the
+ * in-folder `.imw` marker dropped (it marks HOW the workspace is stored,
+ * not where it sits).
+ */
+function pathSegmentNames(rel_path: string): string[] {
+    return rel_path.split('/').map(seg =>
+        seg.replace(META_SUFFIX_REGEXP, '').replace(ASSET_SUFFIX_REGEXP, ''),
+    ).filter(seg => seg !== '.imw' && seg !== '');
+}
+
+/**
+ * True when `candidate_rel`'s name extends `base_rel`'s name with a copy
+ * marker. Checked segment-wise from the root: the first differing segment
+ * must be base+marker while the rest of the path stays identical, so the
+ * marker may sit on any level (`X - 2/A1`, `A/Fire - 2`, `X - копия/.imw`).
+ */
+function isCopyExtensionOf(candidate_rel: string, base_rel: string): boolean {
+    const candidate = pathSegmentNames(candidate_rel);
+    const base = pathSegmentNames(base_rel);
+    if (candidate.length !== base.length) return false;
+    let diff = -1;
+    for (let i = 0; i < base.length; i++) {
+        if (candidate[i] === base[i]) continue;
+        diff = i;
+        break;
+    }
+    if (diff < 0) return false; // identical names — not a copy relation
+    for (let i = diff + 1; i < base.length; i++) {
+        if (candidate[i] !== base[i]) return false; // structure diverged
+    }
+    const seg = candidate[diff];
+    const base_seg = base[diff];
+    if (!base_seg || !seg.startsWith(base_seg)) return false;
+    return COPY_TAIL_REGEXP.test(seg.substring(base_seg.length));
+}
+
 export function compareClaimInfo(a: ClaimInfo, b: ClaimInfo): number {
     const a_claimed = a.claimedAt !== null;
     const b_claimed = b.claimedAt !== null;
@@ -44,6 +98,9 @@ export function compareClaimInfo(a: ClaimInfo, b: ClaimInfo): number {
     if (a_claimed && b_claimed && a.claimedAt !== b.claimedAt) {
         return (a.claimedAt as number) < (b.claimedAt as number) ? -1 : 1;
     }
+    const a_copies_b = isCopyExtensionOf(a.relPath, b.relPath);
+    const b_copies_a = isCopyExtensionOf(b.relPath, a.relPath);
+    if (a_copies_b !== b_copies_a) return a_copies_b ? 1 : -1;
     if (a.relPath !== b.relPath) return a.relPath < b.relPath ? -1 : 1;
     return 0;
 }
