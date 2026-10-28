@@ -18,7 +18,7 @@ import type { AssetQueryWhere, AssetsShortResult, AssetShort, AssetsFullResult, 
 import type { AssetBlockEntity } from "~ims-app-base/logic/types/BlocksType";
 import type { IProjectDatabaseAsset } from "~ims-app-base/logic/types/IProjectDatabase";
 import type { ApiRequestList, ApiResultListWithTotal, ApiResultListWithMore } from "~ims-app-base/logic/types/ProjectTypes";
-import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, assignPlainValueToAssetProps, convertAssetPropsToPlainObject, castAssetPropValueToString, getAssetPropType, type AssetProps, extractAssetLinksFromProps, parseAssetNewBlockRef, type AssetBlockIdWithName } from "~ims-app-base/logic/types/Props";
+import { type AssetPropsPlainObjectValue, type AssetPropsPlainObject, type AssetPropValue, assignPlainValueToAssetProps, convertAssetPropsToPlainObject, castAssetPropValueToString, getAssetPropType, type AssetProps, extractAssetLinksFromProps, parseAssetNewBlockRef, type AssetBlockIdWithName, replaceAssetProps, diffAssetPropObjects } from "~ims-app-base/logic/types/Props";
 import type { AssetPropsSelectionOrder, AssetPropsSelection, AssetPropsSelectionField } from "~ims-app-base/logic/types/PropsSelection";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
@@ -1071,6 +1071,54 @@ export class AssetService implements IProjectDatabaseAsset {
             ids: changing_assets_ids
         };
     }
+    async assetsChangeReplace(params: {
+        where: AssetWhereParams;
+        find: AssetProps;
+        replace: AssetProps;
+        options?: { wholeProp?: boolean; ignoreCase?: boolean };
+    }, options?: { pid?: string }): Promise<AssetsChangeResult> {
+        const wholeProp = !!params.options?.wholeProp;
+        const ignoreCase = !!params.options?.ignoreCase;
+
+        const assets_from_db = await this.searchAssets(params.where);
+        const ops: AssetServiceAssetChangeBatchOpDTO[] = [];
+
+        for (const asset_basic of assets_from_db) {
+            const asset_full = await this.computeFullAsset(asset_basic, null);
+            const setBlocks: { [blockKey: string]: AssetBlockParamsDTO } = {};
+            let hasChange = false;
+
+            for (const block of asset_full.blocks) {
+                const computed = block.computed ?? {};
+                const replaced = replaceAssetProps(computed, params.find, params.replace, { wholeProp, ignoreCase });
+                // diffAssetPropObjects(desired, current) -> change applicable to `current`
+                const diffs = diffAssetPropObjects(replaced, computed);
+                if (diffs.length > 0) {
+                    const propsChange = diffs[0];
+                    const blockRef = block.name ? block.name : `@${block.id}`;
+                    setBlocks[blockRef] = { props: propsChange };
+                    hasChange = true;
+                }
+            }
+
+            if (hasChange) {
+                ops.push({
+                    where: { id: asset_full.id },
+                    set: { blocks: setBlocks },
+                });
+            }
+        }
+
+        const change = await this.assetsChangeBatch({ ops }, options);
+        return {
+            ids: change.ids,
+            objects: change.objects,
+            total: change.total,
+            changeId: change.changeId,
+            touchedWIds: change.touchedWIds,
+        };
+    }
+
     async assetsChangeUndo(params: { changeId: string; }, options?: { pid?: string }): Promise<AssetsChangeResult> {
         const changes = this._sessionChangeHistory.get(params.changeId);
         return this.assetsChangeBatch({

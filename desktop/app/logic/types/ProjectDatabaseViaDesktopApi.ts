@@ -141,6 +141,20 @@ export class ProjectDatabaseViaDesktopApi implements IProjectDatabase {
     return window.imshost.project.assetsChange(info.localPath, params, options);
   }
 
+  assetsChangeReplace(
+    params: {
+      where: AssetWhereParams;
+      find: AssetProps;
+      replace: AssetProps;
+      options?: { wholeProp?: boolean; ignoreCase?: boolean };
+    },
+    options?: { pid?: string },
+  ): Promise<AssetsChangeResult> {
+    const info = this._projectManager.getProjectInfo();
+    assert(info?.localPath, 'Project is not selected');
+    return window.imshost.project.assetsChangeReplace(info.localPath, params, options);
+  }
+
   assetsMove(params: AssetMoveParams): Promise<AssetMoveResult> {
     const info = this._projectManager.getProjectInfo();
     assert(info?.localPath, 'Project is not selected');
