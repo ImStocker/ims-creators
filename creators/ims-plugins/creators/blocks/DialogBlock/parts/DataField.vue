@@ -5,6 +5,7 @@
       'type-in': inId && !outId,
       'type-out': outId && !inId,
       'type-in-out': inId && outId,
+      'explicit-values': explicitValues,
     }"
   >
     <DataHandle
@@ -43,15 +44,28 @@
         }}
       </span>
     </slot>
-    <DataFieldInput
-      v-if="!isInConnected && (preferInputType || dataType) && inId"
-      ref="input"
-      v-model="valueForInput"
-      class="DataField-input"
-      :data-type="preferInputType ? preferInputType : dataType"
-      :placeholder="placeholder"
-      :readonly="readonly"
-    ></DataFieldInput>
+    <template v-if="!isInConnected && (preferInputType || dataType) && inId">
+      <DataFieldInput
+        ref="input"
+        v-model="valueForInput"
+        class="DataField-input"
+        :class="{
+          'has-value': explicitValues && modelValue !== undefined,
+        }"
+        :data-type="preferInputType ? preferInputType : dataType"
+        :placeholder="placeholder"
+        :readonly="readonly"
+      ></DataFieldInput>
+      <button
+        v-if="!readonly && explicitValues"
+        type="button"
+        class="is-button is-button-icon-small DataField-reset"
+        :class="{ hidden: modelValue === undefined }"
+        @click.stop="$emit('clear')"
+      >
+        <i class="ri-arrow-go-back-line"></i>
+      </button>
+    </template>
     <DataFieldInput
       v-else-if="(playValue !== null || playValueSet) && playValueType"
       :model-value="playValue"
@@ -101,7 +115,7 @@ export default defineComponent({
         Number,
         null,
       ] as PropType<ScriptBlockPlainPropValue>,
-      default: null,
+      default: undefined,
     },
     nodeDataController: {
       type: Object as PropType<NodeDataController>,
@@ -123,8 +137,12 @@ export default defineComponent({
       type: [Object, null] as PropType<AssetPropValueType | null>,
       default: null,
     },
+    explicitValues: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ['update:modelValue', 'update:playValue'],
+  emits: ['update:modelValue', 'update:playValue', 'clear'],
   computed: {
     playValueType() {
       if (this.playValueSet) {
@@ -186,6 +204,22 @@ export default defineComponent({
   display: flex;
   align-items: center;
   position: relative;
+
+  &.explicit-values {
+    .DataField-input {
+      transition: opacity 0.2s;
+    }
+    &:hover {
+      .DataField-input:not(.has-value) {
+        opacity: 1;
+      }
+    }
+    &:not(:hover) {
+      .DataField-input:not(.has-value) {
+        opacity: 0;
+      }
+    }
+  }
 }
 .DataField-caption,
 .DataField-input {
@@ -212,6 +246,16 @@ export default defineComponent({
   color: var(--imsde-node-playing-color);
   --local-text-color: var(--imsde-node-playing-color);
   --input-text-color: var(--imsde-node-playing-color);
+}
+
+.DataField-reset {
+  margin: 0 5px;
+
+  &.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none;
+  }
 }
 
 .DataField.type-out {

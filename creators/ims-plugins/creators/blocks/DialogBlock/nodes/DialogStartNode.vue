@@ -1,5 +1,9 @@
 <template>
-  <div class="DialogStartNode DialogEditorNode">
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogStartNode DialogEditorNode"
+  >
     <div
       class="DialogStartNode-header DialogNode-header DialogEditorNode-header"
       :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
@@ -9,18 +13,18 @@
       <ExecHandle id="out" type="source" :position="Position.Right" />
     </div>
     <div
-      v-if="inputParameters.length > 0"
+      v-if="outputParameters.length > 0"
       class="DialogStartNode-body DialogEditorNode-body"
     >
       <node-parameters-grid
         :dialog-player="dialogPlayer"
         :node-data-controller="nodeDataController"
         :readonly="readonly"
-        :input-params="inputParameters"
+        :output-params="outputParameters"
         :playing-node-data="playingNodeData"
       ></node-parameters-grid>
     </div>
-  </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -36,12 +40,14 @@ import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import ExecHandle from '../parts/ExecHandle.vue';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 
 export default defineComponent({
   name: 'DialogStartNode',
   components: {
     ExecHandle,
     NodeParametersGrid,
+    DialogBaseNode,
   },
   props: {
     id: {
@@ -81,12 +87,10 @@ export default defineComponent({
     Position() {
       return Position;
     },
-    inputParameters(): DialogVariable[] {
+    outputParameters(): DialogVariable[] {
       return this.dialogController
         .getVariables()
-        .filter(
-          (v) => v.kind && ['in', 'in-out'].includes(v.kind),
-        );
+        .filter((v) => v.kind && ['in', 'in-out'].includes(v.kind));
     },
   },
 });

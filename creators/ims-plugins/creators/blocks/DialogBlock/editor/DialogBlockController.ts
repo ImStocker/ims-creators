@@ -1210,9 +1210,26 @@ export class DialogBlockController extends BlockEditorController {
         showKindControl: true,
       },
       initialFilters: {
-        kind: ScriptBlockPlainVariableKinds.GLOBAL,
+        kind: null,
       },
     });
+  }
+
+  async addNodeScriptVariable(kind: ScriptBlockPlainVariableKinds) {
+    const variable = await nodeVariableAdd(
+      this.appManager,
+      this.getVariables(),
+      {
+        alreadyExist: this.appManager.$t(
+          'imsDialogEditor.var.variableAlreadyExists',
+        ),
+      },
+      false,
+      true,
+      { kind },
+    );
+    if (!variable) return;
+    this.addVariable(variable);
   }
 
   async manageActions(
@@ -1635,6 +1652,14 @@ export class DialogBlockController extends BlockEditorController {
       if (node?.type === 'end') {
         return [
           {
+            name: 'add-out-variable',
+            title: this.appManager.$t('imsDialogEditor.var.createOutVariable'),
+            icon: 'ri-add-circle-line',
+            action: () =>
+              this.addNodeScriptVariable(ScriptBlockPlainVariableKinds.OUT),
+          },
+          { type: 'separator', name: 'sep-add-out-variable' },
+          {
             name: 'set-exit-name',
             title: this.appManager.$t('imsDialogEditor.setExitName'),
             icon: 'ri-edit-line',
@@ -1643,6 +1668,22 @@ export class DialogBlockController extends BlockEditorController {
           { type: 'separator', name: 'sep-exit-name' },
           ...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix),
         ];
+      }
+    }
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type === 'start') {
+        items.push(
+          {
+            name: 'add-in-variable',
+            title: this.appManager.$t('imsDialogEditor.var.createInVariable'),
+            icon: 'ri-add-circle-line',
+            action: () =>
+              this.addNodeScriptVariable(ScriptBlockPlainVariableKinds.IN),
+          },
+          { type: 'separator', name: 'sep-add-in-variable' },
+        );
       }
     }
 

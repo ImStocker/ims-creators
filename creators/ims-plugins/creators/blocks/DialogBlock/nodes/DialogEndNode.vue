@@ -26,6 +26,7 @@
           :readonly="readonly"
           :input-params="inputParameters"
           :playing-node-data="playingNodeData"
+          :explicit-values="true"
         ></node-parameters-grid>
       </div>
     </ContextMenuZone>
@@ -37,9 +38,12 @@ import { defineComponent, type PropType } from 'vue';
 import { Position } from '@vue-flow/core';
 import type { NodeDescriptor } from './NodeDescriptor';
 import type { NodeDataController } from '../editor/NodeDataController';
-import type { DialogBlockController } from '../editor/DialogBlockController';
+import type {
+  DialogBlockController,
+  DialogVariable,
+} from '../editor/DialogBlockController';
 import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
-import type { DialogVariable } from '../editor/DialogBlockController';
+
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import { castAssetPropValueToString } from '~ims-app-base/logic/types/Props';
@@ -95,9 +99,7 @@ export default defineComponent({
     inputParameters(): DialogVariable[] {
       return this.dialogController
         .getVariables()
-        .filter(
-          (v) => v.kind && ['out', 'in-out'].includes(v.kind),
-        );
+        .filter((v) => v.kind && ['out', 'in-out'].includes(v.kind));
     },
     exitName() {
       return castAssetPropValueToString(this.nodeDataController.subject);
