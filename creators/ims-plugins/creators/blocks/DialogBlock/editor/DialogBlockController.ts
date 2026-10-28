@@ -57,8 +57,9 @@ import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
 import ActionsListFilters from '../dialogs/ActionsListFilters.vue';
 import VariableListFilters from '../dialogs/VariableListFilters.vue';
 import type { IDialogCollectionController } from './DialogVariableController';
-import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import { nodeVariableAdd } from '../logic/nodeVariables';
+import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
+import { withFunctionOutParam } from '../logic/nodeActions';
 import isUUID from 'validator/es/lib/isUUID';
 import PromptDialog from '~ims-app-base/components/Common/PromptDialog.vue';
 
@@ -1188,19 +1189,46 @@ export class DialogBlockController extends BlockEditorController {
           dialogController.canDeleteVariable(variable_name),
         reorderEntities: (variables: DialogVariable[]) =>
           dialogController.reorderVariables(variables),
-        createEntity: async (initial) =>
-          await nodeVariableAdd(
-            this.appManager,
-            dialogController.getOwnVariables(),
-            {
-              alreadyExist: this.appManager.$t(
-                'imsDialogEditor.var.variableAlreadyExists',
-              ),
-            },
-            false,
-            true,
-            initial,
-          ),
+        createEntity: async (initial) => {
+          const list = dialogController.getOwnVariables();
+          const initial_vals = initial ?? {};
+          const resolved_kind =
+            (initial_vals as any)?.kind ?? ScriptBlockPlainVariableKinds.GLOBAL;
+          const max_index = list.reduce(
+            (acc, v) => Math.max(acc, v.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
+          );
+          const new_variable: DialogVariable = {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            kind: resolved_kind,
+            autoFill: null,
+            index: max_index + 1,
+            ...initial_vals,
+          };
+          // ensure name uniqueness if initial provided a name
+          if (
+            initial_vals?.name &&
+            list.some((v) => v.name === new_variable.name)
+          ) {
+            const uname = generateNextUniqueNameNumber(
+              initial_vals.name,
+              (name) => !list.some((v) => v.name === name),
+            );
+            new_variable.name = uname;
+            if (!initial_vals?.title) {
+              new_variable.title = uname;
+            }
+          }
+          return new_variable;
+        },
       }),
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/VariableList.vue')),
@@ -1266,25 +1294,40 @@ export class DialogBlockController extends BlockEditorController {
         reorderEntities: (actions: DialogAction[]) =>
           dialogController.reorderActions(actions),
         createEntity: async (initial) => {
-          const res = await this.appManager
-            .get(DialogManager)
-            .show(EnterActionDialog, {
-              initial,
-              validate: (action) => {
-                const list = dialogController
-                  .getActions()
-                  .some((a) => a.name === action.name);
-                if (list) {
-                  throw new Error(
-                    this.appManager.$t(
-                      'imsDialogEditor.actions.actionAlreadyExists',
-                    ),
-                  );
-                }
-              },
-            });
-          if (!res) return null;
-          return res;
+          const list = dialogController.getOwnActions();
+          const initial_vals = initial ?? {};
+          const type =
+            (initial_vals as any)?.type ?? ScriptBlockPlainActionTypes.TRIGGER;
+          const max_index = list.reduce(
+            (acc, a) => Math.max(acc, a.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((a) => a.name === name),
+          );
+          const new_action: DialogAction = {
+            name: unique_name,
+            title: unique_name,
+            type,
+            params: null,
+            index: max_index + 1,
+            ...initial_vals,
+          };
+          if (
+            initial_vals?.name &&
+            list.some((a) => a.name === new_action.name)
+          ) {
+            const uname = generateNextUniqueNameNumber(
+              initial_vals.name,
+              (name) => !list.some((a) => a.name === name),
+            );
+            new_action.name = uname;
+            if (!initial_vals?.title) {
+              new_action.title = uname;
+            }
+          }
+          return withFunctionOutParam(new_action) as DialogAction;
         },
       }),
       viewComponent: markRaw(

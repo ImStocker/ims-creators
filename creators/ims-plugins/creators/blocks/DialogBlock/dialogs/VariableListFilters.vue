@@ -3,6 +3,7 @@
     <div class="VariableList-filters-group">
       <slot name="prepend-filters"></slot>
       <variable-kind-selector
+        v-if="showKindFilter"
         :model-value="filters?.kind ?? null"
         class="VariableList-filters-kind"
         @update:model-value="changeFilters('kind', $event)"
@@ -36,6 +37,10 @@ export default defineComponent({
       default: null,
     },
     showSearch: {
+      type: Boolean,
+      default: true,
+    },
+    showKindFilter: {
       type: Boolean,
       default: true,
     },

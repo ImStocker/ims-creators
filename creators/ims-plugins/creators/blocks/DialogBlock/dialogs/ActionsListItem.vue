@@ -203,20 +203,13 @@
             {{ $t('imsDialogEditor.actions.inputParameters') }}
           </div>
           <variable-list
-            v-if="getParams(false).length > 0"
             class="ActionsListItem-advanced-list"
             :collection-controller="inputParametersController"
             :show-filters="false"
             :show-search="false"
             :embedded="true"
+            @add="addParameter('in')"
           ></variable-list>
-          <button
-            type="button"
-            class="is-button is-button-action ActionsListItem-advanced-add"
-            @click="addParameter('in')"
-          >
-            {{ $t('common.dialogs.add') }}
-          </button>
         </div>
         <div class="ActionsListItem-advanced-spacer"></div>
         <div class="ActionsListItem-advanced-section">
@@ -224,20 +217,13 @@
             {{ $t('imsDialogEditor.actions.outputParameters') }}
           </div>
           <variable-list
-            v-if="getParams(true).length > 0"
             class="ActionsListItem-advanced-list"
             :collection-controller="outputParametersController"
             :show-filters="false"
             :show-search="false"
             :embedded="true"
+            @add="addParameter('out')"
           ></variable-list>
-          <button
-            type="button"
-            class="is-button is-button-action ActionsListItem-advanced-add"
-            @click="addParameter('out')"
-          >
-            {{ $t('common.dialogs.add') }}
-          </button>
         </div>
         <div class="ActionsListItem-advanced-divider"></div>
         <div class="ActionsListItem-advanced-actions">
@@ -268,6 +254,7 @@ import {
   type ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
 import { normalizeAssetPropPart } from '~ims-app-base/logic/types/Props';
+import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import type {
   IDialogCollectionController,
@@ -281,16 +268,12 @@ import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import ConfirmDialog from '~ims-app-base/components/Common/ConfirmDialog.vue';
-import EnterActionDialog from './EnterActionDialog.vue';
-import EnterVariableDialog from './EnterVariableDialog.vue';
+
 import VariableList from './VariableList.vue';
 import ActionParameterDropdown, {
   type ActionParameterDropdownFocus,
 } from './ActionParameterDropdown.vue';
-import {
-  checkParamsExists,
-  guessDuplicatedItemTitle,
-} from '../logic/nodeVariables';
+import { guessDuplicatedItemTitle } from '../logic/nodeVariables';
 import SomeEditorListItem from '~ims-app-base/components/Asset/SpecialTypes/SomeEditorListItem.vue';
 import {
   setImsClickOutside,
@@ -601,16 +584,23 @@ export default defineComponent({
           setList(list);
         },
         createEntity: async () => {
-          const res = await this.$getAppManager()
-            .get(DialogManager)
-            .show(EnterVariableDialog, {
-              validate: (variable: DialogVariable) => {
-                if (getList().some((el) => el.name === variable.name)) {
-                  throw new Error(alreadyExistsCaption);
-                }
-              },
-            });
-          return res ?? null;
+          const list = getList();
+          const max_index = list.reduce(
+            (acc, v) => Math.max(acc, v.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
+          );
+          return {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            index: max_index + 1,
+          } as ScriptBlockPlainVariable;
         },
         deleteEntity: (variable_name: string) => {
           setList(getList().filter((el) => el.name !== variable_name));
@@ -763,33 +753,23 @@ export default defineComponent({
           );
         });
     },
-    async duplicateAction() {
+    duplicateAction() {
       const guessed_title = guessDuplicatedItemTitle(
         this.getActionTitle(this.action),
         this.actionsList,
       );
       const guessed_name = normalizeAssetPropPart(guessed_title);
+      const max_index = this.actionsList.reduce(
+        (acc, a) => Math.max(acc, a.index ?? 0),
+        -1,
+      );
 
-      const new_action = await this.$getAppManager()
-        .get(DialogManager)
-        .show(EnterActionDialog, {
-          initial: {
-            ...this.action,
-            name: guessed_name,
-            title: guessed_title,
-          },
-          validate: (action) => {
-            const exists = checkParamsExists(action.name, this.actionsList);
-            if (exists) {
-              throw new Error(
-                this.$t('imsDialogEditor.actions.actionAlreadyExists'),
-              );
-            }
-          },
-        });
-
-      if (!new_action) return null;
-      this.actionsController.addEntity(new_action);
+      this.actionsController.addEntity({
+        ...this.action,
+        name: guessed_name,
+        title: guessed_title,
+        index: max_index + 1,
+      });
     },
     async deleteAction() {
       const confirm = await this.$getAppManager()
@@ -1003,10 +983,6 @@ export default defineComponent({
 .ActionsListItem-advanced-list {
   display: flex;
   flex-direction: column;
-}
-
-.ActionsListItem-advanced-add {
-  align-self: flex-start;
 }
 
 .ActionsListItem-advanced-spacer {

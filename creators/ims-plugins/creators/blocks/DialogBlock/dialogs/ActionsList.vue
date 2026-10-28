@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="filteredActions.length > 0 || !embedded"
+    v-if="filteredActions.length > 0 || !embedded || showAdd"
     class="ActionsList"
     :class="{ 'state-embedded': embedded }"
   >
@@ -16,7 +16,7 @@
     <sortable-list
       v-if="filteredActions.length > 0"
       class="ActionsList-content tiny-scrollbars"
-      handle-selector=".ActionsListItem-drag"
+      handle-selector=".SomeEditorListItem-drag"
       id-key="name"
       :list="filteredActions"
       @update:list="changeList($event)"
@@ -38,6 +38,15 @@
         )
       }}
     </div>
+    <button
+      v-if="showAdd"
+      type="button"
+      class="ActionsList-addButton"
+      @click="$emit('add')"
+    >
+      <i class="ri-add-box-fill"></i>
+      {{ addCaption || $t('common.dialogs.add') }}
+    </button>
   </div>
 </template>
 <script lang="ts">
@@ -77,8 +86,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAdd: {
+      type: Boolean,
+      default: true,
+    },
+    addCaption: {
+      type: String,
+      default: '',
+    },
   },
-  emits: ['update:filters'],
+  emits: ['update:filters', 'add'],
   computed: {
     actionsList() {
       return this.collectionController.getEntities();
@@ -116,6 +133,9 @@ export default defineComponent({
   }
 }
 .ActionsList-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   overflow: auto;
   flex: 1;
 
@@ -127,6 +147,36 @@ export default defineComponent({
   margin-bottom: 10px;
   font-style: italic;
   color: var(--local-sub-text-color);
+}
+.ActionsList-addButton {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1.5px dashed var(--local-border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--local-sub-text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  i {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: var(--local-text-color);
+    border-color: var(--local-border-color);
+    background: var(--button-bg-color-hover);
+  }
 }
 :deep(.SortableList-item) {
   padding: 0;
