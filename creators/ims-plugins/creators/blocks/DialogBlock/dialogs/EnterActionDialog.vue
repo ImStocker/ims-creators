@@ -291,8 +291,16 @@ export default defineComponent({
 </script>
 <style lang="scss" scoped>
 .EnterActionDialog {
+  width: 700px;
+  max-width: 100%;
+}
+
+:deep(.SegmentedTabs) {
   width: 100%;
-  max-width: 700px;
+}
+
+:deep(.SegmentedTabs-item) {
+  flex: 1 !important;
 }
 .EnterActionDialog-field-caption {
   text-align: center;

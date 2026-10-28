@@ -40,16 +40,16 @@ export default defineComponent({
         {
           key: null,
           label: this.$t('imsDialogEditor.actions.types.all'),
-          title: this.$t('imsDialogEditor.actions.types.all'),
+          hint: this.$t('imsDialogEditor.actions.types.all'),
         },
         {
           key: 'trigger',
-          title: this.$t('imsDialogEditor.actions.types.triggers'),
+          hint: this.$t('imsDialogEditor.actions.types.triggers'),
           icon: 'ri-flashlight-fill',
         },
         {
           key: 'function',
-          title: this.$t('imsDialogEditor.actions.types.functions'),
+          hint: this.$t('imsDialogEditor.actions.types.functions'),
           icon: 'ri-formula',
         },
       ];

@@ -192,8 +192,16 @@ export default defineComponent({
 @use '~ims-app-base/style/Form';
 
 .EnterVariableDialog {
+  width: 500px;
+  max-width: 100%;
+}
+
+:deep(.SegmentedTabs) {
   width: 100%;
-  max-width: 500px;
+}
+
+:deep(.SegmentedTabs-item) {
+  flex: 1 !important;
 }
 .EnterVariableDialog-field-caption {
   text-align: center;
