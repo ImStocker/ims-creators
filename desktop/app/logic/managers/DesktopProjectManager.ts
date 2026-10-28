@@ -98,8 +98,10 @@ export default class DesktopProjectManager extends ProjectManager{
     async initializeLocalProject(localPath: string, initParams?: ProjectFileDbInitParams): Promise<LocalProjectInitInfo> {
         const res = await window.imshost.project.initProject(localPath, initParams);
         this._projectLocalPath = localPath;
-        if(initParams?.id){
-            window.imshost.sync.syncProject(this._projectLocalPath); // Do await sync
+        // Recreate (cloud bind/unlink) is followed by an explicit resyncAll()
+        // from the caller — skip the fire-and-forget sync so it doesn't race it.
+        if(initParams?.id && !initParams?.recreate){
+            window.imshost.sync.syncProject(this._projectLocalPath);
         }
         return res;
     }

@@ -188,6 +188,12 @@ export class ProjectFileDb {
     });
     await this.sync.init();
     this.settings.init();
+    if (this._info.id && isValidBigNumberKey(this._info.id)) {
+      // Entities loaded from disk never pass through ProjectFileDbTransaction,
+      // so register them for sync here — this is what makes binding a local
+      // folder to a cloud project (and opening an already-bound one) work.
+      await this.sync.ensureEntitiesRegistered();
+    }
   }
 
   async init(initParams?: ProjectFileDbInitParams) {
