@@ -57,8 +57,9 @@ import ManageCollectionDialog from '../dialogs/ManageCollectionDialog.vue';
 import ActionsListFilters from '../dialogs/ActionsListFilters.vue';
 import VariableListFilters from '../dialogs/VariableListFilters.vue';
 import type { IDialogCollectionController } from './DialogVariableController';
-import EnterActionDialog from '../dialogs/EnterActionDialog.vue';
 import { nodeVariableAdd } from '../logic/nodeVariables';
+import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
+import { withFunctionOutParam } from '../logic/nodeActions';
 import isUUID from 'validator/es/lib/isUUID';
 import PromptDialog from '~ims-app-base/components/Common/PromptDialog.vue';
 
@@ -733,10 +734,10 @@ export class DialogBlockController extends BlockEditorController {
           if (toHandleDataMatch.optionIndex !== undefined) {
             const opt = to_node_data.options[toHandleDataMatch.optionIndex];
             if (opt) {
-              opt.values[toHandleDataMatch.param] = null;
+              delete opt.values[toHandleDataMatch.param];
             }
           } else {
-            to_node_data.values[toHandleDataMatch.param] = null;
+            delete to_node_data.values[toHandleDataMatch.param];
           }
         }
       }
@@ -872,8 +873,10 @@ export class DialogBlockController extends BlockEditorController {
   deleteEdgeById(edgeId: string) {
     const edge_index = this.state.edges.findIndex((edge) => edge.id === edgeId);
     if (edge_index >= 0) {
-      this.state.edges.splice(edge_index, 1);
+      // Clean up bound values while the edge is still in state
+      // (onEdgeDeleted looks the edge up by id)
       this.onEdgeDeleted(edgeId);
+      this.state.edges.splice(edge_index, 1);
     }
   }
 
@@ -1188,19 +1191,46 @@ export class DialogBlockController extends BlockEditorController {
           dialogController.canDeleteVariable(variable_name),
         reorderEntities: (variables: DialogVariable[]) =>
           dialogController.reorderVariables(variables),
-        createEntity: async (initial) =>
-          await nodeVariableAdd(
-            this.appManager,
-            dialogController.getOwnVariables(),
-            {
-              alreadyExist: this.appManager.$t(
-                'imsDialogEditor.var.variableAlreadyExists',
-              ),
-            },
-            false,
-            true,
-            initial,
-          ),
+        createEntity: async (initial) => {
+          const list = dialogController.getOwnVariables();
+          const initial_vals = initial ?? {};
+          const resolved_kind =
+            (initial_vals as any)?.kind ?? ScriptBlockPlainVariableKinds.GLOBAL;
+          const max_index = list.reduce(
+            (acc, v) => Math.max(acc, v.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
+          );
+          const new_variable: DialogVariable = {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            kind: resolved_kind,
+            autoFill: null,
+            index: max_index + 1,
+            ...initial_vals,
+          };
+          // ensure name uniqueness if initial provided a name
+          if (
+            initial_vals?.name &&
+            list.some((v) => v.name === new_variable.name)
+          ) {
+            const uname = generateNextUniqueNameNumber(
+              initial_vals.name,
+              (name) => !list.some((v) => v.name === name),
+            );
+            new_variable.name = uname;
+            if (!initial_vals?.title) {
+              new_variable.title = uname;
+            }
+          }
+          return new_variable;
+        },
       }),
       viewComponent: markRaw(
         defineAsyncComponent(() => import('../dialogs/VariableList.vue')),
@@ -1210,9 +1240,26 @@ export class DialogBlockController extends BlockEditorController {
         showKindControl: true,
       },
       initialFilters: {
-        kind: ScriptBlockPlainVariableKinds.GLOBAL,
+        kind: null,
       },
     });
+  }
+
+  async addNodeScriptVariable(kind: ScriptBlockPlainVariableKinds) {
+    const variable = await nodeVariableAdd(
+      this.appManager,
+      this.getVariables(),
+      {
+        alreadyExist: this.appManager.$t(
+          'imsDialogEditor.var.variableAlreadyExists',
+        ),
+      },
+      false,
+      true,
+      { kind },
+    );
+    if (!variable) return;
+    this.addVariable(variable);
   }
 
   async manageActions(
@@ -1249,25 +1296,40 @@ export class DialogBlockController extends BlockEditorController {
         reorderEntities: (actions: DialogAction[]) =>
           dialogController.reorderActions(actions),
         createEntity: async (initial) => {
-          const res = await this.appManager
-            .get(DialogManager)
-            .show(EnterActionDialog, {
-              initial,
-              validate: (action) => {
-                const list = dialogController
-                  .getActions()
-                  .some((a) => a.name === action.name);
-                if (list) {
-                  throw new Error(
-                    this.appManager.$t(
-                      'imsDialogEditor.actions.actionAlreadyExists',
-                    ),
-                  );
-                }
-              },
-            });
-          if (!res) return null;
-          return res;
+          const list = dialogController.getOwnActions();
+          const initial_vals = initial ?? {};
+          const type =
+            (initial_vals as any)?.type ?? ScriptBlockPlainActionTypes.TRIGGER;
+          const max_index = list.reduce(
+            (acc, a) => Math.max(acc, a.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((a) => a.name === name),
+          );
+          const new_action: DialogAction = {
+            name: unique_name,
+            title: unique_name,
+            type,
+            params: null,
+            index: max_index + 1,
+            ...initial_vals,
+          };
+          if (
+            initial_vals?.name &&
+            list.some((a) => a.name === new_action.name)
+          ) {
+            const uname = generateNextUniqueNameNumber(
+              initial_vals.name,
+              (name) => !list.some((a) => a.name === name),
+            );
+            new_action.name = uname;
+            if (!initial_vals?.title) {
+              new_action.title = uname;
+            }
+          }
+          return withFunctionOutParam(new_action) as DialogAction;
         },
       }),
       viewComponent: markRaw(
@@ -1635,14 +1697,45 @@ export class DialogBlockController extends BlockEditorController {
       if (node?.type === 'end') {
         return [
           {
+            name: 'add-out-variable',
+            title: this.appManager.$t('imsDialogEditor.var.createOutVariable'),
+            icon: 'ri-add-circle-line',
+            action: () =>
+              this.addNodeScriptVariable(ScriptBlockPlainVariableKinds.OUT),
+          },
+          { type: 'separator' },
+          {
             name: 'set-exit-name',
             title: this.appManager.$t('imsDialogEditor.setExitName'),
             icon: 'ri-edit-line',
             action: () => this.setNodeExitName(nodeIds[0]),
           },
           { type: 'separator', name: 'sep-exit-name' },
+          {
+            name: 'set-service-name',
+            title: this.appManager.$t('imsDialogEditor.setServiceName'),
+            icon: 'ri-price-tag-3-fill',
+            action: () => this.setNodeServiceName(nodeIds[0]),
+          },
+          { type: 'separator', name: 'sep-service-name' },
           ...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix),
         ];
+      }
+    }
+
+    if (count === 1) {
+      const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
+      if (node?.type === 'start') {
+        items.push(
+          {
+            name: 'add-in-variable',
+            title: this.appManager.$t('imsDialogEditor.var.createInVariable'),
+            icon: 'ri-add-circle-line',
+            action: () =>
+              this.addNodeScriptVariable(ScriptBlockPlainVariableKinds.IN),
+          },
+          { type: 'separator', name: 'sep-add-in-variable' },
+        );
       }
     }
 
@@ -1677,7 +1770,7 @@ export class DialogBlockController extends BlockEditorController {
 
     if (count === 1) {
       const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
-      if (node?.type !== 'comment') {
+      if (node) {
         items.push(
           {
             name: 'set-service-name',

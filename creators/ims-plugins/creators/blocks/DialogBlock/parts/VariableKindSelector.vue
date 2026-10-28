@@ -45,11 +45,11 @@ export default defineComponent({
         {
           key: null,
           label: this.$t('imsDialogEditor.var.kinds.all'),
-          title: this.$t('imsDialogEditor.var.kinds.all'),
+          hint: this.$t('imsDialogEditor.var.kinds.all'),
         },
         ...VARIABLE_KINDS.map((option) => ({
           key: option.kind,
-          title: this.$t(option.titleKey),
+          hint: this.$t(option.titleKey),
           icon: option.icon,
         })),
       ];

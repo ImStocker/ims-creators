@@ -159,7 +159,7 @@ import type { DialogVariable } from '../editor/DialogBlockController';
 import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import { normalizeAssetPropPart } from '~ims-app-base/logic/types/Props';
-import { nodeVariableDuplicate } from '../logic/nodeVariables';
+import { guessDuplicatedItemTitle } from '../logic/nodeVariables';
 import MenuButton from '~ims-app-base/components/Common/MenuButton.vue';
 import MenuList from '~ims-app-base/components/Common/MenuList.vue';
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
@@ -339,19 +339,22 @@ export default defineComponent({
       }
       this.mainEditItem = { ...this.variable };
     },
-    async duplicateVariable(variable: DialogVariable) {
-      const new_variable = await nodeVariableDuplicate(
-        this.$getAppManager(),
+    duplicateVariable(variable: DialogVariable) {
+      const guessed_title = guessDuplicatedItemTitle(
+        variable.title,
         this.variableList,
-        variable,
-        {
-          alreadyExist: this.$t('imsDialogEditor.var.variableAlreadyExists'),
-        },
-        this.showAutoFill,
-        this.showKindControl,
       );
-      if (!new_variable) return;
-      this.variableController.addEntity(new_variable);
+      const guessed_name = normalizeAssetPropPart(guessed_title);
+      const max_index = this.variableList.reduce(
+        (acc, v) => Math.max(acc, v.index ?? 0),
+        -1,
+      );
+      this.variableController.addEntity({
+        ...variable,
+        name: guessed_name,
+        title: guessed_title,
+        index: max_index + 1,
+      });
     },
     async deleteVariable(variable: DialogVariable) {
       const confirm = await this.$getAppManager()

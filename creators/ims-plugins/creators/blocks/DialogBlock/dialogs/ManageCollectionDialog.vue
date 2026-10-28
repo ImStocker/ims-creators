@@ -29,21 +29,11 @@
               v-model:filters="filters"
               :collection-controller="group.controller"
               :show-filters="false"
+              :add-caption="createButtonCaption"
               embedded
               v-bind="dialog.state.viewComponentProps"
+              @add="addEntity(group)"
             />
-            <button
-              type="button"
-              class="ManageCollectionDialog-addButton"
-              :class="{
-                loading: creatingGroupAssetId === group.assetId,
-              }"
-              :disabled="creatingGroupAssetId !== null"
-              @click="addEntity(group)"
-            >
-              <i class="ri-add-box-fill"></i>
-              {{ createButtonCaption }}
-            </button>
           </section>
         </div>
       </div>
@@ -410,39 +400,5 @@ export default defineComponent({
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
-}
-.ManageCollectionDialog-addButton {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1.5px dashed var(--local-border-color);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--local-sub-text-color);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
-
-  i {
-    font-size: 16px;
-  }
-
-  &:hover {
-    color: var(--local-text-color);
-    border-color: var(--local-border-color);
-    background: var(--button-bg-color-hover);
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.6;
-  }
 }
 </style>

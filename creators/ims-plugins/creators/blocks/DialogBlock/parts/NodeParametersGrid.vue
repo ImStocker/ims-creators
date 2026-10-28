@@ -13,6 +13,7 @@
       :menu-list="getParameterContextMenu(param_gr.variable, param_gr.isOutput)"
     >
       <DataField
+        :explicit-values="explicitValues"
         :in-id="
           !param_gr.isOutput
             ? generateDataPinId(false, param_gr.variable.name)
@@ -25,9 +26,11 @@
         "
         :model-value="
           !param_gr.isOutput
-            ? nodeDataController.values[param_gr.variable.name] === undefined
-              ? param_gr.variable.default
-              : nodeDataController.values[param_gr.variable.name]
+            ? explicitValues
+              ? nodeDataController.values[param_gr.variable.name]
+              : nodeDataController.values[param_gr.variable.name] === undefined
+                ? param_gr.variable.default
+                : nodeDataController.values[param_gr.variable.name]
             : null
         "
         :play-value="
@@ -48,6 +51,7 @@
         @update:model-value="
           setParamValue(param_gr.variable, param_gr.isOutput, $event)
         "
+        @clear="nodeDataController.deleteValue(param_gr.variable.name)"
       ></DataField>
       <div
         v-if="
@@ -143,6 +147,10 @@ export default defineComponent({
         (variable: DialogVariable, isOut: boolean) => MenuListItem[]
       >,
       default: () => [],
+    },
+    explicitValues: {
+      type: Boolean,
+      default: false,
     },
   },
   computed: {

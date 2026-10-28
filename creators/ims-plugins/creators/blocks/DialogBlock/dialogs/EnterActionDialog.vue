@@ -45,11 +45,10 @@
             class="EnterActionDialog-params input tiny-scrollbars"
             :collection-controller="inputParametersController"
             :show-search="false"
+            :add-caption="$t('imsDialogEditor.actions.addInputParameter')"
+            @add="addParameter('in')"
           ></variable-list>
         </div>
-        <button class="is-button is-button-action" @click="addParameter('in')">
-          {{ $t('imsDialogEditor.actions.addInputParameter') }}
-        </button>
       </div>
       <div class="EnterActionDialog-field">
         <div class="EnterActionDialog-field-caption">
@@ -60,11 +59,10 @@
             class="EnterActionDialog-params output tiny-scrollbars"
             :collection-controller="outputParametersController"
             :show-search="false"
+            :add-caption="$t('imsDialogEditor.actions.addOutputParameter')"
+            @add="addParameter('out')"
           ></variable-list>
         </div>
-        <button class="is-button is-button-action" @click="addParameter('out')">
-          {{ $t('imsDialogEditor.actions.addOutputParameter') }}
-        </button>
       </div>
     </template>
     <template #footer>
@@ -100,11 +98,11 @@ import {
 import ImsInput from '~ims-app-base/components/Common/ImsInput.vue';
 import VariableList from './VariableList.vue';
 import type { IDialogVariableController } from '../editor/DialogVariableController';
-import DialogManager from '~ims-app-base/logic/managers/DialogManager';
-import EnterVariableDialog from './EnterVariableDialog.vue';
+
 import UiManager from '~ims-app-base/logic/managers/UiManager';
 import ActionTypeSelector from '../parts/ActionTypeSelector.vue';
 import { normalizeAssetPropPart } from '~ims-app-base/logic/types/Props';
+import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import { withFunctionOutParam } from '../logic/nodeActions';
 
 type DialogProps = {
@@ -245,11 +243,23 @@ export default defineComponent({
           }
         },
         createEntity: async () => {
-          const res = await this.$getAppManager()
-            .get(DialogManager)
-            .show(EnterVariableDialog);
-          if (!res) return null;
-          return res;
+          const list = this.action.params?.[key] ?? [];
+          const max_index = list.reduce(
+            (acc, v) => Math.max(acc, v.index ?? 0),
+            -1,
+          );
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
+          );
+          return {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            index: max_index + 1,
+          } as ScriptBlockPlainVariable;
         },
         deleteEntity: (variable_name: string) => {
           const existing_var_index = this.action.params?.[key]?.findIndex(
@@ -281,8 +291,16 @@ export default defineComponent({
 </script>
 <style lang="scss" scoped>
 .EnterActionDialog {
+  width: 700px;
+  max-width: 100%;
+}
+
+:deep(.SegmentedTabs) {
   width: 100%;
-  max-width: 700px;
+}
+
+:deep(.SegmentedTabs-item) {
+  flex: 1 !important;
 }
 .EnterActionDialog-field-caption {
   text-align: center;

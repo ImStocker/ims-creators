@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="filteredVariables.length > 0 || !embedded"
+    v-if="filteredVariables.length > 0 || !embedded || showAdd"
     class="VariableList"
     :class="{ 'state-embedded': embedded }"
   >
@@ -8,6 +8,7 @@
       v-if="showFilters"
       :filters="filters"
       :show-search="showSearch"
+      :show-kind-filter="showKindFilter"
       @update:filters="$emit('update:filters', $event)"
     >
       <template #prepend-filters>
@@ -17,7 +18,7 @@
     <sortable-list
       v-if="filteredVariables.length > 0"
       class="VariableList-content tiny-scrollbars"
-      handle-selector=".VariableListItem-drag"
+      handle-selector=".SomeEditorListItem-drag"
       id-key="name"
       :list="filteredVariables"
       @update:list="changeList($event)"
@@ -41,6 +42,15 @@
         )
       }}
     </div>
+    <button
+      v-if="showAdd"
+      type="button"
+      class="VariableList-addButton"
+      @click="$emit('add')"
+    >
+      <i class="ri-add-box-fill"></i>
+      {{ addCaption || $t('common.dialogs.add') }}
+    </button>
   </div>
 </template>
 
@@ -86,6 +96,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    showKindFilter: {
+      type: Boolean,
+      default: true,
+    },
     showFilters: {
       type: Boolean,
       default: true,
@@ -98,8 +112,16 @@ export default defineComponent({
       type: [Object, null] as PropType<VariableListFiltersType | null>,
       default: null,
     },
+    showAdd: {
+      type: Boolean,
+      default: true,
+    },
+    addCaption: {
+      type: String,
+      default: '',
+    },
   },
-  emits: ['update:filters'],
+  emits: ['update:filters', 'add'],
   computed: {
     variableList() {
       return this.collectionController.getEntities();
@@ -159,6 +181,9 @@ export default defineComponent({
   }
 }
 .VariableList-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   overflow: auto;
   flex: 1;
 
@@ -173,5 +198,35 @@ export default defineComponent({
   margin-bottom: 10px;
   font-style: italic;
   color: var(--local-sub-text-color);
+}
+.VariableList-addButton {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1.5px dashed var(--local-border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--local-sub-text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  i {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: var(--local-text-color);
+    border-color: var(--local-border-color);
+    background: var(--button-bg-color-hover);
+  }
 }
 </style>

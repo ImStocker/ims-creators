@@ -15,31 +15,23 @@
               {{ $t('imsDialogEditor.speech.speechProperties') }}
             </div>
             <variable-list
+              v-model:filters="mainFilters"
               :show-auto-fill="true"
+              :show-kind-filter="false"
               :collection-controller="mainSpeechController"
+              @add="addSettingSpeechMain"
             ></variable-list>
-            <button
-              type="button"
-              class="is-button"
-              @click="addSettingSpeechMain"
-            >
-              {{ $t('imsDialogEditor.speech.add') }}
-            </button>
           </div>
           <div>
             <div class="Dialog-message-header">
               {{ $t('imsDialogEditor.speech.responseOptionsProperties') }}
             </div>
             <variable-list
+              v-model:filters="optionFilters"
+              :show-kind-filter="false"
               :collection-controller="optionSpeechController"
+              @add="addSettingSpeechOption"
             ></variable-list>
-            <button
-              type="button"
-              class="is-button"
-              @click="addSettingSpeechOption"
-            >
-              {{ $t('imsDialogEditor.speech.add') }}
-            </button>
           </div>
         </div>
         <div class="Form-row-buttons">
@@ -59,8 +51,11 @@ import { defineComponent, type PropType } from 'vue';
 import DialogContent from '~ims-app-base/components/Dialog/DialogContent.vue';
 import type { DialogInterface } from '~ims-app-base/logic/managers/DialogManager';
 import VariableList from './VariableList.vue';
-import { nodeVariableAdd } from '../logic/nodeVariables';
+import type { VariableListFilters } from './collectionItemFilters';
+
+import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import type { IDialogVariableController } from '../editor/DialogVariableController';
+import { ScriptBlockPlainVariableKinds } from '../logic/nodeStoring';
 import type {
   DialogBlockController,
   DialogVariable,
@@ -91,6 +86,12 @@ export default defineComponent({
       required: true,
     },
   },
+  data() {
+    return {
+      mainFilters: {} as VariableListFilters,
+      optionFilters: {} as VariableListFilters,
+    };
+  },
   computed: {
     mainSpeechController(): IDialogVariableController {
       return {
@@ -105,17 +106,25 @@ export default defineComponent({
         reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderMainSpeech(variables),
         createEntity: async () => {
-          const new_variable = await nodeVariableAdd(
-            this.$getAppManager(),
-            this.mainSpeechList,
-            {
-              alreadyExist: this.$t(
-                'imsDialogEditor.var.variableAlreadyExists',
-              ),
-            },
-            true,
+          const list = this.mainSpeechList;
+          const max_index = list.reduce(
+            (acc, v) => Math.max(acc, v.index ?? 0),
+            -1,
           );
-          return new_variable ?? null;
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
+          );
+          return {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            kind: ScriptBlockPlainVariableKinds.GLOBAL,
+            autoFill: null,
+            index: max_index + 1,
+          } as DialogVariable;
         },
       };
     },
@@ -132,25 +141,25 @@ export default defineComponent({
         reorderEntities: (variables: DialogVariable[]) =>
           this.dialogController.reorderOptionSpeech(variables),
         createEntity: async () => {
-          const new_variable = await nodeVariableAdd(
-            this.$getAppManager(),
-            this.optionSpeechList,
-            {
-              alreadyExist: this.$t(
-                'imsDialogEditor.var.variableAlreadyExists',
-              ),
-            },
+          const list = this.optionSpeechList;
+          const unique_name = generateNextUniqueNameNumber(
+            'untitled',
+            (name) => !list.some((v) => v.name === name),
           );
-          if (!new_variable) return null;
           const max_index = Math.max(
-            ...[
-              ...this.optionSpeechList.map((option) =>
-                option.index ? option.index : 0,
-              ),
-              0,
-            ],
+            ...list.map((option) => (option.index ? option.index : 0)),
+            0,
           );
-          return { ...new_variable, index: max_index + 1 };
+          return {
+            name: unique_name,
+            title: unique_name,
+            type: null,
+            description: null,
+            default: null,
+            kind: ScriptBlockPlainVariableKinds.GLOBAL,
+            autoFill: null,
+            index: max_index + 1,
+          } as DialogVariable;
         },
       };
     },
