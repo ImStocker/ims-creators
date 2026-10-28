@@ -1,36 +1,38 @@
 <template>
-  <div class="DialogEndNode DialogEditorNode-wrapper">
-    <ContextMenuZone class="DialogEditorNode" :menu-list="contextMenuComp">
-      <div
-        class="DialogEndNode-header DialogNode-header DialogEditorNode-header"
-        :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
-      >
-        <div class="DialogEndNode-header-title">
-          <ExecHandle id="in" type="target" :position="Position.Left" />
-          <i :class="nodeDescriptor.icon"></i>
-          <span class="DialogEndNode-caption">
-            {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
-          </span>
-        </div>
-        <div v-if="exitName" class="DialogEndNode-exitName" :title="exitName">
-          {{ exitName }}
-        </div>
+  <DialogBaseNode
+    :node-id="id"
+    :dialog-player="dialogPlayer"
+    class="DialogEndNode DialogEditorNode"
+  >
+    <div
+      class="DialogEndNode-header DialogNode-header DialogEditorNode-header"
+      :title="$t(`imsDialogEditor.nodes.${nodeDescriptor.name}.description`)"
+    >
+      <div class="DialogEndNode-header-title">
+        <ExecHandle id="in" type="target" :position="Position.Left" />
+        <i :class="nodeDescriptor.icon"></i>
+        <span class="DialogEndNode-caption">
+          {{ $t(`imsDialogEditor.nodes.${nodeDescriptor.name}.title`) }}
+        </span>
       </div>
-      <div
-        v-if="inputParameters.length > 0"
-        class="DialogEndNode-body DialogEditorNode-body"
-      >
-        <node-parameters-grid
-          :dialog-player="dialogPlayer"
-          :node-data-controller="nodeDataController"
-          :readonly="readonly"
-          :input-params="inputParameters"
-          :playing-node-data="playingNodeData"
-          :explicit-values="true"
-        ></node-parameters-grid>
+      <div v-if="exitName" class="DialogEndNode-exitName" :title="exitName">
+        {{ exitName }}
       </div>
-    </ContextMenuZone>
-  </div>
+    </div>
+    <div
+      v-if="inputParameters.length > 0"
+      class="DialogEndNode-body DialogEditorNode-body"
+    >
+      <node-parameters-grid
+        :dialog-player="dialogPlayer"
+        :node-data-controller="nodeDataController"
+        :readonly="readonly"
+        :input-params="inputParameters"
+        :playing-node-data="playingNodeData"
+        :explicit-values="true"
+      ></node-parameters-grid>
+    </div>
+  </DialogBaseNode>
 </template>
 
 <script lang="ts">
@@ -42,20 +44,19 @@ import type {
   DialogBlockController,
   DialogVariable,
 } from '../editor/DialogBlockController';
-import type { MenuListItem } from '~ims-app-base/logic/types/MenuList';
 
 import type { ScriptPlayNode } from '../play/ScriptPlayNode';
 import type { DialogPlayer } from '../play/DialogPlayer';
 import { castAssetPropValueToString } from '~ims-app-base/logic/types/Props';
 import ExecHandle from '../parts/ExecHandle.vue';
-import ContextMenuZone from '~ims-app-base/components/Common/ContextMenuZone.vue';
+import DialogBaseNode from '../parts/DialogBaseNode.vue';
 import NodeParametersGrid from '../parts/NodeParametersGrid.vue';
 
 export default defineComponent({
   name: 'DialogEndNode',
   components: {
     ExecHandle,
-    ContextMenuZone,
+    DialogBaseNode,
     NodeParametersGrid,
   },
   props: {
@@ -103,13 +104,6 @@ export default defineComponent({
     },
     exitName() {
       return castAssetPropValueToString(this.nodeDataController.subject);
-    },
-    contextMenuComp(): MenuListItem[] {
-      return this.dialogController.getNodeContextMenu([this.id], {
-        x: 0,
-        y: 0,
-        zoom: 1,
-      });
     },
   },
 });

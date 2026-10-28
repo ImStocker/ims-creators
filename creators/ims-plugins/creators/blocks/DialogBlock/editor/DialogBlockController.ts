@@ -1703,7 +1703,7 @@ export class DialogBlockController extends BlockEditorController {
             action: () =>
               this.addNodeScriptVariable(ScriptBlockPlainVariableKinds.OUT),
           },
-          { type: 'separator', name: 'sep-add-out-variable' },
+          { type: 'separator' },
           {
             name: 'set-exit-name',
             title: this.appManager.$t('imsDialogEditor.setExitName'),
@@ -1711,6 +1711,13 @@ export class DialogBlockController extends BlockEditorController {
             action: () => this.setNodeExitName(nodeIds[0]),
           },
           { type: 'separator', name: 'sep-exit-name' },
+          {
+            name: 'set-service-name',
+            title: this.appManager.$t('imsDialogEditor.setServiceName'),
+            icon: 'ri-price-tag-3-fill',
+            action: () => this.setNodeServiceName(nodeIds[0]),
+          },
+          { type: 'separator', name: 'sep-service-name' },
           ...this.getNodeCopyCutDeleteMenu(nodeIds, viewport, suffix),
         ];
       }
@@ -1763,7 +1770,7 @@ export class DialogBlockController extends BlockEditorController {
 
     if (count === 1) {
       const node = this.state.nodes.find((n) => n.id === nodeIds[0]);
-      if (node?.type !== 'comment') {
+      if (node) {
         items.push(
           {
             name: 'set-service-name',
