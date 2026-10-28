@@ -10,7 +10,7 @@ import * as node_path from 'path';
 import path from 'node:path';
 import log from 'electron-log/main';
 import { PROJECT_META_AI_CHAT, PROJECT_META_SETTINGS, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT, type AssetSaveFormat } from '../project-db-constants';
-import { ASSET_EXT, WORKSPACE_EXT, WORKSPACE_EXT_TEST_REGEXP, ATTACHMENTS_FOLDER } from './FileSystemService';
+import { ASSET_EXT, WORKSPACE_EXT, WORKSPACE_EXT_TEST_REGEXP, WORKSPACE_META_FILENAME, ATTACHMENTS_FOLDER } from './FileSystemService';
 import { suggestUniqueFilename } from '../utils/files';
 
 function saveStreamToTempFile(stream: Readable,){
@@ -219,7 +219,8 @@ export class ProjectService {
      * Import helper: walk files of a not-yet-imported project (e.g. an unzipped
      * template) and write them into `targetRoot` re-serialized in the target
      * project's save format.
-     * - workspace meta files (`*.imw.json`) and non-asset files are copied as-is
+     * - workspace meta is read from `<folder>/.imw` (new) or a legacy sibling
+     *   `*.imw.json`, and always WRITTEN in the new `<folder>/.imw` format
      * - asset files are re-serialized: markdown-typed assets are written as `.md`,
      *   everything else as new-format `.json` (or legacy `.ima.json` per `format`)
      * - file names are preserved, only the extension is swapped; collisions get
@@ -227,16 +228,19 @@ export class ProjectService {
      */
     async convertImportedRootToTarget(srcRoot: string, targetRoot: string, rootWorkspaceId: string, format: AssetSaveFormat) {
         // The template archive may wrap the gdd workspace into a `gdd/` folder with
-        // a `gdd.imw.json` meta next to it. In that case the folder contents belong
-        // to the project root (`rootWorkspaceId`); unwrap the wrapper instead of
-        // importing it as a nested workspace.
+        // its meta inside (`gdd/.imw`) or next to it (legacy `gdd.imw.json`). In
+        // that case the folder contents belong to the project root
+        // (`rootWorkspaceId`); unwrap the wrapper instead of importing it as a
+        // nested workspace.
         let import_root = srcRoot;
+        const gdd_folder = node_path.join(srcRoot, 'gdd');
         if (
-            fs.existsSync(node_path.join(srcRoot, 'gdd' + WORKSPACE_EXT))
-            && fs.existsSync(node_path.join(srcRoot, 'gdd'))
-            && fs.statSync(node_path.join(srcRoot, 'gdd')).isDirectory()
+            fs.existsSync(gdd_folder)
+            && fs.statSync(gdd_folder).isDirectory()
+            && (fs.existsSync(node_path.join(srcRoot, 'gdd' + WORKSPACE_EXT))
+                || fs.existsSync(node_path.join(gdd_folder, WORKSPACE_META_FILENAME)))
         ) {
-            import_root = node_path.join(srcRoot, 'gdd');
+            import_root = gdd_folder;
         }
         await this._convertImportedFolder(import_root, import_root, targetRoot, rootWorkspaceId, format);
     }
@@ -245,21 +249,55 @@ export class ProjectService {
         const items = await fs.promises.readdir(srcFolder, { withFileTypes: true });
         const is_root = node_path.resolve(srcFolder) === node_path.resolve(srcRoot);
         const folder_base = node_path.basename(srcFolder);
-        const workspace_meta_name = is_root ? null : folder_base + WORKSPACE_EXT;
 
         let child_workspace_id = parentWorkspaceId;
         await fs.promises.mkdir(targetFolder, { recursive: true });
 
-        if (workspace_meta_name) {
-            const has_ws_file = items.some((item) => item.isFile() && item.name === workspace_meta_name);
-            if (has_ws_file) {
-                const ws_raw = node_path.join(srcFolder, workspace_meta_name);
-                const parsed = JSON.parse(await fs.promises.readFile(ws_raw, 'utf8'));
+        if (!is_root) {
+            // Workspace meta: new format is `.imw` INSIDE the folder, legacy is a
+            // sibling `name.imw.json` next to it. Always write the new format.
+            const meta_new_path = node_path.join(srcFolder, WORKSPACE_META_FILENAME);
+            const meta_legacy_path = node_path.join(srcFolder, folder_base + WORKSPACE_EXT);
+            const meta_src_path = fs.existsSync(meta_new_path)
+                ? meta_new_path
+                : (fs.existsSync(meta_legacy_path) ? meta_legacy_path : null);
+            if (meta_src_path) {
+                const parsed = JSON.parse(await fs.promises.readFile(meta_src_path, 'utf8'));
                 if (parsed && typeof parsed.id === 'string') {
                     child_workspace_id = parsed.id;
+                    // New `.imw` files don't store parentId — the loader
+                    // resolves it from the folder the meta sits in.
+                    const meta_out = { ...parsed };
+                    delete meta_out.parentId;
+                    await fs.promises.writeFile(
+                        node_path.join(targetFolder, WORKSPACE_META_FILENAME),
+                        JSON.stringify(meta_out, null, 1),
+                    );
                 }
-                await this._copyImportedFile(ws_raw, node_path.join(targetFolder, workspace_meta_name));
             }
+        }
+
+        // Legacy layout: `X.imw.json` sits NEXT TO the `X/` folder in this
+        // directory — migrate each meta to `X/.imw` inside the target folder.
+        // Stray metas without a matching folder are dropped (a workspace
+        // without a folder does not exist in the new format).
+        const sibling_meta_ids = new Map<string, string>();
+        for (const item of items) {
+            if (!item.isFile() || !WORKSPACE_EXT_TEST_REGEXP.test(item.name)) continue;
+            const base = item.name.replace(WORKSPACE_EXT_TEST_REGEXP, '');
+            if (!base || !items.some(d => d.isDirectory() && d.name === base)) continue;
+            const parsed = JSON.parse(await fs.promises.readFile(node_path.join(srcFolder, item.name), 'utf8'));
+            if (!parsed || typeof parsed.id !== 'string') continue;
+            const target_subfolder = node_path.join(targetFolder, base);
+            await fs.promises.mkdir(target_subfolder, { recursive: true });
+            // New `.imw` files don't store parentId — the loader resolves it
+            const meta_out = { ...parsed };
+            delete meta_out.parentId;
+            await fs.promises.writeFile(
+                node_path.join(target_subfolder, WORKSPACE_META_FILENAME),
+                JSON.stringify(meta_out, null, 1),
+            );
+            sibling_meta_ids.set(base, parsed.id);
         }
 
         for (const item of items) {
@@ -270,15 +308,19 @@ export class ProjectService {
                 await this._copyImportedFolder(node_path.join(srcFolder, item.name), node_path.join(targetFolder, item.name));
                 continue;
             }
-            if (item.isFile() && (item.name === workspace_meta_name || WORKSPACE_EXT_TEST_REGEXP.test(item.name))) {
-                if (item.name !== workspace_meta_name) {
-                    await this._copyImportedFile(node_path.join(srcFolder, item.name), node_path.join(targetFolder, item.name));
-                }
+            if (item.isFile() && WORKSPACE_EXT_TEST_REGEXP.test(item.name)) {
+                // Legacy metas are migrated to `<folder>/.imw` above — never copied as-is
                 continue;
             }
             const src_path = node_path.join(srcFolder, item.name);
             if (item.isDirectory()) {
-                await this._convertImportedFolder(src_path, srcRoot, node_path.join(targetFolder, item.name), child_workspace_id, format);
+                await this._convertImportedFolder(
+                    src_path,
+                    srcRoot,
+                    node_path.join(targetFolder, item.name),
+                    sibling_meta_ids.get(item.name) ?? child_workspace_id,
+                    format,
+                );
             }
             else {
                 await this._convertImportedAssetFile(src_path, targetFolder, child_workspace_id, srcRoot, format);

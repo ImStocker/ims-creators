@@ -28,6 +28,7 @@ export function serializeAssetToJSON(
     comments?: unknown[];
     references?: unknown[];
     blocks?: SharedAssetBlock[];
+    idClaimedAt?: number | null;
   },
   opts?: { compact?: boolean },
 ): Record<string, unknown> {
@@ -46,6 +47,12 @@ export function serializeAssetToJSON(
     comments: asset.comments ?? [],
     references: asset.references ?? [],
   };
+
+  // Id claim (see meta/devdocs/desktop-id-claim.md): assets store it under
+  // `__meta`; omitted when unclaimed so legacy files stay untouched.
+  if (asset.idClaimedAt !== undefined && asset.idClaimedAt !== null) {
+    ima_asset.__meta = { idClaimedAt: asset.idClaimedAt };
+  }
 
   // Write blocks if present (Electron always writes them).
   // Stored blocks are in assigned (flatten) form; persist them as plain objects.
@@ -120,6 +127,7 @@ export function serializeAssetToNewFormatJSON(
     index?: number | null;
     isAbstract?: boolean;
     blocks?: SharedAssetBlock[];
+    idClaimedAt?: number | null;
   },
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -211,6 +219,10 @@ export function serializeAssetToNewFormatJSON(
   };
   if (asset.isAbstract) meta_obj.isAbstract = true;
   if (asset.index !== undefined && asset.index !== null) meta_obj.index = asset.index;
+  // Id claim (see meta/devdocs/desktop-id-claim.md) — omitted when unclaimed
+  if (asset.idClaimedAt !== undefined && asset.idClaimedAt !== null) {
+    meta_obj.idClaimedAt = asset.idClaimedAt;
+  }
   if (Object.keys(meta_block_own_props).length > 0) meta_obj.values = meta_block_own_props;
   meta_obj.blocks = blocks_meta;
   result.__meta = meta_obj;
@@ -229,14 +241,26 @@ export function serializeWorkspaceToJSON(
     parentId?: string | null;
     index?: number | null;
     props?: Record<string, unknown>;
+    idClaimedAt?: number | null;
   },
+  opts?: { includeParentId?: boolean },
 ): Record<string, unknown> {
-  return {
+  const result: Record<string, unknown> = {
     id: workspace.id,
     title: workspace.title ?? null,
     name: workspace.name ?? null,
-    parentId: workspace.parentId ?? null,
     index: workspace.index ?? null,
     props: workspace.props ?? {},
   };
+  // parentId is intentionally NOT stored in `.imw` files: the loader resolves
+  // it from the folder the meta sits in. Archives that import elsewhere (the
+  // server rebuilds the tree from it) opt in via `includeParentId`.
+  if (opts?.includeParentId) {
+    result.parentId = workspace.parentId ?? null;
+  }
+  // Id claim (see meta/devdocs/desktop-id-claim.md) — omitted when unclaimed
+  if (workspace.idClaimedAt !== undefined && workspace.idClaimedAt !== null) {
+    result.idClaimedAt = workspace.idClaimedAt;
+  }
+  return result;
 }

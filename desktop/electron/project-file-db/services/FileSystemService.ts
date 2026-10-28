@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
-import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle } from "../utils/files";
+import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle, isDirSync, getWorkspaceLocalPathFolder, getAssetLocalPath } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META, BLOCK_ID_META, BLOCK_TYPE_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
 import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
@@ -14,6 +14,7 @@ import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { plainBlockToAssigned } from "../logic/asset-ops";
 import { assignPlainValueToAssetProps, getAssetPropType } from '~ims-app-base/logic/types/Props';
 import { parseMarkdownFrontmatter, MARKDOWN_DEFAULT_ICON, type MarkdownFrontmatterMeta } from '../logic/markdown-frontmatter';
+import { resolveWorkspaceClaims, compareClaimInfo, type WorkspaceClaimant, type ClaimResolution, type ClaimInfo } from '../logic/id-claim';
    
 type FileSystemExpectChange = {
     filepaths: string[]
@@ -33,8 +34,18 @@ const PARCEL_WATCHER_DELAY = 100;
 
 export const ASSET_EXT = '.ima.json'
 export const ASSET_EXT_TEST_REGEXP = /\.ima[ \d\(\)\[\]_]*\.json$/i
+/**
+ * Legacy workspace meta: a `name.imw.json` file sitting NEXT TO the `name/`
+ * folder. Kept readable for old projects; never written anymore.
+ */
 export const WORKSPACE_EXT = '.imw.json'
 export const WORKSPACE_EXT_TEST_REGEXP = /\.imw[ \d\(\)\[\]_]*\.json$/i
+/**
+ * Current workspace meta: a dot-file INSIDE the workspace folder, so the meta
+ * travels with the folder on rename/move (the legacy sibling file did not,
+ * which broke identity when a folder was renamed outside the app).
+ */
+export const WORKSPACE_META_FILENAME = '.imw'
 
 export const ATTACHMENTS_FOLDER = 'attachments'
 
@@ -65,6 +76,16 @@ export class FileSystemService{
     private _fsExpectChanges: FileSystemExpectChange[] = []
     private _fsPendingFSEvents: Event[] = []
     private _fsPendingFSInWork = false
+
+    // Id-claim state (see meta/devdocs/desktop-id-claim.md): which ids are
+    // owned by which artifact during this session. Seeded with system ids on
+    // init; never released during the session (tombstones are the registry's job).
+    private _claimedWorkspaceIds = new Set<string>();
+    private _claimedWorkspacePaths = new Map<string, string>(); // id -> key path of its artifact
+    private _claimedAssetIds = new Set<string>();
+    private _assetClaimants = new Map<string, { absPath: string; relPath: string; claimedAt: number | null; asset: ProjectFileDbAsset }>();
+    private _wsClaimResolution: Map<string, ClaimResolution> | null = null;
+    private _loadingPhase = false;
 
     constructor(public db: ProjectFileDb){
 
@@ -105,7 +126,10 @@ export class FileSystemService{
         const file = await fs.promises.readFile(absolutePath, { encoding: 'utf8' });
         if (extname === '.json') {
             if (ASSET_EXT_TEST_REGEXP.test(local_name)) {
-                const asset = JSON.parse(file) as ProjectFileDbAsset;
+                const asset = JSON.parse(file) as ProjectFileDbAsset & { __meta?: { idClaimedAt?: unknown } };
+                // Id claim lives under `__meta` (see meta/devdocs/desktop-id-claim.md)
+                asset.idClaimedAt = typeof asset.__meta?.idClaimedAt === 'number' ? asset.__meta.idClaimedAt : null;
+                delete asset.__meta;
                 asset.title = prepareEntityTitle(local_name, asset.title, ASSET_EXT_TEST_REGEXP)
                 asset.localName = local_name
                 asset.workspaceId = parentWorkspaceId;
@@ -115,6 +139,7 @@ export class FileSystemService{
                 asset.rights = AssetRights.FULL_ACCESS;
                 // On-disk blocks are plain — store them in assigned (flatten) form
                 asset.blocks = (asset.blocks ?? []).map(block => plainBlockToAssigned(block as any));
+                await this._claimAssetEntry(asset, absolutePath, rootPath);
                 return {
                     type: 'asset',
                     localPath: local_path,
@@ -122,7 +147,29 @@ export class FileSystemService{
                 }
             }
             else if (WORKSPACE_EXT_TEST_REGEXP.test(local_name)){
-                const workspace_info = JSON.parse(file) as ProjectFileDbWorkspace;
+                const resolution = this._wsClaimResolution?.get(absolutePath);
+                if (resolution?.action === 'drop') {
+                    log.info('id-claim: conflicting folderless meta not loaded', absolutePath);
+                    return null;
+                }
+                // Pairing check must mirror the folder walk: only a meta named
+                // exactly `<folder>.imw.json` with the folder present counts as folder-backed
+                const legacy_base = local_name.endsWith(WORKSPACE_EXT)
+                    ? local_name.substring(0, local_name.length - WORKSPACE_EXT.length)
+                    : null;
+                const legacy_folder = legacy_base
+                    ? node_path.join(node_path.dirname(absolutePath), legacy_base)
+                    : null;
+                const folder_path = legacy_folder && isDirSync(legacy_folder) ? legacy_folder : null;
+                if (folder_path && fs.existsSync(node_path.join(folder_path, WORKSPACE_META_FILENAME))) {
+                    // In-folder `.imw` owns the folder's identity — a leftover
+                    // legacy sibling must not load as a second workspace
+                    log.info('id-claim: leftover legacy meta next to in-folder .imw not loaded', absolutePath);
+                    return null;
+                }
+                const workspace_info = JSON.parse(file) as ProjectFileDbWorkspace & { idClaimedAt?: unknown };
+                if (resolution?.action === 'reid') workspace_info.id = resolution.newId;
+                workspace_info.idClaimedAt = typeof workspace_info.idClaimedAt === 'number' ? workspace_info.idClaimedAt : null;
                 workspace_info.title = prepareEntityTitle(local_name, workspace_info.title, WORKSPACE_EXT_TEST_REGEXP)
                 workspace_info.localName = local_name
                 workspace_info.parentId = parentWorkspaceId;
@@ -133,6 +180,13 @@ export class FileSystemService{
                 if(workspace_info.name === 'gdd') {
                     workspace_info.name = null; // gdd is reserved workspace name
                 }
+                workspace_info.id = await this._claimWorkspaceEntry(
+                    workspace_info.id,
+                    absolutePath,
+                    folder_path ?? absolutePath,
+                    rootPath,
+                    'legacy'
+                );
                 return {
                     type: 'workspace',
                     localPath: local_path,
@@ -145,10 +199,14 @@ export class FileSystemService{
                     let asset: ProjectFileDbAsset;
                     if (parsed.__meta && typeof parsed.__meta.id === 'string') {
                         asset = this._loadNewFormatAsset(parsed, local_name, local_path, parentWorkspaceId, created_at, updated_at);
+                        // Id claim lives under `__meta`
+                        asset.idClaimedAt = typeof parsed.__meta.idClaimedAt === 'number' ? parsed.__meta.idClaimedAt : null;
                     }
                     else {
                         asset = this._loadPlainJsonAsset(parsed, local_name, local_path, parentWorkspaceId, created_at, updated_at, absolutePath, rootPath);
+                        asset.idClaimedAt = null;
                     }
+                    await this._claimAssetEntry(asset, absolutePath, rootPath);
                     return {
                         type: 'asset',
                         localPath: local_path,
@@ -227,6 +285,7 @@ export class FileSystemService{
                 lastViewedAt: null,
                 localName: local_name,
             };
+            await this._claimAssetEntry(asset_full, absolutePath, rootPath);
             return {
                 type: 'asset',
                 localPath: local_path,
@@ -536,6 +595,52 @@ export class FileSystemService{
             return null;
         }, rootPath)        
     }
+
+    /**
+     * Load the new-format meta file (`folder/.imw`). Returns null when absent.
+     * The folder basename wins as the title when it diverges from the
+     * title-derived file name (same rule as the legacy sibling meta).
+     */
+    private async _loadWorkspaceInsideMeta(absoluteFolderPath: string, parentWorkspaceId: string | null, root_path: string): Promise<ProjectFileDbWorkspace | null> {
+        const meta_path = node_path.join(absoluteFolderPath, WORKSPACE_META_FILENAME);
+        let file: string;
+        try {
+            file = await fs.promises.readFile(meta_path, { encoding: 'utf8' });
+        }
+        catch (err: any){
+            if (err.code === 'ENOENT'){
+                return null;
+            }
+            throw err;
+        }
+        const file_info = await fs.promises.stat(meta_path);
+        const title = node_path.basename(absoluteFolderPath);
+        let workspace_info: (ProjectFileDbWorkspace & { idClaimedAt?: unknown }) | null;
+        try {
+            workspace_info = JSON.parse(file) as ProjectFileDbWorkspace & { idClaimedAt?: unknown };
+        }
+        catch {
+            // Unreadable `.imw` (e.g. unresolved merge conflict) — fall back to
+            // legacy meta / folder synthesis instead of failing the whole load
+            return null;
+        }
+        workspace_info.idClaimedAt = typeof workspace_info.idClaimedAt === 'number' ? workspace_info.idClaimedAt : null;
+        const title_to_filename = workspace_info.title ? prepareFileBasenameByEntityTitle(workspace_info.title) : '';
+        const filename_without_index = title.replace(/ - \d+$/, '');
+        if (!(title_to_filename === filename_without_index && workspace_info.title)){
+            workspace_info.title = title;
+        }
+        workspace_info.localName = title
+        workspace_info.parentId = parentWorkspaceId;
+        workspace_info.createdAt = file_info.birthtime.toISOString();
+        workspace_info.updatedAt = file_info.mtime.toISOString();
+        workspace_info.projectId = this.db.info.id ?? '';
+        workspace_info.rights = AssetRights.FULL_ACCESS;
+        if(workspace_info.name === 'gdd') {
+            workspace_info.name = null; // gdd is reserved workspace name
+        }
+        return workspace_info;
+    }
     
 
     async _loadFolderAsWorkspaceImpl(absolutePath: string, parentWorkspaceId: string | null, getWorkspaceMeta: () => Promise<ProjectFileDbWorkspace | null>, root_path: string): Promise<{
@@ -543,14 +648,20 @@ export class FileSystemService{
         localPath: string,
         content: FileSystemWorkspaceContent
     }>{
-        const local_path = node_path.relative(root_path, absolutePath) + WORKSPACE_EXT
-        let workspace = await getWorkspaceMeta();
+        const local_path = node_path.relative(root_path, absolutePath)
+        // New format first (meta inside the folder), legacy sibling meta as fallback
+        let workspace = await this._loadWorkspaceInsideMeta(absolutePath, parentWorkspaceId, root_path);
+        let source: 'folder' | 'legacy' | 'synthesized' = workspace ? 'folder' : 'legacy';
         if(!workspace){
+            workspace = await getWorkspaceMeta();
+            if (workspace) source = 'legacy';
+        }
+        if(!workspace){
+            source = 'synthesized';
             const file_info = await fs.promises.stat(absolutePath);
             const created_at = file_info.birthtime.toISOString();
             const updated_at = file_info.mtime.toISOString();
             const title = node_path.basename(absolutePath);
-            const local_name = title + WORKSPACE_EXT;
             workspace = {
                 id: absolutePathToUuid(absolutePath, root_path),
                 title: title,
@@ -562,8 +673,16 @@ export class FileSystemService{
                 rights: AssetRights.FULL_ACCESS,
                 index: null,
                 props: {},
-                localName: local_name,
+                localName: title,
             }
+        }
+        if (source !== 'legacy') {
+            // Legacy metas were already resolved/claimed when read as files;
+            // folder metas and synthesized folders resolve here — before the
+            // content walk, so children attribute to the final id.
+            const resolution = this._wsClaimResolution?.get(absolutePath);
+            if (resolution?.action === 'reid') workspace.id = resolution.newId;
+            workspace.id = await this._claimWorkspaceEntry(workspace.id, absolutePath, absolutePath, root_path, source);
         }
         const content = await this.loadWorkspaceContentFromPath(
             absolutePath,
@@ -619,6 +738,416 @@ export class FileSystemService{
     async loadAssetFromFile(absolutePath: string, parentWorkspaceId: string | null, rootPath: string): Promise<ProjectFileDbAsset | null> {
         const loaded = await this._loadFile(absolutePath, parentWorkspaceId, rootPath);
         return loaded && loaded.type === 'asset' ? loaded.asset : null;
+    }
+
+    // ─── Id claim resolution (see meta/devdocs/desktop-id-claim.md) ───────────
+
+    private _relPortablePath(absolute_path: string): string {
+        return node_path.relative(this.db.localPath, absolute_path).split(/[\\/]/).join('/');
+    }
+
+    /**
+     * Session-scoped workspace id claim. A re-claimed id (system id stolen by a
+     * file, duplicated meta whose load-time write-back previously failed, or a
+     * copy arriving at runtime) is replaced — the incoming artifact always
+     * loses to the already-established owner. The new id is written back so it
+     * is stable across loads.
+     */
+    private async _claimWorkspaceEntry(
+        id: string,
+        key_path: string,
+        candidate_base: string,
+        root_path: string,
+        kind: 'legacy' | 'folder' | 'synthesized',
+    ): Promise<string> {
+        if (!id) return id;
+        if (!this._claimedWorkspaceIds.has(id)) {
+            this._claimedWorkspaceIds.add(id);
+            this._claimedWorkspacePaths.set(id, key_path);
+            return id;
+        }
+        if (this._claimedWorkspacePaths.get(id) === key_path) {
+            return id; // the same artifact re-processed (repeated watcher events)
+        }
+        const new_id = await this._assignNewId('workspace', candidate_base, root_path);
+        log.warn('id-claim: duplicate workspace id replaced', { from: id, to: new_id, key: key_path });
+        this._claimedWorkspaceIds.add(new_id);
+        this._claimedWorkspacePaths.set(new_id, key_path);
+        const stamp = Date.now();
+        try {
+            if (kind === 'legacy') {
+                await this._rewriteWorkspaceMetaAt(key_path, new_id, stamp);
+            }
+            else if (kind === 'folder') {
+                await this._rewriteWorkspaceMetaAt(node_path.join(key_path, WORKSPACE_META_FILENAME), new_id, stamp);
+            }
+            // synthesized: no meta file yet — the id persists on first save
+            await this._registryMarkResolved(new_id, stamp, this._relPortablePath(key_path));
+        }
+        catch (err: any) {
+            log.error('id-claim: write-back failed', key_path, err.message);
+        }
+        return new_id;
+    }
+
+    /**
+     * Session-scoped asset id claim. At load time the portable chain decides
+     * (compareClaimInfo); at runtime the already-loaded claimant always wins.
+     * Displacing an earlier claimant only rewrites its file — references to
+     * the id intentionally follow the surviving identity.
+     */
+    private async _claimAssetEntry(asset: ProjectFileDbAsset, absolute_path: string, root_path: string): Promise<void> {
+        const id = asset.id;
+        if (!id) return;
+        const rel_path = this._relPortablePath(absolute_path);
+        if (!this._claimedAssetIds.has(id)) {
+            this._claimedAssetIds.add(id);
+            this._assetClaimants.set(id, { absPath: absolute_path, relPath: rel_path, claimedAt: asset.idClaimedAt ?? null, asset });
+            return;
+        }
+        const existing = this._assetClaimants.get(id);
+        if (existing && existing.absPath === absolute_path) {
+            return; // the same file re-processed
+        }
+        if (!existing || !this._loadingPhase) {
+            // Id owned by a system/tx-noted entity, or a runtime copy — incoming loses
+            await this._reidAssetEntry(asset, absolute_path);
+            return;
+        }
+        const current: ClaimInfo = { claimedAt: asset.idClaimedAt ?? null, relPath: rel_path };
+        if (compareClaimInfo(current, existing) < 0) {
+            // Current file wins the chain: the earlier claimant takes a new id
+            const new_id = await this._assignNewId('asset', existing.absPath, root_path);
+            log.info('id-claim: earlier asset claimant displaced', { from: id, to: new_id, path: existing.absPath });
+            const stamp = Date.now();
+            existing.asset.id = new_id;
+            existing.asset.idClaimedAt = stamp;
+            try {
+                await this._rewriteAssetFile(existing.absPath, new_id, stamp);
+                await this._registryMarkResolved(new_id, stamp, existing.relPath);
+            }
+            catch (err: any) {
+                log.error('id-claim: write-back failed', existing.absPath, err.message);
+            }
+            this._claimedAssetIds.add(new_id);
+            this._assetClaimants.set(new_id, { absPath: existing.absPath, relPath: existing.relPath, claimedAt: stamp, asset: existing.asset });
+            this._assetClaimants.set(id, { absPath: absolute_path, relPath: rel_path, claimedAt: current.claimedAt, asset });
+        }
+        else {
+            await this._reidAssetEntry(asset, absolute_path);
+        }
+    }
+
+    private async _reidAssetEntry(asset: ProjectFileDbAsset, absolute_path: string): Promise<void> {
+        const root_path = this.db.localPath;
+        const new_id = await this._assignNewId('asset', absolute_path, root_path);
+        const stamp = Date.now();
+        log.warn('id-claim: duplicate asset id replaced', { from: asset.id, to: new_id, path: absolute_path });
+        asset.id = new_id;
+        asset.idClaimedAt = stamp;
+        try {
+            await this._rewriteAssetFile(absolute_path, new_id, stamp);
+            await this._registryMarkResolved(new_id, stamp, this._relPortablePath(absolute_path));
+        }
+        catch (err: any) {
+            log.error('id-claim: write-back failed', absolute_path, err.message);
+        }
+        this._claimedAssetIds.add(new_id);
+        this._assetClaimants.set(new_id, {
+            absPath: absolute_path,
+            relPath: this._relPortablePath(absolute_path),
+            claimedAt: stamp,
+            asset,
+        });
+    }
+
+    /**
+     * Deterministic path-derived id when free, random uuid fallback otherwise
+     * (a path-derived id can itself be taken after moves/copies of previously
+     * generated ids). The random branch is machine-local — it converges across
+     * machines through the write-back.
+     */
+    private async _assignNewId(kind: 'workspace' | 'asset', base_abs_path: string, root_path: string): Promise<string> {
+        const claimed = kind === 'workspace' ? this._claimedWorkspaceIds : this._claimedAssetIds;
+        const candidate = absolutePathToUuid(base_abs_path, root_path);
+        if (!claimed.has(candidate) && !(await this._registryHasId(candidate))) {
+            claimed.add(candidate);
+            return candidate;
+        }
+        let random_id = '';
+        do {
+            random_id = uuidv4();
+        } while (claimed.has(random_id) || (await this._registryHasId(random_id)));
+        claimed.add(random_id);
+        log.warn('id-claim: path-derived id already used, generated a random id', { kind, base: base_abs_path, candidate, random: random_id });
+        return random_id;
+    }
+
+    /** Raw rewrite of a workspace meta: id and/or claim stamp, format-preserving. */
+    private async _rewriteWorkspaceMetaAt(file_path: string, new_id: string | null, claim_stamp: number | null): Promise<void> {
+        await this.expectFsChange([file_path], async () => {
+            const raw = JSON.parse(await fs.promises.readFile(file_path, 'utf8'));
+            if (new_id !== null) raw.id = new_id;
+            if (claim_stamp !== null) raw.idClaimedAt = claim_stamp;
+            if (node_path.basename(file_path) === WORKSPACE_META_FILENAME) {
+                delete raw.parentId; // new `.imw` files don't store parentId
+            }
+            await fs.promises.writeFile(file_path, JSON.stringify(raw, null, 1), 'utf8');
+        });
+    }
+
+    /**
+     * Raw rewrite of an asset file: identity under `__meta` (new format) or
+     * top-level (legacy flat `.ima.json`). Files without a recognized
+     * on-disk identity (plain json / markdown) are in-memory only.
+     */
+    private async _rewriteAssetFile(file_path: string, new_id: string | null, claim_stamp: number | null): Promise<void> {
+        await this.expectFsChange([file_path], async () => {
+            const raw = JSON.parse(await fs.promises.readFile(file_path, 'utf8'));
+            const has_meta_id = raw && typeof raw.__meta === 'object' && raw.__meta !== null && typeof raw.__meta.id === 'string';
+            if (has_meta_id) {
+                if (new_id !== null) raw.__meta.id = new_id;
+                if (claim_stamp !== null) raw.__meta.idClaimedAt = claim_stamp;
+            }
+            else if (raw && typeof raw.id === 'string' && ASSET_EXT_TEST_REGEXP.test(node_path.basename(file_path))) {
+                if (new_id !== null) raw.id = new_id;
+                if (claim_stamp !== null) {
+                    raw.__meta = {
+                        ...(typeof raw.__meta === 'object' && raw.__meta !== null ? raw.__meta : {}),
+                        idClaimedAt: claim_stamp,
+                    };
+                }
+            }
+            else {
+                return; // no recognized on-disk identity — nothing to persist
+            }
+            await fs.promises.writeFile(file_path, JSON.stringify(raw, null, 1), 'utf8');
+        });
+    }
+
+    /**
+     * Phase 1: collect every workspace claimant in the tree — legacy sibling
+     * metas, in-folder `.imw` files and synthesized (meta-less) folders —
+     * mirroring exactly which files/folders the loader treats as workspaces.
+     */
+    private async _scanWorkspaceClaims(root_path: string): Promise<WorkspaceClaimant[]> {
+        const claimants: WorkspaceClaimant[] = [];
+        const folders: { folderPath: string; hasImw: boolean }[] = [];
+        const read_claim = (parsed: any): number | null =>
+            typeof parsed?.idClaimedAt === 'number' ? parsed.idClaimedAt : null;
+
+        const walk = async (dir: string, is_root: boolean): Promise<void> => {
+            const items = await fs.promises.readdir(dir, { withFileTypes: true });
+            const dir_names = new Set(items.filter(i => i.isDirectory()).map(i => i.name));
+            for (const item of items) {
+                if (item.isFile()) {
+                    if (item.name.startsWith('.')) continue; // mirror _loadFileItems
+                    if (!WORKSPACE_EXT_TEST_REGEXP.test(item.name) || !item.name.endsWith(WORKSPACE_EXT)) continue;
+                    const abs = node_path.join(dir, item.name);
+                    const base = item.name.substring(0, item.name.length - WORKSPACE_EXT.length);
+                    const folder_path = dir_names.has(base) ? node_path.join(dir, base) : null;
+                    try {
+                        const parsed = JSON.parse(await fs.promises.readFile(abs, 'utf8'));
+                        if (typeof parsed?.id !== 'string' || !parsed.id) continue;
+                        claimants.push({
+                            keyPath: abs,
+                            kind: 'legacy',
+                            folderPath: folder_path,
+                            id: parsed.id,
+                            claimedAt: read_claim(parsed),
+                            parsed,
+                            relPath: this._relPortablePath(abs),
+                        });
+                    }
+                    catch { /* unreadable — the loader skips it too */ }
+                }
+                else if (item.isDirectory()) {
+                    if (is_root && (item.name.startsWith('.') || item.name === ATTACHMENTS_FOLDER)) continue; // mirror walk
+                    const folder_path = node_path.join(dir, item.name);
+                    const meta_path = node_path.join(folder_path, WORKSPACE_META_FILENAME);
+                    const has_imw = fs.existsSync(meta_path);
+                    folders.push({ folderPath: folder_path, hasImw: has_imw });
+                    if (has_imw) {
+                        try {
+                            const parsed = JSON.parse(await fs.promises.readFile(meta_path, 'utf8'));
+                            if (typeof parsed?.id === 'string' && parsed.id) {
+                                claimants.push({
+                                    keyPath: folder_path,
+                                    kind: 'folder',
+                                    folderPath: folder_path,
+                                    id: parsed.id,
+                                    claimedAt: read_claim(parsed),
+                                    parsed,
+                                    relPath: this._relPortablePath(meta_path),
+                                });
+                            }
+                        }
+                        catch { /* unreadable `.imw` — the loader synthesizes the folder */ }
+                    }
+                    await walk(folder_path, false);
+                }
+            }
+        };
+        await walk(root_path, true);
+
+        // Synthesized claimants: folders without in-folder `.imw` and without an
+        // exact legacy meta pair — the loader derives their id from the path.
+        const paired_folders = new Set(
+            claimants.filter(c => c.kind === 'legacy' && c.folderPath).map(c => c.folderPath as string),
+        );
+        for (const folder of folders) {
+            if (folder.hasImw || paired_folders.has(folder.folderPath)) continue;
+            claimants.push({
+                keyPath: folder.folderPath,
+                kind: 'synthesized',
+                folderPath: folder.folderPath,
+                id: absolutePathToUuid(folder.folderPath, root_path),
+                claimedAt: null,
+                parsed: null,
+                relPath: this._relPortablePath(folder.folderPath),
+            });
+        }
+        return claimants;
+    }
+
+    /** Persist resolution outcomes into the meta files (loser re-id write-back). */
+    private async _writeClaimResolutions(claimants: WorkspaceClaimant[], resolutions: Map<string, ClaimResolution>): Promise<void> {
+        if (resolutions.size === 0) return;
+        const by_key = new Map(claimants.map(c => [c.keyPath, c]));
+        for (const [key, resolution] of resolutions) {
+            const claimant = by_key.get(key);
+            if (!claimant) continue;
+            if (resolution.action === 'drop') {
+                log.info('id-claim: conflicting folderless meta dropped from identity', key, claimant.id);
+                continue;
+            }
+            const stamp = Date.now();
+            log.info('id-claim: duplicate workspace id replaced', { key, from: claimant.id, to: resolution.newId });
+            if (!claimant.parsed) continue; // synthesized — the id persists on first save
+            try {
+                const file_path = claimant.kind === 'legacy'
+                    ? claimant.keyPath
+                    : node_path.join(claimant.folderPath as string, WORKSPACE_META_FILENAME);
+                await this.expectFsChange([file_path], async () => {
+                    claimant.parsed!.id = resolution.newId;
+                    claimant.parsed!.idClaimedAt = stamp;
+                    if (claimant.kind !== 'legacy') {
+                        delete claimant.parsed!.parentId; // new `.imw` files don't store parentId
+                    }
+                    await fs.promises.writeFile(file_path, JSON.stringify(claimant.parsed, null, 1), 'utf8');
+                });
+                await this._registryMarkResolved(resolution.newId, stamp, this._relPortablePath(file_path));
+            }
+            catch (err: any) {
+                log.error('id-claim: write-back failed', key, err.message);
+            }
+        }
+    }
+
+    // ─── Id-claim registry (`id_claims` table, machine-local) ─────────────────
+
+    private async _registryHasId(id: string): Promise<boolean> {
+        try {
+            const rows: { entity_id: string }[] = await this.db.dataSource.query(
+                'SELECT entity_id FROM id_claims WHERE entity_id = ?',
+                [id],
+            );
+            return rows.length > 0;
+        }
+        catch {
+            return false; // table absent (first run before migrations) or db not ready
+        }
+    }
+
+    private async _registryMarkResolved(id: string, claimed_at: number, file_path: string | null): Promise<void> {
+        try {
+            const now = Date.now();
+            await this.db.dataSource.query(
+                `INSERT INTO id_claims (entity_id, claimed_at, first_seen_at, file_path, source, changed_at)
+                 VALUES (?, ?, ?, ?, 'resolved', ?)
+                 ON CONFLICT (entity_id) DO UPDATE SET
+                    claimed_at = excluded.claimed_at,
+                    file_path = excluded.file_path,
+                    source = 'resolved',
+                    changed_at = excluded.changed_at`,
+                [id, claimed_at, now, file_path, now],
+            );
+        }
+        catch { /* registry-only bookkeeping — never blocks loading */ }
+    }
+
+    /**
+     * Record every loaded user entity in the id registry (first-seen wins).
+     * Called right after init; rows are never deleted — an id whose file is
+     * gone stays claimed, which is exactly the tombstone case the registry
+     * exists for.
+     */
+    async registerIdClaims(): Promise<void> {
+        const now = Date.now();
+        const rows: (string | number | null)[][] = [];
+        const rel = (absolute_path: string) => this._relPortablePath(absolute_path);
+        const project_id = this.db.info.id;
+        try {
+            for (const workspace of this.db.workspace.workspaces.iterate()) {
+                if (workspace.projectId !== project_id) continue;
+                let file_path: string | null = null;
+                try { file_path = rel(getWorkspaceLocalPathFolder(workspace, this.db)); } catch { file_path = null; }
+                rows.push([workspace.id, workspace.idClaimedAt ?? null, now, file_path, 'file', now]);
+            }
+            for (const asset of this.db.asset.assets.iterate()) {
+                if (asset.projectId !== project_id) continue;
+                if (this.db.asset.systemAssets.byId.has(asset.id)) continue;
+                let file_path: string | null = null;
+                try { file_path = rel(getAssetLocalPath(asset, this.db)); } catch { file_path = null; }
+                rows.push([asset.id, asset.idClaimedAt ?? null, now, file_path, 'file', now]);
+            }
+            const CHUNK = 80; // sqlite parameter limit headroom
+            for (let i = 0; i < rows.length; i += CHUNK) {
+                const chunk = rows.slice(i, i + CHUNK);
+                const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+                await this.db.dataSource.query(
+                    `INSERT INTO id_claims (entity_id, claimed_at, first_seen_at, file_path, source, changed_at)
+                     VALUES ${placeholders} ON CONFLICT (entity_id) DO NOTHING`,
+                    chunk.flat(),
+                );
+            }
+        }
+        catch (err: any) {
+            log.error('id-claim: registry population failed', err.message);
+        }
+    }
+
+    /**
+     * Keep the session claim sets current for entities created/changed outside
+     * the loaders (transactions). Path-aware: a re-appearance of the id at the
+     * SAME path is the same entity; at a different path it is a copy and loses.
+     */
+    noteWorkspaceClaim(workspace: ProjectFileDbWorkspace): void {
+        if (!workspace.id) return;
+        this._claimedWorkspaceIds.add(workspace.id);
+        try {
+            const folder = getWorkspaceLocalPathFolder(workspace, this.db);
+            const key = workspace.localName?.endsWith(WORKSPACE_EXT)
+                ? folder + WORKSPACE_EXT  // legacy sibling meta keys by its file
+                : folder;
+            this._claimedWorkspacePaths.set(workspace.id, key);
+        }
+        catch { /* path unresolvable — id-only claim */ }
+    }
+
+    noteAssetClaim(asset: ProjectFileDbAsset): void {
+        if (!asset.id) return;
+        this._claimedAssetIds.add(asset.id);
+        try {
+            const abs_path = getAssetLocalPath(asset, this.db);
+            this._assetClaimants.set(asset.id, {
+                absPath: abs_path,
+                relPath: this._relPortablePath(abs_path),
+                claimedAt: asset.idClaimedAt ?? null,
+                asset,
+            });
+        }
+        catch { /* path unresolvable — id-only claim */ }
     }
 
     private _getWatcherIgnore(): string[]{
@@ -863,16 +1392,44 @@ export class FileSystemService{
             rights: 1,
             blocks: (asset.blocks ?? []).map(block => plainBlockToAssigned(block as any)),
         })
-        this.db.asset.systemAssets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(toSystemAsset))
-        this.db.asset.assets.addMany((SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(toSystemAsset));
-        this.db.workspace.workspaces.addMany((SystemBundle.workspaces as unknown as ProjectFileDbWorkspace[]).map(workspace => {
+        const system_assets = (SystemBundle.assets as unknown as ProjectFileDbAsset[]).map(toSystemAsset);
+        const system_workspaces = (SystemBundle.workspaces as unknown as ProjectFileDbWorkspace[]).map(workspace => {
             return {...workspace, rights: 1}
-        }));
+        });
+        this.db.asset.systemAssets.addMany(system_assets)
+        this.db.asset.assets.addMany(system_assets);
+        this.db.workspace.workspaces.addMany(system_workspaces);
 
-        const user_files = await this.loadWorkspaceContentFromPath(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
-        this.db.asset.assets.addMany(user_files.assets.map(asset => asset.entry));
-        this.db.workspace.workspaces.add(this.db.RootGddFolder)
-        this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
+        // Id-claim session state (see meta/devdocs/desktop-id-claim.md)
+        this._claimedWorkspaceIds = new Set<string>([...system_workspaces.map(w => w.id), this.db.RootGddFolder.id]);
+        this._claimedWorkspacePaths = new Map<string, string>();
+        this._claimedAssetIds = new Set<string>(system_assets.map(a => a.id));
+        this._assetClaimants = new Map();
+        this._wsClaimResolution = null;
+
+        this._loadingPhase = true;
+        try {
+            // Phase 1: scan every workspace claimant in the tree and resolve
+            // duplicate-id conflicts globally (any nesting depth) before any
+            // content walk attributes children to an id.
+            const claimants = await this._scanWorkspaceClaims(this.db.localPath);
+            this._wsClaimResolution = await resolveWorkspaceClaims(claimants, {
+                rootPath: this.db.localPath,
+                isIdTaken: async (id) => this._claimedWorkspaceIds.has(id) || (await this._registryHasId(id)),
+                randomId: () => uuidv4(),
+            });
+            await this._writeClaimResolutions(claimants, this._wsClaimResolution);
+
+            // Phase 2: normal walk — losers take pre-assigned ids, drops are skipped
+            const user_files = await this.loadWorkspaceContentFromPath(this.db.localPath, this.db.RootGddFolder.id, this.db.localPath);
+            this.db.asset.assets.addMany(user_files.assets.map(asset => asset.entry));
+            this.db.workspace.workspaces.add(this.db.RootGddFolder)
+            this.db.workspace.workspaces.addMany(user_files.workspaces.map(workspace => workspace.entry));
+        }
+        finally {
+            this._loadingPhase = false;
+            this._wsClaimResolution = null;
+        }
 
         //  New-format assets don't store typeIds. Rebuild them
         this.db.asset.rebuildTypeStructure();
