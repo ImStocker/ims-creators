@@ -23,7 +23,8 @@
     "postinstall": "nuxt prepare && electron-builder install-app-deps",
     "typeorm": "ts-node ./node_modules/typeorm/cli.js",
     "migration:create": "cross-env npm run typeorm -- migration:create ./electron/project-file-db/migrations/%npm_config_name%",
-    "test": "vitest"
+    "test": "node scripts/run-tests.mjs",
+    "test:run": "node scripts/run-tests.mjs run"
   },
   "main": "dist-electron/main.js",
   "build": {
