@@ -274,8 +274,8 @@ export default defineComponent({
       await this.$getAppManager().get(DesktopSyncManager).pauseSyncProject();
       this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.pauseEnd'));
     },
-    async resyncAll(){
-      await this.$getAppManager().get(DesktopSyncManager).resyncAll()
+    async resyncAll(waitComplete = true){
+      await this.$getAppManager().get(DesktopSyncManager).resyncAll(waitComplete)
       this.$getAppManager().get(UiManager).showSuccess(this.$t('desktop.fsSync.menu.syncNowEnd'));
     },
     openInCloud(){

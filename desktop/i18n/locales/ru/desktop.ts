@@ -171,6 +171,8 @@ export default {
         noProject: 'Проект не открыт',
         cloudNotFound: 'Облачный проект не найден',
         noPermission: 'У вас нет прав на переименование этого проекта',
+        noGameDesignAccess:
+          'У вас нет доступа к рабочему пространству «Геймдизайн»',
         renameCloudFailed: 'Не удалось переименовать облачный проект',
         location: 'Расположение',
         folderName: 'Имя папки',

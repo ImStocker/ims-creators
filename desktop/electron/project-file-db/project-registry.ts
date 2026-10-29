@@ -10,7 +10,12 @@ const projectDbMap = new Map<string, {
 export function requestProjectDb(projectPath: string, forWindow?: BrowserWindow): ProjectFileDb {
   projectPath = path.normalize(projectPath);
   let requested = projectDbMap.get(projectPath);
-  if (!requested || requested.db.isDestroying) {
+  // One live instance per path, even mid-destroy: a destroying db is reused —
+  // ProjectFileDb.init() waits out the destroy and joins the in-flight recreate.
+  // Spawning a second instance here (the old `isDestroying` branch) left two
+  // RootGddFolder ids alive for one project: the stale one kept serving sync
+  // and could clobber .imsc/index.json with a null rootWorkspaceId.
+  if (!requested) {
     requested = {
       for: new Set(),
       db: new ProjectFileDb(projectPath)

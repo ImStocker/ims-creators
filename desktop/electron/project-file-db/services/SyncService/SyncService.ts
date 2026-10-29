@@ -15,11 +15,16 @@ import crypto from 'crypto';
 import axios from "axios";
 import type { SyncInfo } from "#logic/types/SyncTypes";
 import { SyncCurrentStateStatus, type SyncCurrentState } from "#bridge/types/SyncTypes";
+import { LOCAL_ROOT_WORKSPACE_ID } from "#bridge/utils/cloud-root";
 import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
 
 const SYNC_CHUNK_SIZE = 50;
 export const SQLITE_NOW_STM = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 const ATTACHMENTS_DIR = 'attachments';
+
+/** Shown while a cloud-bound project has no resolved server root workspace. */
+export const ROOT_WORKSPACE_UNRESOLVED_ERROR =
+    'Cloud root workspace is not resolved — sync paused. Reopen the project or reconnect it to the cloud.';
 
 export type ProjectDbFile = {
     server_file_id: string,
@@ -55,7 +60,8 @@ type ServerWorkspaceToCheckChange = {
 
 export class SyncService {
 
-    private _syncProcessRunning = false;
+    private _syncProcessRunning: Promise<void> | null = null;
+    private _syncProcessRequestedAgain = false
     private _synchronizationTimer: NodeJS.Timeout | undefined;
     private _currentState: SyncCurrentState = {
         status: SyncCurrentStateStatus.FREE,
@@ -81,7 +87,9 @@ export class SyncService {
         }
         if(restart && this._syncWithCloudTime > 0 && this._currentState.status !== SyncCurrentStateStatus.PAUSE) {
             this._synchronizationTimer = setInterval(() => {
-                this.syncProject();
+                if (!this._syncProcessRunning){
+                    this.syncProject();
+                }
             }, this._syncWithCloudTime * 1000);
         }
     }
@@ -196,7 +204,7 @@ export class SyncService {
         }
     }
 
-    async resyncAll(){
+    async resyncAll(waitComplete = true){
         // Repair missing rows first — UPDATE alone cannot register entities
         // that were never tracked (e.g. a folder opened directly from disk).
         await this.ensureEntitiesRegistered();
@@ -208,13 +216,39 @@ export class SyncService {
             UPDATE assets
             SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
         `, []);
-        await this.syncProject();
+        const syncing = this.syncProject();
+        if (waitComplete){
+            await syncing
+        }
+    }
+
+    /**
+     * A cloud-bound project must know the server id of its gdd root workspace:
+     * entities are positioned from it at load, and syncing while it's missing
+     * would upload the local placeholder root id (00000000-…-200000000002),
+     * which the server rejects with ENTITY_NOT_FOUND — a permanent
+     * "workspace not found" loop on every reload. DesktopCreatorManager
+     * re-resolves the root on project load; until then sync stays paused with
+     * a clear error instead of hammering the server.
+     */
+    private _isRootWorkspaceResolved(): boolean {
+        const root_workspace_id = this.db.info.rootWorkspaceId;
+        return !!root_workspace_id && root_workspace_id !== LOCAL_ROOT_WORKSPACE_ID;
+    }
+
+    private async _pauseForUnresolvedRoot(): Promise<void> {
+        await this.changeCurrentState({ error: ROOT_WORKSPACE_UNRESOLVED_ERROR });
     }
 
     async resyncAssetsAndWorkspaces(
         asset_ids: string[],
         workspace_ids: string[],
     ){
+        if (!this.db.info.id || !isValidBigNumberKey(this.db.info.id)) return;
+        if (!this._isRootWorkspaceResolved()) {
+            await this._pauseForUnresolvedRoot();
+            return;
+        }
         await this.db.dataSource.createQueryRunner().query(`
             UPDATE workspaces
             SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL
@@ -257,57 +291,75 @@ export class SyncService {
     }
 
     async syncProject(){
-        if (this._syncProcessRunning) return;
         if (!this.db.info.id || !isValidBigNumberKey(this.db.info.id)) return;
 
         const account = this.db.api.getTokenInfo();
         if (!account) return;
 
-        let sync_log_id: number | null = null;
-        try{
-            this._syncProcessRunning = true;
-            this.changeCurrentState({
-                status: SyncCurrentStateStatus.IN_PROCESS
-            });
-            const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
-                INSERT INTO sync_logs (sync_start)
-                VALUES (${SQLITE_NOW_STM}) RETURNING id;
-            `);
-            sync_log_id = insert_res[0].id;
-            await this.checkUnsyncedAssetsAndWorkspaces(sync_log_id);
-            await this.syncAssetsAndWorkspaces();
-            this.changeCurrentState({
-                status: SyncCurrentStateStatus.FREE,
-                hasChanges: false,
-                error: null,
-            });
+        if (this._syncProcessRunning){
+            this._syncProcessRequestedAgain = true;
+            await this._syncProcessRunning;
+            return;
         }
-        catch(err: any){
-            if(sync_log_id) {
-                await this.db.dataSource.createQueryRunner().query(`
-                    UPDATE sync_logs
-                    SET error = ?
-                    WHERE id = ?
-                `, [ err.message, sync_log_id]);  
+        
+        this._syncProcessRunning = (async () => {
+
+            if (!this._isRootWorkspaceResolved()) {
+                await this._pauseForUnresolvedRoot();
+                return;
             }
-            else {
-                log.error('Sync failed', err);
+
+            let sync_log_id: number | null = null;
+            try{
+                this.changeCurrentState({
+                    status: SyncCurrentStateStatus.IN_PROCESS
+                });
+                const insert_res: {id: number}[] = await this.db.dataSource.createQueryRunner().query(`
+                    INSERT INTO sync_logs (sync_start)
+                    VALUES (${SQLITE_NOW_STM}) RETURNING id;
+                `);
+                sync_log_id = insert_res[0].id;
+                await this.checkUnsyncedAssetsAndWorkspaces(sync_log_id);
+                await this.syncAssetsAndWorkspaces();
+                this.changeCurrentState({
+                    status: SyncCurrentStateStatus.FREE,
+                    hasChanges: false,
+                    error: null,
+                });
             }
-            this.changeCurrentState({
-                status: SyncCurrentStateStatus.FREE,
-                error: err.message,
-            });
-        }
-        finally {
-            if(sync_log_id) {
-                await this.db.dataSource.createQueryRunner().query(`
-                    UPDATE sync_logs
-                    SET sync_end = ${SQLITE_NOW_STM}
-                    WHERE id = ?
-                `, [sync_log_id]);
+            catch(err: any){
+                if(sync_log_id) {
+                    await this.db.dataSource.createQueryRunner().query(`
+                        UPDATE sync_logs
+                        SET error = ?
+                        WHERE id = ?
+                    `, [ err.message, sync_log_id]);  
+                }
+                else {
+                    log.error('Sync failed', err);
+                }
+                this.changeCurrentState({
+                    status: SyncCurrentStateStatus.FREE,
+                    error: err.message,
+                });
             }
-            this._syncProcessRunning = false;
-        }
+            finally {
+                if(sync_log_id) {
+                    await this.db.dataSource.createQueryRunner().query(`
+                        UPDATE sync_logs
+                        SET sync_end = ${SQLITE_NOW_STM}
+                        WHERE id = ?
+                    `, [sync_log_id]);
+                }
+            }
+
+        })().finally(async () => {
+            this._syncProcessRunning = null;
+            if (this._syncProcessRequestedAgain){
+                this._syncProcessRequestedAgain = false;
+                await this.syncProject()
+            }
+        })
     }
 
     async checkUnsyncedAssetsAndWorkspaces(sync_log_id: number) {

@@ -9,6 +9,8 @@ import ApiManager from "~ims-app-base/logic/managers/ApiManager";
 import { HttpMethods, Service } from "~ims-app-base/logic/managers/ApiWorker";
 import type { ProjectFullInfo, ProjectShortInfo, ApiResultListWithTotal } from "~ims-app-base/logic/types/ProjectTypes";
 import type { ProjectFileDbInitParams } from "~~/electron/project-file-db/ProjectFileDb";
+import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
+import { LOCAL_ROOT_WORKSPACE_ID, resolveCloudRootWorkspaceId } from "#bridge/utils/cloud-root";
 
 export const availableFilenameRegexp = new RegExp("[^- А-Яа-яa-zA-Z,@.;'`!)(]+", 'g');
 function prepareFileBasenameByEntityTitle(title: string){
@@ -17,6 +19,7 @@ function prepareFileBasenameByEntityTitle(title: string){
 
 export default class DesktopProjectManager extends ProjectManager{
     private _projectLocalPath: string | null = null;
+    private _projectRootWorkspaceId: string | null = null
 
     override getCurrentAccountValueInProject() {
         const user_info = this.appManager.get(AuthManager).getUserInfo();
@@ -98,12 +101,57 @@ export default class DesktopProjectManager extends ProjectManager{
     async initializeLocalProject(localPath: string, initParams?: ProjectFileDbInitParams): Promise<LocalProjectInitInfo> {
         const res = await window.imshost.project.initProject(localPath, initParams);
         this._projectLocalPath = localPath;
+        // Every open path (first open, reload, recent list) lands here, so this
+        // is where a bound-but-unresolved root gets healed — see the method
+        // below. It must run before the fire-and-forget sync below, so the sync
+        // never races the repair's recreate.
+        const info = await this._repairUnresolvedRootWorkspace(localPath, res);
+        this._projectRootWorkspaceId = info.rootWorkspaceId;
         // Recreate (cloud bind/unlink) is followed by an explicit resyncAll()
         // from the caller — skip the fire-and-forget sync so it doesn't race it.
         if(initParams?.id && !initParams?.recreate){
             window.imshost.sync.syncProject(this._projectLocalPath);
         }
-        return res;
+        return info;
+    }
+
+    /**
+     * A cloud-bound project must know the server id of its gdd root workspace:
+     * entities are positioned from it at load, and while it's missing sync
+     * refuses to upload the local placeholder root id (SyncService guard, see
+     * bridge/utils/cloud-root.ts). Legacy projects were bound with
+     * `rootWorkspaceId: null` (or the bind lookup missed) — re-resolve the root
+     * from the server and recreate; on any failure keep the project as-is, the
+     * sync state surfaces the paused-sync error.
+     *
+     * Deliberately NOT recursive: the recreate goes straight through
+     * window.imshost.project.initProject, so repair runs at most once per
+     * initializeLocalProject call — even if the server keeps returning nothing
+     * resolvable, this cannot loop.
+     */
+    private async _repairUnresolvedRootWorkspace(localPath: string, info: LocalProjectInitInfo): Promise<LocalProjectInitInfo> {
+        if (!info.id || !isValidBigNumberKey(info.id)) return info;
+        if (info.rootWorkspaceId && info.rootWorkspaceId !== LOCAL_ROOT_WORKSPACE_ID) return info;
+        try {
+            const project_info = await this.appManager
+                .get(ApiManager)
+                .call<ProjectFullInfo>(Service.CREATORS, HttpMethods.GET, 'project/info', { pid: info.id });
+            const root_workspace_id = resolveCloudRootWorkspaceId(project_info?.rootWorkspaces ?? []);
+            if (!root_workspace_id) {
+                console.error('Cloud project has no resolvable gdd root workspace', info.id);
+                return info;
+            }
+            return await window.imshost.project.initProject(localPath, {
+                id: info.id,
+                title: info.title,
+                rootWorkspaceId: root_workspace_id,
+                recreate: true,
+            });
+        }
+        catch (err: any) {
+            console.error('Failed to resolve cloud root workspace:', err?.message ?? err);
+            return info;
+        }
     }
     
     override getAllowAnonymUsers() {
@@ -199,5 +247,9 @@ export default class DesktopProjectManager extends ProjectManager{
                 `${this.appManager.$t('desktop.settings.project.renameCloudFailed')}: ${err?.message ?? err}`,
             );
         }
+    }
+
+    getProjectRootWorkpaceId(){
+        return this._projectRootWorkspaceId;
     }
 }

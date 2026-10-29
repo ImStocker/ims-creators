@@ -24,9 +24,9 @@ export class ImsHostSync extends ImsHostBase {
         return await project_db.sync.resyncAssetsAndWorkspaces(asset_ids,workspace_ids);
     }
 
-    async resyncAll(projectPath: string){
+    async resyncAll(projectPath: string, waitComplete = true){
         const project_db = requestProjectDb(projectPath, this._window);
-        return await project_db.sync.resyncAll();
+        return await project_db.sync.resyncAll(waitComplete);
     }
 
     async pauseSyncProject(projectPath: string){

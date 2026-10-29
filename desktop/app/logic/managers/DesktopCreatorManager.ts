@@ -3,13 +3,13 @@ import { AppSubManagerBase, type IAppManager } from "~ims-app-base/logic/manager
 import { ProjectRolePulseRights, type AppLoadResult, type ProjectFullInfo } from "~ims-app-base/logic/types/ProjectTypes";
 import { assert } from "~ims-app-base/logic/utils/typeUtils";
 import type { LocalProjectInitInfo } from "#bridge/api/ImsHostProject";
+import { resolveCloudRootWorkspaceId } from "#bridge/utils/cloud-root";
 import DesktopProjectManager from "./DesktopProjectManager";
 import SyncStoreCore from "~ims-app-base/logic/types/SyncStoreCore";
 import ApiManager from "~ims-app-base/logic/managers/ApiManager";
 import CreatorAssetManager from "~ims-app-base/logic/managers/CreatorAssetManager";
 import ProjectManager from "~ims-app-base/logic/managers/ProjectManager";
 import ProjectSettingsManager from '~ims-app-base/logic/managers/ProjectSettingsManager';
-import type { Workspace } from '~ims-app-base/logic/types/Workspaces';
 import { DesktopCreatorAssetManager } from "./DesktopCreatorAssetManager";
 import DesktopUiManager from "./DesktopUiManager";
 import UiManager from "~ims-app-base/logic/managers/UiManager";
@@ -210,11 +210,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         );
 
         this.removeFromProjectList(old_local_path);
-        this.addToProjectListIfNotAdded({
-            id: res.id,
-            title: res.title,
-            localPath: res.localPath,
-        });
+        this.addToProjectListIfNotAdded(res);
 
         await this._recentProjectsStore.awaitSave();
 
@@ -243,11 +239,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         await window.imshost.project.closeProject(res.localPath);
 
         this.removeFromProjectList(local_path);
-        this.addToProjectListIfNotAdded({
-            id: res.id,
-            title: res.title,
-            localPath: res.localPath,
-        });
+        this.addToProjectListIfNotAdded(res);
 
         await this._recentProjectsStore.awaitSave();
     }
@@ -270,11 +262,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         await window.imshost.project.closeProject(res.localPath);
 
         this.removeFromProjectList(local_path);
-        this.addToProjectListIfNotAdded({
-            id: res.id,
-            title: res.title,
-            localPath: res.localPath,
-        });
+        this.addToProjectListIfNotAdded(res);
 
         await this._recentProjectsStore.awaitSave();
     }
@@ -319,15 +307,24 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
     }
 
     async connectToCloudProject(new_project_info: ProjectFullInfo){
-        let rootWorkspaceId = null
-        if (new_project_info){
-            rootWorkspaceId = new_project_info.rootWorkspaces.find((w: Workspace) => w.name === 'gdd')?.id;
-        }
         assert(this._loadedForProjectPath)
+        const root_workspace_id = resolveCloudRootWorkspaceId(new_project_info?.rootWorkspaces ?? []);
+        if (!root_workspace_id) {
+            // Writing rootWorkspaceId: null next to a valid project id would
+            // make every load derive entity ids from the local placeholder root
+            // and every sync fail with ENTITY_NOT_FOUND ("workspace not found
+            // 00000000-…-200000000002") — refuse to bind instead. The gdd root
+            // is missing from rootWorkspaces almost always because the user has
+            // no rights on it, so say exactly that; the dialog's showError
+            // surfaces it through the awaited call.
+            throw new Error(
+                this.appManager.$t('desktop.settings.project.noGameDesignAccess'),
+            );
+        }
         await this.appManager.get(DesktopProjectManager).initializeLocalProject(this._loadedForProjectPath, {
             id: new_project_info.id ?? null,
             title: new_project_info.title,
-            rootWorkspaceId: rootWorkspaceId ?? null,
+            rootWorkspaceId: root_workspace_id,
             recreate: true,
         });
         const project_info = this.appManager.get(DesktopProjectManager).getProjectInfo()
@@ -337,8 +334,8 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         })      
         this.appManager.get<DesktopCreatorAssetManager>(CreatorAssetManager).setProjectIdToFiles(project_info.id);
         // Re-sync after the recreate: registers every loaded asset/workspace in
-        // the sync tables, marks them all as need_sync and uploads them.
-        await this.appManager.get(DesktopSyncManager).resyncAll();
+        // the sync tables, marks them all as need_sync and starts syncing 
+        await this.appManager.get(DesktopSyncManager).resyncAll(false);
         await this.appManager.get(UiManager).reloadPage();
     }
 

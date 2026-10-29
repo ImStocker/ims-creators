@@ -19,6 +19,7 @@ import type { AssetReferenceEntity, AssetShort } from "~ims-app-base/logic/types
 import type { AssetProps, AssetPropsPlainObject } from "~ims-app-base/logic/types/Props";
 import type { AssetCommentDTO } from "~ims-app-base/logic/types/CommentTypes";
 import type { SyncCurrentState } from "#bridge/types/SyncTypes";
+import { LOCAL_ROOT_WORKSPACE_ID } from "#bridge/utils/cloud-root";
 import { isValidBigNumberKey } from "~ims-app-base/logic/utils/big-number-key";
 
 export type ProjectFileDbAssetBlock = {
@@ -103,7 +104,7 @@ export type ProjectFileDbInitParams = {
 }
 
 const RootGddFolder: ProjectFileDbWorkspace = {
-  "id": "00000000-0000-0000-0000-200000000002",
+  "id": LOCAL_ROOT_WORKSPACE_ID,
   "index": null,
   "title": "[[t:Gdd]]",
   "name": "gdd",
@@ -119,6 +120,7 @@ const RootGddFolder: ProjectFileDbWorkspace = {
 export class ProjectFileDb {
   private _info: ProjectFileDbInfo | null = null;
   private _initing: Promise<void> | null = null;
+  private _initQueue: Promise<void> = Promise.resolve();
   private _dataSource: DataSource | null = null;
   private _destroying: Promise<void> | null = null;
 
@@ -177,7 +179,7 @@ export class ProjectFileDb {
         inited: true,
         rootWorkspaceId: initParams?.rootWorkspaceId ?? null
       }
-      await fs.promises.writeFile(path.join(this.localPath, PROJECT_META_INDEX), JSON.stringify(this._info), 'utf-8')
+      await this._writeProjectIndex()
     }
     assert(this._info);
 
@@ -187,9 +189,10 @@ export class ProjectFileDb {
       this.RootGddFolder.projectId = this._info.id;
     }
     this.RootGddFolder.localName = '';
-    if (this._info.rootWorkspaceId) {
-      this.RootGddFolder.id = this._info.rootWorkspaceId
-    }
+    // Bound projects run on the server root id persisted in index.json;
+    // local-only ones always fall back to the placeholder — never inherit a
+    // previously bound instance's server id (unlink re-init must reset it).
+    this.RootGddFolder.id = this._info.rootWorkspaceId ?? LOCAL_ROOT_WORKSPACE_ID;
 
     // DataSource first: migrations must run before the filesystem load so the
     // id-claim registry exists while conflicts are being resolved.
@@ -214,21 +217,34 @@ export class ProjectFileDb {
   }
 
   async init(initParams?: ProjectFileDbInitParams) {
-    if (this.isDestroying) {
-      throw new Error('Cannot init destroying ProjectFileDb');
-    }
-    if (initParams?.recreate) {
-      await this.destroy();
-      this._destroying = null;
-      this._initing = null;
-    }
-    if (!this._initing) {
-      this._initing = this._initImpl(initParams).catch(err => {
+    // Serialize init calls through a queue:
+    //  - an init that arrives while a destroy is in flight (e.g. a project
+    //    reload racing a cloud-bind recreate) waits it out instead of throwing
+    //    "Cannot init destroying ProjectFileDb" — that error pushed callers to
+    //    request a second ProjectFileDb for the same path, which kept a stale
+    //    RootGddFolder id alive and made sync upload the placeholder root id;
+    //  - a queued init joins the result of an already-running init (params and
+    //    all) rather than racing a second _initImpl over the same files.
+    const run = async (): Promise<void> => {
+      while (this._destroying) {
+        await this._destroying.catch(() => {});
+      }
+      if (initParams?.recreate) {
+        await this.destroy();
+        this._destroying = null;
         this._initing = null;
-        throw err;
-      })
-    }
-    return this._initing;
+      }
+      if (!this._initing) {
+        this._initing = this._initImpl(initParams).catch(err => {
+          this._initing = null;
+          throw err;
+        })
+      }
+      return this._initing;
+    };
+    const result = this._initQueue.then(run, run);
+    this._initQueue = result.then(() => {}, () => {});
+    return result;
   }
 
 
@@ -244,14 +260,22 @@ export class ProjectFileDb {
       this._dataSource = null;
     }
     this._info = null;
+    // An init waiting on this destroy must start a fresh _initImpl instead of
+    // joining the now-destroyed one.
+    this._initing = null;
   }
 
   async destroy() {
     if (!this._destroying) {
-      this._destroying = this._destroyImpl().catch(err => {
-        this._destroying = null;
-        throw err;
-      })
+      // Clear the flag as soon as the destroy settles (success or failure) so
+      // isDestroying only ever reflects an in-flight destroy — init() waits on
+      // this promise and would loop forever otherwise.
+      const destroying = this._destroyImpl().finally(() => {
+        if (this._destroying === destroying) {
+          this._destroying = null;
+        }
+      });
+      this._destroying = destroying;
     }
     return this._destroying;
   }
@@ -259,11 +283,20 @@ export class ProjectFileDb {
   async renameTitle(title: string): Promise<void> {
     assert(this._info, 'ProjectFileDb is not inited');
     this._info.title = title;
-    await fs.promises.writeFile(
-      path.join(this.localPath, PROJECT_META_INDEX),
-      JSON.stringify(this._info),
-      'utf-8',
-    );
+    await this._writeProjectIndex();
+  }
+
+  /**
+   * Persist `_info` (id / title / rootWorkspaceId) atomically: a concurrent
+   * load must never read a half-written index.json — a torn read throws on
+   * JSON.parse and the project fails to open.
+   */
+  private async _writeProjectIndex(): Promise<void> {
+    assert(this._info, 'ProjectFileDb is not inited');
+    const target = path.join(this.localPath, PROJECT_META_INDEX);
+    const tmp = target + '.tmp';
+    await fs.promises.writeFile(tmp, JSON.stringify(this._info), 'utf-8');
+    await fs.promises.rename(tmp, target);
   }
 
   get info() {

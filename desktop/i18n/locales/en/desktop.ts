@@ -171,6 +171,8 @@ export default {
         noProject: 'No project is open',
         cloudNotFound: 'Cloud project was not found',
         noPermission: 'You do not have permission to rename this project',
+        noGameDesignAccess:
+          'You do not have access to the Game Design workspace',
         renameCloudFailed: 'Failed to rename the cloud project',
         location: 'Location',
         folderName: 'Folder name',

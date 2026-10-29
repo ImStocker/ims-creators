@@ -57,6 +57,12 @@ import log from 'electron-log/main';
 export type LocalProjectInitInfo = {
   id: string | null;
   title: string;
+  /**
+   * Server id of the project's gdd root workspace — present because initProject
+   * returns `{ ...project_db.info, localPath }` (ProjectFileDbInfo); null/absent
+   * for local-only or legacy-bound projects (see bridge/utils/cloud-root.ts).
+   */
+  rootWorkspaceId: string | null;
   localPath: string;
 };
 
@@ -238,6 +244,7 @@ export class ImsHostProject extends ImsHostBase {
     return {
       id,
       title,
+      rootWorkspaceId: project_db.info.rootWorkspaceId,
       localPath: new_path,
     };
   }
@@ -256,7 +263,12 @@ export class ImsHostProject extends ImsHostBase {
     const title = project_db.info.title ?? '';
 
     if (target_path_norm === norm_path) {
-      return { id, title, localPath: project_db.localPath };
+      return {
+        id,
+        title,
+        rootWorkspaceId: project_db.info.rootWorkspaceId,
+        localPath: project_db.localPath,
+      };
     }
     if (target_path_norm.startsWith(norm_path + path.sep)) {
       throw new Error('Cannot move a project into itself');
@@ -270,6 +282,7 @@ export class ImsHostProject extends ImsHostBase {
     return {
       id,
       title,
+      rootWorkspaceId: project_db.info.rootWorkspaceId,
       localPath: target_path_norm,
     };
   }

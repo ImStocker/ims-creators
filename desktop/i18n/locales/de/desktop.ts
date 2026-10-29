@@ -171,6 +171,8 @@ export default {
         noProject: 'Kein Projekt geöffnet',
         cloudNotFound: 'Cloud-Projekt nicht gefunden',
         noPermission: 'Sie haben keine Berechtigung, dieses Projekt umzubenennen',
+        noGameDesignAccess:
+          'Sie haben keinen Zugriff auf den Game-Design-Arbeitsbereich',
         renameCloudFailed: 'Cloud-Projekt konnte nicht umbenannt werden',
         location: 'Speicherort',
         folderName: 'Ordnername',

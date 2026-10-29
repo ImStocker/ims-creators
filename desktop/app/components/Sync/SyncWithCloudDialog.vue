@@ -195,7 +195,7 @@ export default defineComponent({
                 if(!project_info.localPath) {
                     throw Error('localPath is not set') ;
                 }
-                this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(new_project_info);
+                await this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(new_project_info);
             }
             else {
                 if(!this.project){
@@ -209,7 +209,7 @@ export default defineComponent({
                 if(!selected_project_full_info){
                     throw Error('Project is not founded');
                 }
-                this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(selected_project_full_info);
+                await this.$getAppManager().get(DesktopCreatorManager).connectToCloudProject(selected_project_full_info);
             }
             this.dialog.close(true);
         }
