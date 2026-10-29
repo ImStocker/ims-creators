@@ -324,7 +324,6 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             rootWorkspaceId = new_project_info.rootWorkspaces.find((w: Workspace) => w.name === 'gdd')?.id;
         }
         assert(this._loadedForProjectPath)
-        await this.appManager.get(DesktopSyncManager).resyncAll(); // Mark all object to be synced
         await this.appManager.get(DesktopProjectManager).initializeLocalProject(this._loadedForProjectPath, {
             id: new_project_info.id ?? null,
             title: new_project_info.title,
@@ -337,6 +336,9 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             localPath: project_info.localPath
         })      
         this.appManager.get<DesktopCreatorAssetManager>(CreatorAssetManager).setProjectIdToFiles(project_info.id);
+        // Re-sync after the recreate: registers every loaded asset/workspace in
+        // the sync tables, marks them all as need_sync and uploads them.
+        await this.appManager.get(DesktopSyncManager).resyncAll();
         await this.appManager.get(UiManager).reloadPage();
     }
 

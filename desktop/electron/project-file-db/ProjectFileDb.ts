@@ -54,6 +54,12 @@ export type ProjectFileDbAsset = AssetShort & {
   references: AssetReferenceEntity[];
   lastViewedAt?: string | null;
   /**
+   * When this file's claim on its id was asserted (entity creation or
+   * conflict-resolution stamp). Content-carried so it travels with copies —
+   * see meta/devdocs/desktop-id-claim.md. Stored under `__meta` on disk.
+   */
+  idClaimedAt?: number | null;
+  /**
    * Transient cache-validity marker: when this asset's full form (blocks +
    * inheritance) was last recomputed. Only kept in memory on full-computed
    * assets — never serialized to file or sent to consumers.
@@ -74,6 +80,12 @@ export type ProjectFileDbWorkspace = {
   props: AssetPropsPlainObject;
   unread?: number;
   localName?: string;
+  /**
+   * When this file's claim on its id was asserted (entity creation or
+   * conflict-resolution stamp). Content-carried so it travels with copies —
+   * see meta/devdocs/desktop-id-claim.md. Stored top-level on disk.
+   */
+  idClaimedAt?: number | null;
 };
 
 export type ProjectFileDbInfo = {
@@ -178,16 +190,27 @@ export class ProjectFileDb {
     if (this._info.rootWorkspaceId) {
       this.RootGddFolder.id = this._info.rootWorkspaceId
     }
-    await this.fileSystem.init()
 
+    // DataSource first: migrations must run before the filesystem load so the
+    // id-claim registry exists while conflicts are being resolved.
     this._dataSource = getProjectDataSource(this.localPath);
     await this._dataSource.initialize();
 
     await this._dataSource.runMigrations({
       transaction: 'all',
     });
+
+    await this.fileSystem.init()
+    await this.fileSystem.registerIdClaims();
+
     await this.sync.init();
     this.settings.init();
+    if (this._info.id && isValidBigNumberKey(this._info.id)) {
+      // Entities loaded from disk never pass through ProjectFileDbTransaction,
+      // so register them for sync here — this is what makes binding a local
+      // folder to a cloud project (and opening an already-bound one) work.
+      await this.sync.ensureEntitiesRegistered();
+    }
   }
 
   async init(initParams?: ProjectFileDbInitParams) {

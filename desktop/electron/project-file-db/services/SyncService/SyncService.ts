@@ -165,7 +165,41 @@ export class SyncService {
         }
     }
 
+    /**
+     * Register every user-owned asset/workspace currently loaded in memory
+     * into the sync tables. Inserts only missing rows — existing rows keep
+     * their need_sync/synced_at/conflict state. No-op for local-only projects.
+     */
+    async ensureEntitiesRegistered(): Promise<void> {
+        if (!this.db.info.id || !isValidBigNumberKey(this.db.info.id)) return;
+
+        const asset_entries = [...this.db.asset.assets.iterate()]
+            .filter(asset => asset.projectId === this.db.info.id)
+            .map(asset => ({ id: asset.id, title: asset.title ?? null }));
+        const workspace_entries = [...this.db.workspace.workspaces.iterate()]
+            .filter(workspace => workspace.projectId === this.db.info.id)
+            .map(workspace => ({ id: workspace.id, title: workspace.title ?? null }));
+
+        if (asset_entries.length > 0) {
+            await this.db.dataSource.createQueryRunner().query(`
+                INSERT INTO assets (id, title, need_sync)
+                VALUES ` + asset_entries.map(() => `(?, ?, ${SQLITE_NOW_STM})`).join(',') +
+                ` ON CONFLICT (id) DO NOTHING
+            `, asset_entries.map(entry => [entry.id, entry.title]).flat());
+        }
+        if (workspace_entries.length > 0) {
+            await this.db.dataSource.createQueryRunner().query(`
+                INSERT INTO workspaces (id, title, need_sync)
+                VALUES ` + workspace_entries.map(() => `(?, ?, ${SQLITE_NOW_STM})`).join(',') +
+                ` ON CONFLICT (id) DO NOTHING
+            `, workspace_entries.map(entry => [entry.id, entry.title]).flat());
+        }
+    }
+
     async resyncAll(){
+        // Repair missing rows first — UPDATE alone cannot register entities
+        // that were never tracked (e.g. a folder opened directly from disk).
+        await this.ensureEntitiesRegistered();
         await this.db.dataSource.createQueryRunner().query(`
             UPDATE workspaces
             SET need_sync = ${SQLITE_NOW_STM}, conflict = NULL, conflict_message = NULL

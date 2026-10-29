@@ -18,7 +18,7 @@ import JSZip from "jszip";
 import { once } from "node:events";
 import { PassThrough, type Writable } from "node:stream";
 import { WORKSPACE_BASE_ORDERING, ASSET_SAVE_FORMAT_SETTING_KEY, ASSET_SAVE_FORMAT_DEFAULT } from "../project-db-constants";
-import { WORKSPACE_EXT } from "./FileSystemService";
+import { WORKSPACE_EXT, WORKSPACE_META_FILENAME } from "./FileSystemService";
 import { ProjectFileDbTransaction } from "../logic/ProjectFileDbTransaction";
 import { serializeWorkspaceToJSON } from "../logic/serialize";
    
@@ -225,8 +225,8 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         })
     }
 
-    saveWorkspaceFileToStream(workspace: ProjectFileDbWorkspace, stream: Writable){
-        const data = serializeWorkspaceToJSON(workspace);
+    saveWorkspaceFileToStream(workspace: ProjectFileDbWorkspace, stream: Writable, opts?: { includeParentId?: boolean }){
+        const data = serializeWorkspaceToJSON(workspace, opts);
         stream.write(JSON.stringify(data, null, 1))
     }
 
@@ -362,17 +362,17 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
             parentId: workspaceId
         })
         for (const workspace of workspaces){
-            const name = generateNextUniqueNameNumber(
+            const basename = generateNextUniqueNameNumber(
                 prepareFileBasenameByEntityTitle(workspace.title ?? 'untitled'),
                 (val) => !used_names.has(val),
                 ' - ',
-                WORKSPACE_EXT
             );
-            const basename = name.substring(0, name.length - WORKSPACE_EXT.length)
-            used_names.add(name);
+            used_names.add(basename);
             const writeStream = new PassThrough();
-            targetZip.file((subfolder ? subfolder + "/" : '') + name, writeStream);
-            this.saveWorkspaceFileToStream(workspace, writeStream);
+            // New format: the meta file lives INSIDE the workspace folder.
+            // parentId IS included: the server rebuilds the tree from archives.
+            targetZip.file((subfolder ? subfolder + "/" : '') + basename + '/' + WORKSPACE_META_FILENAME, writeStream);
+            this.saveWorkspaceFileToStream(workspace, writeStream, { includeParentId: true });
             writeStream.end();
             await this._exportToZip(workspace.id, targetZip, (subfolder ? subfolder + "/" : '') + basename)
         }
@@ -392,7 +392,7 @@ export class WorkspaceService implements IProjectDatabaseWorkspace{
         const segments = localDirPath.split(/[\\\/]/g);
         let current_workspace = this.db.RootGddFolder;
         for (const segment of segments){
-            const next = this.workspaces.iterate().find(x => x.localName === segment + WORKSPACE_EXT && x.parentId === current_workspace.id);
+            const next = this.workspaces.iterate().find(x => x.parentId === current_workspace.id && (x.localName === segment || x.localName === segment + WORKSPACE_EXT));
             if (!next) return null;
             current_workspace = next;
         }

@@ -5,7 +5,6 @@ import crypto from 'node:crypto';
 import { generateNextUniqueNameNumber } from '~ims-app-base/logic/utils/stringUtils';
 import type { ProjectFileDbWorkspace, ProjectFileDbAsset, ProjectFileDb } from '../ProjectFileDb';
 import { assert } from '~ims-app-base/logic/utils/typeUtils';
-import { WORKSPACE_EXT } from '../services/FileSystemService';
 
 export const forbiddenFilenameCharsRegexp = /[<>:"/\\|?*\x00-\x1f]/g;
 export const forbiddenFilenameValuesRegexp = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
@@ -72,20 +71,13 @@ export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db:
   return getWorkspaceLocalPathFolder(workspace ?? null, db)
 }
 
-  export async function applyImsFileLocationChange(file: ProjectFileDbWorkspace | ProjectFileDbAsset, old_local_path: string, db: ProjectFileDb): Promise<string> {
-    let parent_id: string | null;
-    let parent_path: string = db.localPath;
-    let is_workspace = false;
-    if((file as ProjectFileDbAsset)?.workspaceId){
-        parent_id = (file as ProjectFileDbAsset).workspaceId;
-    }
-    else {
-        parent_id = (file as ProjectFileDbWorkspace).parentId;
-        is_workspace = true;
-    }
+  /**
+   * Move an ASSET meta file (.ima.json / .json / .md) to its new location.
+   */
+  export async function applyImsFileLocationChange(file: ProjectFileDbAsset, old_local_path: string, db: ProjectFileDb): Promise<string> {
     assert(file.localName);
+    const parent_path = getWorkspaceLocalPathFolderById(file.workspaceId, db);
     const file_local_ext = getImsExtname(file.localName);
-    parent_path = getWorkspaceLocalPathFolderById(parent_id, db);
     const suggest_title_with_ext = generateNextUniqueNameNumber(
         prepareFileBasenameByEntityTitle(file.title ?? 'untitled'),
         (name) => !fs.existsSync(path.join(parent_path, name )),
@@ -93,18 +85,17 @@ export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db:
         file_local_ext
     );
     const new_w_file_path = path.join(parent_path, suggest_title_with_ext)
-    const old_w_file_path = old_local_path + (is_workspace ? WORKSPACE_EXT: '');
-    // перемещаю информацию о файле (.im(a|w).json)
+    // перемещаю информацию о файле (.ima.json)
 
 
 
-    // move file meta (.im(a|w).json)
+    // move file meta (.ima.json)
     await db.fileSystem.expectFsChange([
-      old_w_file_path, 
+      old_local_path, 
       new_w_file_path
     ], async () => {
       try {
-        await fse.move(old_w_file_path, new_w_file_path);
+        await fse.move(old_local_path, new_w_file_path);
       }
       catch (err: any){
         if (err.code !== 'ENOENT'){
@@ -112,25 +103,42 @@ export function getWorkspaceLocalPathFolderById(workspace_id: string | null, db:
         }
       }
     })
-    if (is_workspace) {
-        // move folder for workspaces 
-        const workspace_folder_from = old_w_file_path.replace(/\.imw\.json$/, '');
-        const workspace_folder_to = new_w_file_path.replace(/\.imw\.json$/, '');
-        await db.fileSystem.expectFsChange([
-          workspace_folder_from, 
-          workspace_folder_to
-        ], async () => {
-            try {
-                await fse.move(workspace_folder_from, workspace_folder_to)
-            }
-            catch (err: any){
-              if (err.code !== 'ENOENT'){
-                throw err;
-              }
-            }
-        })
-    }
     return new_w_file_path;
+  }
+
+  /**
+   * Move/rename a workspace FOLDER. The `.imw` meta lives inside the folder,
+   * so it travels along — only the folder itself is moved.
+   */
+  export async function applyImsWorkspaceFolderChange(workspace: ProjectFileDbWorkspace, old_folder_path: string, db: ProjectFileDb): Promise<string> {
+    assert(workspace.localName);
+    const parent_path = getWorkspaceLocalPathFolderById(workspace.parentId, db);
+    const old_folder_path_resolved = path.resolve(old_folder_path);
+    const suggest_folder_name = generateNextUniqueNameNumber(
+        prepareFileBasenameByEntityTitle(workspace.title ?? 'untitled'),
+        // On a pure rename the old folder itself sits at the target name — treat it as free
+        (name) => path.resolve(path.join(parent_path, name)) === old_folder_path_resolved
+          || !fs.existsSync(path.join(parent_path, name)),
+        ' - ',
+    );
+    const new_folder_path = path.join(parent_path, suggest_folder_name)
+    if (path.resolve(new_folder_path) === old_folder_path_resolved){
+      return new_folder_path;
+    }
+    await db.fileSystem.expectFsChange([
+      old_folder_path, 
+      new_folder_path
+    ], async () => {
+      try {
+        await fse.move(old_folder_path, new_folder_path);
+      }
+      catch (err: any){
+        if (err.code !== 'ENOENT'){
+          throw err;
+        }
+      }
+    })
+    return new_folder_path;
   }
 
   export function absolutePathToUuid(filepath: string, root_path: string){

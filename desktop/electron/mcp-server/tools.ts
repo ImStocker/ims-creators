@@ -21,6 +21,7 @@ function adaptProjectDb(projectDb: ProjectFileDb): IProjectDatabase {
     assetsGraph: (q) => projectDb.asset.assetsGraph(q),
     assetsCreate: (p) => projectDb.asset.assetsCreate(p),
     assetsChange: (p, opts?) => projectDb.asset.assetsChange(p, opts),
+    assetsChangeReplace: (p, opts?) => projectDb.asset.assetsChangeReplace(p, opts),
     assetsChangeUndo: (p, opts?) => projectDb.asset.assetsChangeUndo(p, opts),
     assetsChangeBatch: (p, opts?) => projectDb.asset.assetsChangeBatch(p, opts),
     assetsDelete: (w) => projectDb.asset.assetsDelete(w),

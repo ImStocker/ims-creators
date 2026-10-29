@@ -343,6 +343,20 @@ export class ImsHostProject extends ImsHostBase {
     return project_db.asset.assetsChange(params, options);
   }
 
+  async assetsChangeReplace(
+    projectPath: string,
+    params: {
+      where: AssetWhereParams;
+      find: AssetProps;
+      replace: AssetProps;
+      options?: { wholeProp?: boolean; ignoreCase?: boolean };
+    },
+    options?: { pid?: string },
+  ): Promise<AssetsChangeResult> {
+    const project_db = requestProjectDb(projectPath, this._window);
+    return project_db.asset.assetsChangeReplace(params, options);
+  }
+
   async assetsDelete(
     projectPath: string,
     where: AssetWhereParams,

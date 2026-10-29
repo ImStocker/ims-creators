@@ -1,8 +1,8 @@
 import type { ProjectFileDb, ProjectFileDbAsset, ProjectFileDbWorkspace } from "../ProjectFileDb";
 import type { ProjectContentChangeEventArg } from "~ims-app-base/logic/types/IProjectDatabase";
 import { generateNextUniqueNameNumber } from "~ims-app-base/logic/utils/stringUtils";
-import { WORKSPACE_EXT } from "../services/FileSystemService";
-import { getWorkspaceLocalPathFolder, applyImsFileLocationChange, getWorkspaceLocalPathFolderById, forbiddenFilenameCharsRegexp, getAssetLocalPath } from "../utils/files";
+import { WORKSPACE_EXT, WORKSPACE_META_FILENAME } from "../services/FileSystemService";
+import { getWorkspaceLocalPathFolder, applyImsFileLocationChange, applyImsWorkspaceFolderChange, getWorkspaceLocalPathFolderById, forbiddenFilenameCharsRegexp, getAssetLocalPath } from "../utils/files";
 import { shell } from "electron";
 import fs from 'node:fs';
 import * as node_path from 'path';
@@ -117,7 +117,20 @@ export class ProjectFileDbTransaction{
         assert(entry_id)
 
         if (newEntry){
+            if (oldEntry && oldEntry.id !== newEntry.id) {
+                // Id changed (conflict resolution): the old id must not linger
+                this.db.workspace.workspaces.delete(oldEntry.id);
+                // Children must follow the id change — nothing else re-points
+                // already-inserted descendants (assets.workspaceId, nested
+                // workspaces.parentId) when a workspace is re-identified at runtime.
+                this._repointChildrenAfterIdChange(oldEntry.id, newEntry.id);
+            }
             this.db.workspace.workspaces.replace(newEntry);
+            // The claim is content-owned: never drop it when a change was
+            // built from a payload that doesn't carry the field (e.g. sync).
+            if (newEntry.idClaimedAt == null && oldEntry?.idClaimedAt != null) {
+                newEntry.idClaimedAt = oldEntry.idClaimedAt;
+            }
             this._notSyncedWorkspaces.push({id: newEntry.id, title: newEntry.title})
         }
         else {
@@ -141,12 +154,36 @@ export class ProjectFileDbTransaction{
             }
             else if (oldEntry && newEntry) {
                 const old_path_folder = getWorkspaceLocalPathFolder(oldEntry, this.db);
-                let local_path = old_path_folder + WORKSPACE_EXT;
+                let local_path_folder = old_path_folder;
                 if(newEntry.parentId !== oldEntry.parentId || newEntry.title !== oldEntry.title) {
-                    local_path = await applyImsFileLocationChange(newEntry, old_path_folder, this.db);
-                    newEntry.localName = node_path.basename(local_path);
+                    local_path_folder = await applyImsWorkspaceFolderChange(newEntry, old_path_folder, this.db);
+                    newEntry.localName = node_path.basename(local_path_folder);
                 }
-                await this.db.workspace.saveWorkspaceFileToFile(newEntry, local_path);
+                else if (newEntry.localName?.endsWith(WORKSPACE_EXT)) {
+                    // Lazy migration of a legacy localName (`name.imw.json`) to the folder-basename form
+                    newEntry.localName = node_path.basename(local_path_folder);
+                }
+                const local_path_meta = node_path.join(local_path_folder, WORKSPACE_META_FILENAME);
+                // Folderless metas (kept from legacy projects) get their folder
+                // created on first edit instead of failing with ENOENT.
+                if (!fs.existsSync(local_path_folder)) {
+                    await this.db.fileSystem.expectFsChange([local_path_folder], async () => {
+                        await fs.promises.mkdir(local_path_folder, { recursive: true });
+                    })
+                }
+                await this.db.workspace.saveWorkspaceFileToFile(newEntry, local_path_meta);
+                // Drop the legacy sibling meta (if any) — the meta now lives inside the folder
+                const legacy_meta_path = old_path_folder + WORKSPACE_EXT;
+                if (legacy_meta_path !== local_path_meta && fs.existsSync(legacy_meta_path)) {
+                    await this.db.fileSystem.expectFsChange([legacy_meta_path], async () => {
+                        try {
+                            await shell.trashItem(legacy_meta_path);
+                        }
+                        catch (err: any){
+                            // Ignore error
+                        }
+                    })
+                }
             }
             else if (newEntry) {
                 const workspace_file_basename = newEntry.title ? newEntry.title : entry_id;
@@ -158,18 +195,22 @@ export class ProjectFileDbTransaction{
                     (workspace_file_basename ?? 'untitled').replace(forbiddenFilenameCharsRegexp, '_').trim(),
                     (name) => !fs.existsSync(node_path.join(parent_workspace_path, name + '')),
                 );
-                const suggest_title_with_ext = suggest_title + WORKSPACE_EXT
-                newEntry.localName = suggest_title_with_ext;
-                const workspace_local_path_meta = node_path.join(parent_workspace_path, suggest_title_with_ext);
-                const workspace_local_path_folder = workspace_local_path_meta.replace(/\.imw\.json$/, '');
+                newEntry.localName = suggest_title;
+                // Assert this file's claim on its id at creation
+                newEntry.idClaimedAt = newEntry.idClaimedAt ?? Date.now();
+                const workspace_local_path_folder = node_path.join(parent_workspace_path, suggest_title);
+                const workspace_local_path_meta = node_path.join(workspace_local_path_folder, WORKSPACE_META_FILENAME);
                 await this.db.fileSystem.expectFsChange([
-                    workspace_local_path_meta,
                     workspace_local_path_folder
                 ], async () => {
-                    await this.db.workspace.saveWorkspaceFileToFile(newEntry, workspace_local_path_meta);
                     await fs.promises.mkdir(workspace_local_path_folder);
+                    await this.db.workspace.saveWorkspaceFileToFile(newEntry, workspace_local_path_meta);
                 })
             }         
+        }
+        if (newEntry) {
+            // Claim after file ops — localName/paths are final by now
+            this.db.fileSystem.noteWorkspaceClaim(newEntry);
         }
                 
         const wTchIds = [];
@@ -192,6 +233,28 @@ export class ProjectFileDbTransaction{
     }
 
     
+    /**
+     * Enforce "a workspace's children point at its CURRENT id": when a
+     * workspace id changes at runtime (conflict resolution during a watcher
+     * re-load), re-point every collection asset whose workspaceId and every
+     * nested workspace whose parentId still references the old id. Ops are
+     * appended to this transaction, so the changes are marked not-synced,
+     * serialized and emitted like any other change.
+     */
+    private _repointChildrenAfterIdChange(oldId: string, newId: string) {
+        for (const asset of this.db.asset.assets.iterate()) {
+            if (asset.workspaceId === oldId) {
+                this.changeAsset(asset, { ...asset, workspaceId: newId });
+            }
+        }
+        for (const workspace of this.db.workspace.workspaces.iterate()) {
+            if (workspace.parentId === oldId) {
+                this.changeWorkspace(workspace, { ...workspace, parentId: newId });
+            }
+        }
+    }
+
+
     private async _deleteAssetFileFromFilesystem(asset: ProjectFileDbAsset){
         if (!asset.localName) return;
         const local_path = getAssetLocalPath(asset, this.db)
@@ -212,7 +275,16 @@ export class ProjectFileDbTransaction{
         assert(entry_id)
 
         if (newEntry){
+            if (oldEntry && oldEntry.id !== newEntry.id) {
+                // Id changed (conflict resolution): the old id must not linger
+                this.db.asset.assets.delete(oldEntry.id);
+            }
             this.db.asset.assets.replace(newEntry)
+            // The claim is content-owned: never drop it when a change was
+            // built from a payload that doesn't carry the field (e.g. sync).
+            if (newEntry.idClaimedAt == null && oldEntry?.idClaimedAt != null) {
+                newEntry.idClaimedAt = oldEntry.idClaimedAt;
+            }
             this.db.asset.onAssetCollectionUpdated(oldEntry, newEntry)
             this._notSyncedAssets.push({id: newEntry.id, title: newEntry.title})
         }
@@ -245,8 +317,14 @@ export class ProjectFileDbTransaction{
                     (name) => !fs.existsSync(node_path.join(parent_workspace_path, name))
                 )
                 newEntry.localName = suggest_title;
+                // Assert this file's claim on its id at creation
+                newEntry.idClaimedAt = newEntry.idClaimedAt ?? Date.now();
                 await this.db.asset.saveAssetFile(newEntry)
             }
+        }
+        if (newEntry) {
+            // Claim after file ops — localName/paths are final by now
+            this.db.fileSystem.noteAssetClaim(newEntry);
         }
 
         const wTchIds = [];
