@@ -6,6 +6,7 @@
       'type-out': outId && !inId,
       'type-in-out': inId && outId,
       'explicit-values': explicitValues,
+      'has-value': explicitValues && modelValue !== undefined,
     }"
   >
     <DataHandle
@@ -35,13 +36,16 @@
       name="caption"
     >
       <span class="DataField-caption">
-        <caption-string :value="caption"></caption-string
-        >{{
-          (!isInConnected && dataType && inId) ||
-          (playValue !== null && playValueType !== undefined)
-            ? ':'
-            : ''
-        }}
+        <caption-string :value="caption"></caption-string>
+        <span
+          v-if="
+            !isInConnected &&
+            ((dataType && inId) ||
+              (playValue !== null && playValueType !== undefined))
+          "
+          class="DataField-colon"
+          >:</span
+        >
       </span>
     </slot>
     <template v-if="!isInConnected && (preferInputType || dataType) && inId">
@@ -49,9 +53,6 @@
         ref="input"
         v-model="valueForInput"
         class="DataField-input"
-        :class="{
-          'has-value': explicitValues && modelValue !== undefined,
-        }"
         :data-type="preferInputType ? preferInputType : dataType"
         :placeholder="placeholder"
         :readonly="readonly"
@@ -206,17 +207,22 @@ export default defineComponent({
   position: relative;
 
   &.explicit-values {
-    .DataField-input {
+    .DataField-input,
+    .DataField-colon {
       transition: opacity 0.2s;
     }
-    &:hover {
-      .DataField-input:not(.has-value) {
-        opacity: 1;
+    &:not(.has-value) {
+      &:hover {
+        .DataField-input,
+        .DataField-colon {
+          opacity: 1;
+        }
       }
-    }
-    &:not(:hover) {
-      .DataField-input:not(.has-value) {
-        opacity: 0;
+      &:not(:hover) {
+        .DataField-input,
+        .DataField-colon {
+          opacity: 0;
+        }
       }
     }
   }
