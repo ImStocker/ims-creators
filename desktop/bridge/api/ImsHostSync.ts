@@ -29,6 +29,11 @@ export class ImsHostSync extends ImsHostBase {
         return await project_db.sync.resyncAll(waitComplete);
     }
 
+    async clearServerState(projectPath: string){
+        const project_db = requestProjectDb(projectPath, this._window);
+        return await project_db.sync.clearServerState();
+    }
+
     async pauseSyncProject(projectPath: string){
         const project_db = requestProjectDb(projectPath, this._window);
         return await project_db.sync.pauseSyncProject();

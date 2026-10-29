@@ -331,6 +331,11 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
             rootWorkspaceId: root_workspace_id,
             recreate: true,
         });
+        // Fresh server relationship on every bind: a folder copied out of an
+        // already-synced project carries the old binding's server_state (stale
+        // root ids that syncEntity would trust forever) — wipe it before
+        // re-registration and the resync below.
+        await window.imshost.sync.clearServerState(this._loadedForProjectPath);
         const project_info = this.appManager.get(DesktopProjectManager).getProjectInfo()
         assert(project_info)
         Object.assign(project_info, new_project_info, {
@@ -359,6 +364,10 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
                 recreate: true,
             }
         );
+        // The project DB survives the recreate — wipe the detached binding's
+        // server state (stale server_state root ids, file mappings, sync cursor
+        // and errors) so a later re-bind can never inherit it.
+        await window.imshost.sync.clearServerState(this._loadedForProjectPath);
 
         await this.appManager.get(UiManager).reloadPage();
     }

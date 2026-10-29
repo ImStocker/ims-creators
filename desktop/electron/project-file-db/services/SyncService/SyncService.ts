@@ -240,6 +240,41 @@ export class SyncService {
         await this.changeCurrentState({ error: ROOT_WORKSPACE_UNRESOLVED_ERROR });
     }
 
+    /**
+     * Drop every trace of a cloud binding: server snapshots (syncEntity trusts
+     * `server_state` — stale rows would keep diffing/PUTting against the OLD
+     * project's root ids forever and never self-heal), attachment upload
+     * mappings, the changes-stream cursor and sync logs, plus the transient
+     * sync state and the pause flag, which both belonged to the previous
+     * binding. Called when a project is detached and when it (re)binds, so a
+     * folder copied out of an already-synced project can never carry another
+     * project's server state into a new relationship.
+     */
+    async clearServerState(): Promise<void> {
+        // Never clear under a running sync: its finally-block writes
+        // server_state back into the rows being deleted.
+        while (this._syncProcessRunning) {
+            await this._syncProcessRunning.catch(() => {});
+        }
+        // Sync tables are pure bookkeeping — the entities themselves live in
+        // memory/on disk and get re-registered (with need_sync) by
+        // ensureEntitiesRegistered on the next bind.
+        await this.db.dataSource.createQueryRunner().query(`DELETE FROM assets`, []);
+        await this.db.dataSource.createQueryRunner().query(`DELETE FROM workspaces`, []);
+        await this.db.dataSource.createQueryRunner().query(`DELETE FROM files`, []);
+        await this.db.dataSource.createQueryRunner().query(`DELETE FROM sync_logs`, []);
+        await this.db.settings.setKey('syncOnPause', false);
+        const changes: {
+            status?: SyncCurrentStateStatus,
+            hasChanges?: boolean,
+            error?: string | null,
+        } = { hasChanges: false, error: null };
+        if (this._currentState.status === SyncCurrentStateStatus.PAUSE) {
+            changes.status = SyncCurrentStateStatus.FREE;
+        }
+        await this.changeCurrentState(changes);
+    }
+
     async resyncAssetsAndWorkspaces(
         asset_ids: string[],
         workspace_ids: string[],
