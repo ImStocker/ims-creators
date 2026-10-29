@@ -16,6 +16,8 @@ import { assignPlainValueToAssetProps, getAssetPropType } from '~ims-app-base/lo
 import { parseMarkdownFrontmatter, MARKDOWN_DEFAULT_ICON, type MarkdownFrontmatterMeta } from '../logic/markdown-frontmatter';
 import { resolveWorkspaceClaims, compareClaimInfo, type WorkspaceClaimant, type ClaimResolution, type ClaimInfo } from '../logic/id-claim';
    
+const MARKDOWN_BLOCK_ID_META = '00000000-0000-0000-0000-390000000001';
+
 type FileSystemExpectChange = {
     filepaths: string[]
 }
@@ -244,7 +246,7 @@ export class FileSystemService{
                 ownTitle: null,
                 ownIcon: own_icon,
                 blocks: [{
-                    id: uuidv4(),
+                    id: MARKDOWN_BLOCK_ID_META,
                     type: 'props',
                     name: BLOCK_NAME_META,
                     title: null,
