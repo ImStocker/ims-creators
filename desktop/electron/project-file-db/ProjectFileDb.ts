@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ApiService } from "./services/ApiService";
 import { getMainTokenStorage } from "../main-token-storage";
-import { PROJECT_META_FOLDER, PROJECT_META_INDEX } from "./project-db-constants";
+import { PROJECT_META_INDEX } from "./project-db-constants";
+import { prepareProjectMeta, readProjectLocalInfo, writeJsonAtomic, writeProjectLocalInfo } from "./project-meta-layout";
 import { AssetRights } from "~ims-app-base/logic/types/Rights";
 import type { DataSource } from "typeorm";
 import { getProjectDataSource } from "./project-data-source";
@@ -148,17 +149,23 @@ export class ProjectFileDb {
   }
 
   private async _initImpl(initParams?: ProjectFileDbInitParams) {
-    await fs.promises.mkdir(path.join(this.localPath, PROJECT_META_FOLDER), {
-      recursive: true
-    });
+    // Creates `.imsc/` + `.imsc/.imsc-local/`, migrates a pre-split layout and
+    // keeps the local folder out of version control. Must run before anything
+    // reads index.json or opens the database.
+    await prepareProjectMeta(this.localPath);
 
     let need_recreate = !!initParams?.recreate;
     if (!need_recreate) {
       try {
         const projectInfoText = await fs.promises.readFile(path.join(this.localPath, PROJECT_META_INDEX), 'utf-8')
         const projectInfo = JSON.parse(projectInfoText);
+        const localInfo = await readProjectLocalInfo(this.localPath);
+        // The binding normally lives in local.json; fall back to index.json so
+        // a binding written by an older build (or a failed migration) is not
+        // silently dropped.
+        const boundId = localInfo.id || projectInfo.id || '';
         this._info = {
-          id: projectInfo.id && isValidBigNumberKey(projectInfo.id) ? projectInfo.id : '',
+          id: boundId && isValidBigNumberKey(boundId) ? boundId : '',
           title: projectInfo.title,
           inited: projectInfo.inited,
           rootWorkspaceId: projectInfo.rootWorkspaceId
@@ -180,6 +187,7 @@ export class ProjectFileDb {
         rootWorkspaceId: initParams?.rootWorkspaceId ?? null
       }
       await this._writeProjectIndex()
+      await this._writeProjectLocalInfo()
     }
     assert(this._info);
 
@@ -287,16 +295,25 @@ export class ProjectFileDb {
   }
 
   /**
-   * Persist `_info` (id / title / rootWorkspaceId) atomically: a concurrent
-   * load must never read a half-written index.json — a torn read throws on
-   * JSON.parse and the project fails to open.
+   * Persist the shared part of `_info` (title / inited / rootWorkspaceId)
+   * atomically: a concurrent load must never read a half-written index.json —
+   * a torn read throws on JSON.parse and the project fails to open.
+   *
+   * The cloud binding (`id`) is deliberately absent — it is machine-local and
+   * lives in `.imsc/.imsc-local/local.json`, so a git clone starts unbound
+   * instead of inheriting the committer's cloud project id.
    */
   private async _writeProjectIndex(): Promise<void> {
     assert(this._info, 'ProjectFileDb is not inited');
-    const target = path.join(this.localPath, PROJECT_META_INDEX);
-    const tmp = target + '.tmp';
-    await fs.promises.writeFile(tmp, JSON.stringify(this._info), 'utf-8');
-    await fs.promises.rename(tmp, target);
+    const { id: _bound, ...shared } = this._info;
+    await writeJsonAtomic(path.join(this.localPath, PROJECT_META_INDEX), shared);
+  }
+
+  /** Persist the machine-local part of `_info` (the cloud binding). */
+  private async _writeProjectLocalInfo(): Promise<void> {
+    assert(this._info, 'ProjectFileDb is not inited');
+    const existing = await readProjectLocalInfo(this.localPath);
+    await writeProjectLocalInfo(this.localPath, { ...existing, id: this._info.id });
   }
 
   get info() {
