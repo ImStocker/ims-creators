@@ -132,14 +132,22 @@ export class DesktopTabController {
         return;
       }
 
+      // Prepare route to prevent wrong escaping projectPath
+      const prepared_route = typeof route !== 'string' && 'name' in route ? {
+        name: route.name,
+        params: route.params,
+        query: route.query,
+        hash: route.hash
+      } : route;
+
       let current_tab = this.currentTab;
 
       if (!current_tab){
-        current_tab = new DesktopTab('', route)
+        current_tab = new DesktopTab('', prepared_route)
         this.tabs.push(current_tab);
         this._currentTab = current_tab;
       } else {
-        current_tab.route = route
+        current_tab.route = prepared_route
       }
       
       this._addToHistory(current_tab);
