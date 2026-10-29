@@ -18,6 +18,11 @@ import DesktopSyncManager from "./DesktopSyncManager";
 export const PENDING_PROJECT_RENAMED_TOAST_KEY =
   'pending-project-renamed-toast';
 
+
+function normalizeLocalPath(path: string){
+    return path.replace(/[\\\/]+/g, "/")
+}
+
 export default class DesktopCreatorManager extends AppSubManagerBase{
     isLoaded = false;
     protected _loadedForProjectId: string | null = null;
@@ -47,7 +52,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
      
     async appLoadData(project: { id?: string; shortLink?: string; } | null): Promise<AppLoadResult> {
         let is_loaded = this.isLoaded;
-        const norm_local_path = project?.id ? project?.id.replaceAll("\\", "/") : null;0
+        const norm_local_path = project?.id ? normalizeLocalPath(project?.id) : null;
         if (is_loaded) {
             is_loaded =
                 (project && norm_local_path === this._loadedForProjectPath) ||
@@ -56,7 +61,6 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
         if (is_loaded && this._loadedData) return this._loadedData;
 
         let local_project_info: LocalProjectInitInfo | null = null;
-        const user_info = this.appManager.get(AuthManager).getUserInfo();
 
         const app_data: AppLoadResult = {
             invitations: [],
@@ -99,7 +103,7 @@ export default class DesktopCreatorManager extends AppSubManagerBase{
     }
 
     appActivate(appInfo: AppLoadResult, localPath: string): void {
-        const norm_local_path = localPath.replaceAll("\\", "/");
+        const norm_local_path = normalizeLocalPath(localPath);
 
         if (this.isLoaded && (this._loadedForProjectPath === norm_local_path)) {
             return;
