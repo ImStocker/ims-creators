@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import * as node_path from 'path';
 import { AssetRights } from '~ims-app-base/logic/types/Rights';
 import { v4 as uuidv4 } from 'uuid';
-import { absolutePathToUuid, isDir, prepareFileBasenameByEntityTitle, isDirSync, getWorkspaceLocalPathFolder, getAssetLocalPath } from "../utils/files";
+import { absolutePathToUuid, isDir, isDirSync, getWorkspaceLocalPathFolder, getAssetLocalPath } from "../utils/files";
 import { MARKDOWN_ASSET_ID, BLOCK_NAME_META, BLOCK_ID_META, BLOCK_TYPE_META } from "~ims-app-base/logic/constants";
 import SystemBundle from "../system-assets-bundle.json"
 import watcher, { type AsyncSubscription, type Event } from "@parcel/watcher"
@@ -49,7 +49,11 @@ export const WORKSPACE_META_FILENAME = '.imw'
 
 export const ATTACHMENTS_FOLDER = 'attachments'
 
-const NEW_FORMAT_EXT_TEST_REGEXP = /(?: - \d+)?\.json$/i
+/**
+ * Extension of new-format files. Copy markers (` - N`) are part of the file
+ * name and must never be stripped when deriving a title from it.
+ */
+const NEW_FORMAT_EXT_TEST_REGEXP = /\.json$/i
 
 function isNewFormatJsonFile(localName: string): boolean {
     return localName.endsWith('.json')
@@ -58,15 +62,12 @@ function isNewFormatJsonFile(localName: string): boolean {
 }
 
 function prepareEntityTitle(filename: string, title: string | null, ext_regexp: RegExp): string {
-    const title_to_filename = title ? prepareFileBasenameByEntityTitle(title) : '';
-    const filename_without_ext = filename.replace(ext_regexp, '') 
-    const filename_without_index = filename_without_ext.replace(/ - \d+$/, '');  // Remove index if name was used
-    if (title_to_filename === filename_without_index && title){
-        return title
-    }
-    else {
-        return filename_without_ext
-    }
+    // Titles are shown exactly as they exist: the title stored in the file
+    // always wins verbatim; only when it's absent do we fall back to the file
+    // name (extension stripped, copy suffix ` - N` kept — it is part of the
+    // name, never removed).
+    if (title) return title;
+    return filename.replace(ext_regexp, '');
 }
 
 
@@ -598,8 +599,9 @@ export class FileSystemService{
 
     /**
      * Load the new-format meta file (`folder/.imw`). Returns null when absent.
-     * The folder basename wins as the title when it diverges from the
-     * title-derived file name (same rule as the legacy sibling meta).
+     * Title rule (same as `prepareEntityTitle`): a title stored in `.imw` is
+     * used verbatim; the folder basename — copy suffix ` - N` included — is
+     * only the fallback when the meta carries no title.
      */
     private async _loadWorkspaceInsideMeta(absoluteFolderPath: string, parentWorkspaceId: string | null, root_path: string): Promise<ProjectFileDbWorkspace | null> {
         const meta_path = node_path.join(absoluteFolderPath, WORKSPACE_META_FILENAME);
@@ -625,9 +627,10 @@ export class FileSystemService{
             return null;
         }
         workspace_info.idClaimedAt = typeof workspace_info.idClaimedAt === 'number' ? workspace_info.idClaimedAt : null;
-        const title_to_filename = workspace_info.title ? prepareFileBasenameByEntityTitle(workspace_info.title) : '';
-        const filename_without_index = title.replace(/ - \d+$/, '');
-        if (!(title_to_filename === filename_without_index && workspace_info.title)){
+        // Titles are shown as stored: a title inside `.imw` wins verbatim; the
+        // folder basename (copy suffix ` - N` kept) is only the fallback when
+        // the meta carries none — same rule as prepareEntityTitle.
+        if (!workspace_info.title) {
             workspace_info.title = title;
         }
         workspace_info.localName = title
