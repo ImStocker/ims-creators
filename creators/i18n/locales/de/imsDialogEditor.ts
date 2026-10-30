@@ -323,7 +323,7 @@ export default {
     debug: 'Ab diesem Knoten debuggen',
     runFromNode: 'Ab diesem Knoten ausführen',
     debugFromNode: 'Ab diesem Knoten debuggen',
-    setServiceName: 'Dienstnamen festlegen',
+    setServiceName: 'Knotenkennung ändern',
     serviceNameAlreadyExists: 'Dienstname existiert bereits',
     setExitName: 'Ausgangsnamen festlegen',
   },

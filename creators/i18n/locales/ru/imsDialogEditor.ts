@@ -324,7 +324,7 @@ export default {
     debug: 'Отладить этого узла',
     runFromNode: 'Запустить с этого узла',
     debugFromNode: 'Отладить этого узла',
-    setServiceName: 'Задать служебное имя',
+    setServiceName: 'Изменить идентификатор узла',
     serviceNameAlreadyExists: 'Служебное имя уже существует',
     setExitName: 'Задать имя выхода',
   },

@@ -325,7 +325,7 @@ export default {
     debug: 'Debug from this node',
     runFromNode: 'Run from this node',
     debugFromNode: 'Debug from this node',
-    setServiceName: 'Set service name',
+    setServiceName: 'Change node identifier',
     serviceNameAlreadyExists: 'Service name already exists',
     setExitName: 'Set exit name',
   },
