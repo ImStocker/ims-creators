@@ -26,7 +26,7 @@
     "eslint": "^9.18.0",
     "fabric": "^6.9.0",
     "hash-wasm": "^4.11.0",
-    "imsc-script": "^2.1.1",
+    "imsc-script": "^2.2.0",
     "mxgraph": "4.2.2",
     "nuxt": "^3.17.3",
     "quill-delta": "^5.1.0",
