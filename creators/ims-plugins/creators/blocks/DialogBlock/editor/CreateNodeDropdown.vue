@@ -126,10 +126,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+@use '~ims-app-base/style/scrollbars-mixins';
+
 .CreateNodeDropdown {
   background-color: var(--imsde-dropdown-bg-color);
   border-radius: var(--imsde-dropdown-border-radius);
   box-shadow: var(--imsde-dropdown-box-shadow);
+  max-height: var(--DropdownContainer-freeHeight);
+  width: max-content;
+  max-width: var(--DropdownContainer-freeWidth);
+  overflow: auto;
+  user-select: none;
+  @include scrollbars-mixins.tiny-scrollbars;
 }
 .CreateNodeDropdown-sep {
   height: 1px;
