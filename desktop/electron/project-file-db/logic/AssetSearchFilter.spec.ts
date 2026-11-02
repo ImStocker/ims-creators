@@ -1,8 +1,9 @@
 import { AssetPropWhereOpKind } from '~ims-app-base/logic/types/PropsWhere';
 import { AssetPropType, type AssetProps } from '~ims-app-base/logic/types/Props';
 import { resolveSelectionField } from './asset-selection';
-import type { ProjectFileDbAsset, ProjectFileDbAssetBlock } from '../ProjectFileDb';
+import type { ProjectFileDb, ProjectFileDbAsset, ProjectFileDbAssetBlock } from '../ProjectFileDb';
 import { AssetSearchFilter } from './AssetSearchFilter';
+import { AssetService } from '../services/AssetService';
 
 const BLOCK_ID = '00000000-0000-0000-0000-350000000003';
 
@@ -245,5 +246,103 @@ describe('asset-fields value reads used by operand props', () => {
         const field = resolveSelectionField('title');
         expect(field.descriptor?.jsonName).toBe('title');
         expect(field.fieldType).toBe(AssetPropType.STRING);
+    });
+});
+
+describe('same-name block of a parent asset with a different type', () => {
+    const DESC_ID = '00000000-0000-0000-0000-350000000002';
+    const PARENT_ID = '2680e50e-0b68-41be-b8c8-76e78c8e0160';
+    const CHILD_ID = 'd2982dab-6464-43f0-b2ea-f753836facf3';
+
+    function makeTypedBlock(id: string, type: string, name: string, props: AssetProps): ProjectFileDbAssetBlock {
+        return {
+            id,
+            type,
+            name,
+            title: null,
+            index: 0,
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+            ownTitle: null,
+            own: true,
+            props,
+            computed: {},
+            inherited: null,
+        };
+    }
+
+    function makeTypedAsset(
+        id: string,
+        title: string,
+        parentIds: string[],
+        typeIds: string[],
+        blocks: ProjectFileDbAssetBlock[],
+    ): ProjectFileDbAsset {
+        // no computedAt on purpose: the asset must be recomputed, otherwise the
+        // cached `computed` from a previous run would mask the merge rule
+        return { ...makeAsset(id, title, {}), typeIds, parentIds, blocks };
+    }
+
+    function makeService(child_block_type: string): { service: AssetService; child: ProjectFileDbAsset } {
+        const service = new AssetService({} as unknown as ProjectFileDb);
+        const parent = makeTypedAsset(PARENT_ID, 'Game Cards', [], [], [
+            makeTypedBlock(DESC_ID, 'markdown', 'description', { key: 123 }),
+        ]);
+        const child = makeTypedAsset(CHILD_ID, 'Dumbbell', [PARENT_ID], [PARENT_ID], [
+            makeTypedBlock(DESC_ID, child_block_type, 'description', { mmm: 444 }),
+        ]);
+        service.assets.addMany([parent, child]);
+        return { service, child };
+    }
+
+    async function searchChild(
+        service: AssetService,
+        child: ProjectFileDbAsset,
+        where: Record<string, unknown>,
+    ): Promise<string[]> {
+        const db = {
+            asset: {
+                computeFullAsset: (
+                    a: ProjectFileDbAsset,
+                    b: Parameters<AssetService['computeFullAsset']>[1],
+                ) => service.computeFullAsset(a, b),
+            },
+        } as unknown as Parameters<typeof AssetSearchFilter.Create>[1];
+        const filter = await AssetSearchFilter.Create(where as never, db);
+        return (await filter.apply([child])).map((asset) => asset.id);
+    }
+
+    test('the ancestor block does not leak its props into the full asset', async () => {
+        const { service, child } = makeService('text');
+        const full = await service.computeFullAsset(child);
+
+        const descriptions = full.blocks.filter((block) => block.name === 'description');
+        expect(descriptions).toHaveLength(1);
+        // the child's own block wins, the inherited markdown one is hidden
+        expect(descriptions[0].type).toBe('text');
+        expect(descriptions[0].computed).toEqual({ mmm: 444 });
+    });
+
+    test('the ancestor prop is not searchable, the child prop is', async () => {
+        const { service, child } = makeService('text');
+
+        // parent block (type `markdown`) must not match through the child's
+        // block of type `text`
+        expect(await searchChild(service, child, {
+            'description|key': { op: AssetPropWhereOpKind.EQUAL, v: 123 },
+        })).toEqual([]);
+
+        // the child's own prop still matches
+        expect(await searchChild(service, child, {
+            'description|mmm': { op: AssetPropWhereOpKind.EQUAL, v: 444 },
+        })).toEqual([CHILD_ID]);
+    });
+
+    test('same name and same type keeps inheriting the parent prop', async () => {
+        const { service, child } = makeService('markdown');
+
+        expect(await searchChild(service, child, {
+            'description|key': { op: AssetPropWhereOpKind.EQUAL, v: 123 },
+        })).toEqual([CHILD_ID]);
     });
 });

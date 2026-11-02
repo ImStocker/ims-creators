@@ -284,12 +284,18 @@ export class AssetService implements IProjectDatabaseAsset {
                         inherited: { ...parent_block.computed },
                     })
                 }
-                else {
+                else if (asset.blocks[ind].type === parent_block.type) {
                     asset.blocks[ind] = {
                         ...asset.blocks[ind],
                         inherited: { ...parent_block.computed },
                     }
                 }
+                // Тот же id/имя, но другой тип: блок предка скрывается - это
+                // "удалён блок старого типа + создан блок нового типа" без
+                // реального удаления. Наследование пропсов идёт по block_key
+                // (имя + тип), поэтому блок с другим типом не участвует в merge.
+                // Зеркалит серверное правило в asset.service.ts
+                // (_extractAssetDataFromParents).
             }
         }
 
