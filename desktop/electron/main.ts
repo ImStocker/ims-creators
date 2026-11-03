@@ -53,16 +53,23 @@ async function initApp() {
 
     let quitRequested = false;
     app.on('before-quit', async (event) => {
-      if (!quitRequested) {
-        event.preventDefault();
+      if (quitRequested) return;
+      event.preventDefault();
+      // Set synchronously before any await: a second quit request arriving
+      // while cleanup runs must not start a duplicate teardown.
+      quitRequested = true;
 
+      try {
         await closeAllProjectDb();
 
         await stopMcpServer().catch((e) =>
           log.error('MCP: stop on quit failed:', e),
         );
-
-        quitRequested = true;
+      } catch (e) {
+        // Never wedge the quit: a rejecting destroy() would otherwise leave
+        // the app alive with every project folder still locked.
+        log.error('Cleanup on quit failed:', e);
+      } finally {
         app.quit();
       }
     });

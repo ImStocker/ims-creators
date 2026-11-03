@@ -2,12 +2,15 @@ import { BrowserWindow, type IpcMainEvent, ipcMain, shell } from 'electron';
 import type { WindowArgs } from '#bridge/types/WindowArgs';
 
 import path from 'node:path';
+import log from 'electron-log/main';
 import { registerImsHostWindow, unregisterImsHostWindow } from './imshost-api';
 import { launch } from './shell-utils';
 import {
   registerWindowProjectPath,
   unregisterWindowProjectPath,
 } from './project-windows';
+import { releaseProjectDbForWindow } from './project-file-db/project-registry';
+import { closeMcpSessionsForProject } from './mcp-server/index';
 
 const preload = path.join(import.meta.dirname, 'preload.js');
 const distPath = path.join(import.meta.dirname, '../dist-client/public');
@@ -114,6 +117,14 @@ export async function createWindow(args: WindowArgs) {
   win.once('closed', () => {
     unregisterImsHostWindow(win);
     unregisterWindowProjectPath(win);
+    // Releases this window's hold on its project DBs and its project-path
+    // registration: without it the dead window stays in the registry's `for`
+    // set, destroy() never runs, and the project folder (SQLite + watcher
+    // handles) stays locked for as long as the app is alive. MCP sessions
+    // close first, mirroring closeProject().
+    releaseProjectDbForWindow(win, closeMcpSessionsForProject).catch((err) =>
+      log.error('Failed to release project db for closed window:', err),
+    );
   });
 
   win.on('close', (e) => {
