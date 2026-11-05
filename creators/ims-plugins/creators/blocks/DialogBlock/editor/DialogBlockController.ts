@@ -35,7 +35,7 @@ import DialogManager from '~ims-app-base/logic/managers/DialogManager';
 import {
   ScriptBlockPlainVariableKinds,
   type ScriptBlockPlainAction,
-  type ScriptBlockPlainActionTypes,
+  ScriptBlockPlainActionTypes,
   type ScriptBlockPlainNode,
   type ScriptBlockPlainVariable,
 } from '../logic/nodeStoring';
