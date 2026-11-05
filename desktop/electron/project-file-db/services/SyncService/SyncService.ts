@@ -58,6 +58,14 @@ type ServerWorkspaceToCheckChange = {
     props: Workspace['props'],
 }
 
+/**
+ * Per-run memo for parent-ordered asset sync: the outcome of processing one
+ * asset (true = uploaded / nothing to do, false = blocked by a failed or
+ * unavailable ancestor), or 'in_progress' while its ancestors are still being
+ * processed — used only to break parent cycles.
+ */
+type ParentSyncVisit = boolean | 'in_progress';
+
 export class SyncService {
 
     private _syncProcessRunning: Promise<void> | null = null;
@@ -356,9 +364,12 @@ export class SyncService {
                 sync_log_id = insert_res[0].id;
                 await this.checkUnsyncedAssetsAndWorkspaces(sync_log_id);
                 await this.syncAssetsAndWorkspaces();
+                // Assets blocked by an unavailable ancestor stay pending for the
+                // next run — report them as remaining changes instead of a clean
+                // finish.
                 this.changeCurrentState({
                     status: SyncCurrentStateStatus.FREE,
-                    hasChanges: false,
+                    hasChanges: (await this._countPendingSyncRows()) > 0,
                     error: null,
                 });
             }
@@ -563,6 +574,19 @@ export class SyncService {
         }
     }
 
+    /** Entities still waiting for upload: pending, or blocked by an ancestor. */
+    private async _countPendingSyncRows(): Promise<number> {
+        const rows: { pending: number }[] = await this.db.dataSource.createQueryRunner().query(`
+            SELECT
+                (SELECT COUNT(*) FROM assets
+                    WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL)) +
+                (SELECT COUNT(*) FROM workspaces
+                    WHERE need_sync > synced_at OR (need_sync IS NOT NULL AND synced_at IS NULL))
+                AS pending;
+        `);
+        return rows[0].pending;
+    }
+
     async syncAssetsAndWorkspaces() {
         const db_workspaces: SyncTableRow[] = await this.db.dataSource.createQueryRunner().query(`
             SELECT id,server_state,server_deleted
@@ -580,7 +604,7 @@ export class SyncService {
     }
 
     private async _syncAsset(db_asset: SyncTableRow){
-        await syncEntity<ProjectFileDbAsset, AssetFull, AssetSetDTO, AssetSetDTO>(db_asset, {
+        return syncEntity<ProjectFileDbAsset, AssetFull, AssetSetDTO, AssetSetDTO>(db_asset, {
             db: this.db, 
             entityTable: 'assets',
             serverLoad: (id) => this._loadFromServerAsset(id),
@@ -640,37 +664,132 @@ export class SyncService {
         })
     }
 
-    private async _checkParentAssetNeedSyncAndSync(need_sync_assets_map: Map<string, SyncTableRow>, asset_id: string){
-        const db_asset = need_sync_assets_map.get(asset_id)
-        if(!db_asset) return;
-        
-        const local_asset = this.db.asset.assets.byId.get(db_asset.id);
-        if(local_asset?.parentIds) {
-            for(const parent_id of local_asset.parentIds) {
-                await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
-            }
+    /**
+     * Sync one asset only after every ancestor it references. An ancestor in the
+     * current pending batch is synced first (recursively); one outside the batch
+     * is confirmed on the server — see _confirmOutOfBatchParent. Returns false
+     * when an ancestor failed or is unavailable: the asset's sync row is then
+     * left untouched, so the next run retries it instead of uploading a child
+     * whose parent does not exist on the server.
+     */
+    private async _checkParentAssetNeedSyncAndSync(
+        need_sync_assets_map: Map<string, SyncTableRow>,
+        asset_id: string,
+        visited: Map<string, ParentSyncVisit>,
+    ): Promise<boolean> {
+        const visit_state = visited.get(asset_id);
+        if (visit_state !== undefined) {
+            // Already processed: reuse its outcome. An 'in_progress' entry means
+            // we came back to an ancestor that is still being processed — a
+            // parent cycle; break it here so the run cannot recurse forever.
+            return visit_state === 'in_progress' ? true : visit_state;
         }
-        else {
-            const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
-                where: JSON.stringify({
-                    id: [db_asset.id],
-                })
-            });
-            const server_asset = server_asset_full.objects.assetFulls[db_asset.id];
-            if(server_asset?.parentIds) {
-                for(const parent_id of server_asset.parentIds) {
-                    await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id)
+        visited.set(asset_id, 'in_progress');
+
+        let synced_ok: boolean;
+        const db_asset = need_sync_assets_map.get(asset_id);
+        if (!db_asset) {
+            synced_ok = await this._confirmOutOfBatchParent(need_sync_assets_map, asset_id, visited);
+        } else {
+            const local_asset = this.db.asset.assets.byId.get(db_asset.id);
+            let parent_ids: string[] = [];
+            if (local_asset?.parentIds) {
+                parent_ids = local_asset.parentIds;
+            } else {
+                const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
+                    where: JSON.stringify({
+                        id: [db_asset.id],
+                    })
+                });
+                const server_asset = server_asset_full.objects.assetFulls[db_asset.id];
+                parent_ids = server_asset?.parentIds ?? [];
+            }
+
+            let ancestors_ok = true;
+            for (const parent_id of parent_ids) {
+                if (!await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id, visited)) {
+                    ancestors_ok = false;
+                    break;
                 }
             }
+
+            if (!ancestors_ok) {
+                // Blocked by an ancestor: leave this asset's sync row untouched
+                // so it stays pending and is retried on the next run.
+                synced_ok = false;
+            } else {
+                const conflict = await this._syncAsset(db_asset);
+                if (!conflict) {
+                    need_sync_assets_map.delete(db_asset.id);
+                }
+                synced_ok = !conflict;
+            }
         }
-        await this._syncAsset(db_asset);
-        need_sync_assets_map.delete(db_asset.id);
+
+        visited.set(asset_id, synced_ok);
+        return synced_ok;
+    }
+
+    /**
+     * An ancestor outside the pending batch is normally assumed to already be on
+     * the server. A row previously uploaded there (server_state present) is
+     * trusted without a request; anything else is checked with assets/full, and
+     * if the ancestor exists locally but was never uploaded (never registered,
+     * or an earlier upload failed and was marked as synced) it is registered and
+     * synced right now, before the child that needs it.
+     */
+    private async _confirmOutOfBatchParent(
+        need_sync_assets_map: Map<string, SyncTableRow>,
+        parent_id: string,
+        visited: Map<string, ParentSyncVisit>,
+    ): Promise<boolean> {
+        const rows: { server_state: string | null; server_deleted: number | null }[] =
+            await this.db.dataSource.createQueryRunner().query(
+                `SELECT server_state, server_deleted FROM assets WHERE id = ?`, [parent_id]);
+        const row = rows[0];
+        if (row && row.server_state && row.server_state !== 'null' && !row.server_deleted) {
+            // Uploaded in an earlier run — trust it.
+            return true;
+        }
+
+        let on_server = false;
+        try {
+            const server_asset_full: AssetsFullResult = await this.db.api.call(Service.CREATORS, HttpMethods.GET, `assets/full`, {
+                where: JSON.stringify({
+                    id: [parent_id],
+                })
+            });
+            on_server = !!server_asset_full.objects.assetFulls[parent_id];
+        } catch {
+            // Cannot verify right now — let the child's own upload surface the
+            // server's error (which now lists the missing ids) instead of
+            // stalling the run.
+            return true;
+        }
+        if (on_server) return true;
+
+        const local_parent = this.db.asset.assets.byId.get(parent_id);
+        if (!local_parent) {
+            // Nowhere to upload it from: let the child attempt its upload so the
+            // server's "Parent asset not found: <ids>" message is recorded.
+            return true;
+        }
+
+        // The ancestor exists locally but is not on the server: register and
+        // push it now. Clear the in-progress marker first — the entry gate for
+        // this id was already consumed by our caller, and the fresh registration
+        // must go through the normal in-batch path (its own ancestors first).
+        await this.markNotSyncedEntities('asset', [{ id: parent_id, title: local_parent.title ?? null }]);
+        need_sync_assets_map.set(parent_id, { id: parent_id, server_state: '', server_deleted: 0 });
+        visited.delete(parent_id);
+        return this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, parent_id, visited);
     }
 
     private async _syncAssets(db_assets: SyncTableRow[]){
         const need_sync_assets_map = new Map(db_assets.map(a => [a.id, a]));
+        const visited = new Map<string, ParentSyncVisit>();
         for(const db_asset of db_assets){
-            await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, db_asset.id);
+            await this._checkParentAssetNeedSyncAndSync(need_sync_assets_map, db_asset.id, visited);
         }
     }
 
