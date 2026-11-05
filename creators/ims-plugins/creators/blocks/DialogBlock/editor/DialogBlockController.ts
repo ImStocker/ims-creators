@@ -1210,10 +1210,9 @@ export class DialogBlockController extends BlockEditorController {
             type: null,
             description: null,
             default: null,
-            kind: resolved_kind,
-            autoFill: null,
             index: max_index + 1,
             ...initial_vals,
+            kind: resolved_kind,
           };
           // ensure name uniqueness if initial provided a name
           if (
@@ -1311,10 +1310,10 @@ export class DialogBlockController extends BlockEditorController {
           const new_action: DialogAction = {
             name: unique_name,
             title: unique_name,
-            type,
             params: null,
             index: max_index + 1,
             ...initial_vals,
+            type,
           };
           if (
             initial_vals?.name &&
