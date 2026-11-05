@@ -1112,26 +1112,36 @@ export class SyncService {
             }
         }
         else {
-            const file: any = await this.db.api.download(
-                Service.FILE_STORAGE,
-                HttpMethods.GET, 
-                `file/${asset_prop.Store}/${asset_prop.FileId}`, {}
-            )
-            const relative_path = await this._saveAttachmentReturnRelativePath(file, asset_prop.Title);
-            
-            await this.db.dataSource.createQueryRunner().query(`
-            INSERT INTO files (server_file_id,local_path,server_store, created_at)
-            VALUES (?,?,?, ${SQLITE_NOW_STM}) ON CONFLICT (local_path) 
-                DO UPDATE SET server_file_id = excluded.server_file_id, server_store = excluded.server_store;
-            `, [asset_prop.FileId, relative_path, asset_prop.Store]);
-            
-            const local_asset_prop: AssetPropValueFile = {
-                ...asset_prop,
-                Title: node_path.basename(relative_path),
-                Dir: node_path.dirname(relative_path).replaceAll('\\', '//'),
-                Store: "loc-project",
-            };
-            return local_asset_prop;
+            try {
+                const file: any = await this.db.api.download(
+                    Service.FILE_STORAGE,
+                    HttpMethods.GET, 
+                    `file/${asset_prop.Store}/${asset_prop.FileId}`, {}
+                )
+                const relative_path = await this._saveAttachmentReturnRelativePath(file, asset_prop.Title);
+                
+                await this.db.dataSource.createQueryRunner().query(`
+                INSERT INTO files (server_file_id,local_path,server_store, created_at)
+                VALUES (?,?,?, ${SQLITE_NOW_STM}) ON CONFLICT (local_path) 
+                    DO UPDATE SET server_file_id = excluded.server_file_id, server_store = excluded.server_store;
+                `, [asset_prop.FileId, relative_path, asset_prop.Store]);
+                
+                const local_asset_prop: AssetPropValueFile = {
+                    ...asset_prop,
+                    Title: node_path.basename(relative_path),
+                    Dir: node_path.dirname(relative_path).replaceAll('\\', '//'),
+                    Store: "loc-project",
+                };
+                return local_asset_prop;
+            }
+            catch (error: any) {
+                // The attachment is missing (or unwritable) on this side too: keep the
+                // server prop as-is so a broken link cannot fail the whole asset sync.
+                // The prop stays cloud-store, so the download is retried whenever this
+                // asset is synced again.
+                log.warn(`Can't download attachment ${asset_prop.Store}/${asset_prop.FileId}: ${error?.message ?? error}`);
+                return asset_prop;
+            }
         }
     }
 
@@ -1243,9 +1253,18 @@ export class SyncService {
         if (!/^loc-/.test(file.Store)) {
            return file;
         }
-        const formData = new FormData();
         const project_root = this.db.localPath;
-        const attachment_path = node_path.join(project_root ?? '', ATTACHMENTS_DIR, file.Title);
+        // A prop may point at any project-relative path — the UI opens Dir/Title and
+        // the files table records it — so prefer that and only fall back to the
+        // legacy attachments/Title layout used by older props.
+        const attachment_path = [
+            node_path.join(project_root ?? '', file.Dir ?? '', file.Title),
+            node_path.join(project_root ?? '', ATTACHMENTS_DIR, file.Title),
+        ].find((candidate) => fs.existsSync(candidate));
+        if (!attachment_path) {
+            return await this._fallbackMissingLocalFile(file);
+        }
+        const formData = new FormData();
         const file_blob = await fs.promises.readFile(attachment_path);
         formData.append('file', new Blob([new Uint8Array(file_blob)]), file.Title);
         formData.append('id', file.FileId);
@@ -1286,6 +1305,39 @@ export class SyncService {
             Dir: res.dir,
             Store: res.store
         };
+    }
+
+    /**
+     * The local file behind this prop is gone (deleted, or a broken link). It must
+     * not fail the whole asset: reuse the cloud reference recorded for this path
+     * when the file was uploaded before, otherwise push the prop as-is without
+     * converting it to cloud storage.
+     *
+     * Only a missing file lands here — token/upload errors still propagate, so a
+     * file that exists keeps being retried instead of going local-only forever.
+     */
+    private async _fallbackMissingLocalFile(file: AssetPropValueFile): Promise<AssetPropValueFile>{
+        const local_paths = [
+            node_path.join(file.Dir ?? '', file.Title),
+            node_path.join(ATTACHMENTS_DIR, file.Title),
+        ];
+        for (const local_path of local_paths) {
+            const uploaded: ProjectDbFile[] = await this.db.dataSource.createQueryRunner().query(`
+                SELECT server_file_id,server_store FROM files
+                WHERE local_path = ?
+                LIMIT 1
+            `, [local_path]);
+            if (uploaded.length > 0) {
+                log.warn(`Attachment not found on disk, reusing its uploaded cloud file: ${local_path}`);
+                return {
+                    ...file,
+                    FileId: uploaded[0].server_file_id,
+                    Store: uploaded[0].server_store,
+                };
+            }
+        }
+        log.warn(`Attachment not found on disk, syncing prop as-is: ${local_paths[0]}`);
+        return file;
     }
 
     async convertServerAssetToLocal (server_asset: AssetFull): Promise<ProjectFileDbAsset>{
