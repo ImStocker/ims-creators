@@ -1061,7 +1061,9 @@ export class DialogBlockController extends BlockEditorController {
       ...this.state.variables.own,
       [variable.name]: variable,
     };
-    this.savePropsDelayed();
+    // Discrete action: save immediately so the item shows up in lists
+    // without waiting for the debounce (see savePropsDelayed usages).
+    this.saveProps();
   }
 
   addAction(action: DialogAction) {
@@ -1069,7 +1071,7 @@ export class DialogBlockController extends BlockEditorController {
       ...this.state.actions.own,
       [action.name]: action,
     };
-    this.savePropsDelayed();
+    this.saveProps();
   }
 
   changeVariable(variable_name, variable: DialogVariable) {
@@ -1132,7 +1134,7 @@ export class DialogBlockController extends BlockEditorController {
       };
       delete res[variable_name];
       this.state.variables.own = res;
-      this.savePropsDelayed();
+      this.saveProps();
     }
   }
   deleteAction(action_name: string) {
@@ -1142,7 +1144,7 @@ export class DialogBlockController extends BlockEditorController {
       };
       delete res[action_name];
       this.state.actions.own = res;
-      this.savePropsDelayed();
+      this.saveProps();
     }
   }
 
