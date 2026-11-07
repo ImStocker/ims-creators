@@ -43,6 +43,7 @@
               :show-filters="false"
               :add-caption="createButtonCaption"
               :add-disabled="!group.controller"
+              :add-loading="creatingGroupAssetId === group.assetId"
               embedded
               v-bind="dialog.state.viewComponentProps"
               @add="addEntity(group)"
@@ -344,8 +345,6 @@ export default defineComponent({
     },
 
     createGroupPlaceholder(asset_id: string, title: string): CollectionGroup {
-      // reactive(): заглушка должна лежать в this.groups как прокси,
-      // иначе мутации полей в initGroup() (raw-объект) не триггеры ререндер
       return reactive({
         assetId: asset_id,
         controllerAssetId: asset_id,

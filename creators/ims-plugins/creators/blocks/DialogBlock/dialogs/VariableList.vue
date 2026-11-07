@@ -46,6 +46,7 @@
       v-if="showAdd"
       type="button"
       class="VariableList-addButton is-button is-button-dotted"
+      :class="{ loading: addLoading }"
       :disabled="addDisabled"
       @click="$emit('add')"
     >
@@ -118,6 +119,10 @@ export default defineComponent({
       default: true,
     },
     addDisabled: {
+      type: Boolean,
+      default: false,
+    },
+    addLoading: {
       type: Boolean,
       default: false,
     },
