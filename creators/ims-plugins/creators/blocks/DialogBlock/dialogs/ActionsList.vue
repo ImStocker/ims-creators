@@ -41,7 +41,8 @@
     <button
       v-if="showAdd"
       type="button"
-      class="ActionsList-addButton"
+      class="ActionsList-addButton is-button is-button-dotted"
+      :disabled="addDisabled"
       @click="$emit('add')"
     >
       <i class="ri-add-box-fill"></i>
@@ -71,8 +72,8 @@ export default defineComponent({
   },
   props: {
     collectionController: {
-      type: Object as PropType<IDialogCollectionController>,
-      required: true,
+      type: Object as PropType<IDialogCollectionController | null>,
+      default: null,
     },
     filters: {
       type: [Object, null] as PropType<ActionsListFiltersType | null>,
@@ -90,6 +91,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    addDisabled: {
+      type: Boolean,
+      default: false,
+    },
     addCaption: {
       type: String,
       default: '',
@@ -98,7 +103,7 @@ export default defineComponent({
   emits: ['update:filters', 'add'],
   computed: {
     actionsList() {
-      return this.collectionController.getEntities();
+      return this.collectionController?.getEntities() ?? [];
     },
     filteredActions() {
       return this.actionsList.filter((a) => isActionVisible(a, this.filters));
@@ -109,7 +114,7 @@ export default defineComponent({
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
-          this.collectionController.reorderEntities(reordered_actions);
+          this.collectionController?.reorderEntities(reordered_actions);
         });
     },
   },
@@ -151,31 +156,14 @@ export default defineComponent({
 .ActionsList-addButton {
   margin-top: 10px;
   width: 100%;
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1.5px dashed var(--local-border-color);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--local-sub-text-color);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+  --button-border-radius: 12px;
+  --button-padding: 0.8em 0.66em !important;
+  --button-outline-width: 0px !important;
 
-  i {
-    font-size: 16px;
-  }
-
-  &:hover {
-    color: var(--local-text-color);
-    border-color: var(--local-border-color);
-    background: var(--button-bg-color-hover);
+  &:disabled {
+    cursor: not-allowed;
   }
 }
 :deep(.SortableList-item) {

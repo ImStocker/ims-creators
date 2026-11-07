@@ -23,6 +23,18 @@
               <div class="ManageCollectionDialog-group-title">
                 {{ group.title }}
               </div>
+              <div
+                v-if="group.loading"
+                class="ManageCollectionDialog-groupSpinner loaderSpinner"
+                role="status"
+                :aria-label="$t('common.loading')"
+              />
+            </div>
+            <div
+              v-if="group.error"
+              class="ManageCollectionDialog-groupError error-message-block"
+            >
+              {{ group.error }}
             </div>
             <component
               :is="dialog.state.viewComponent"
@@ -30,6 +42,7 @@
               :collection-controller="group.controller"
               :show-filters="false"
               :add-caption="createButtonCaption"
+              :add-disabled="!group.controller"
               embedded
               v-bind="dialog.state.viewComponentProps"
               @add="addEntity(group)"
@@ -45,6 +58,7 @@
             type="button"
             class="is-button accent"
             :class="{ loading: !saveDone }"
+            :disabled="anyGroupLoading"
             @click="save"
           >
             {{ $t('common.dialogs.close') }}
@@ -55,7 +69,7 @@
   </dialog-content>
 </template>
 <script lang="ts">
-import { defineComponent, type Component, type PropType } from 'vue';
+import { defineComponent, reactive, type Component, type PropType } from 'vue';
 import DialogContent from '~ims-app-base/components/Dialog/DialogContent.vue';
 import type { IProjectContext } from '~ims-app-base/logic/types/IProjectContext';
 import { DialogBlockController } from '../editor/DialogBlockController';
@@ -95,9 +109,11 @@ type CollectionGroup = {
   assetId: string;
   controllerAssetId: string;
   title: string;
-  controller: IDialogCollectionController;
+  controller: IDialogCollectionController | null;
   externalAssetBlockEditor: AssetBlockEditorVM | null;
   isLocalCopy: boolean;
+  loading: boolean;
+  error: string | null;
 };
 
 export default defineComponent({
@@ -143,6 +159,9 @@ export default defineComponent({
         return this.dialog.state.createButtonCaption({ filters: this.filters });
       } else return this.dialog.state.createButtonCaption;
     },
+    anyGroupLoading() {
+      return this.groups.some((group) => group.loading);
+    },
   },
   async mounted() {
     await this.loadDialog();
@@ -163,7 +182,12 @@ export default defineComponent({
     },
 
     async addEntity(group: CollectionGroup) {
-      if (this.creatingGroupAssetId) {
+      if (
+        this.creatingGroupAssetId ||
+        group.loading ||
+        group.error ||
+        !group.controller
+      ) {
         return;
       }
       this.creatingGroupAssetId = group.assetId;
@@ -223,7 +247,9 @@ export default defineComponent({
               group.isLocalCopy = true;
             }
           }
-          const new_entity = await group.controller.createEntity(
+          const controller = group.controller;
+          if (!controller) return;
+          const new_entity = await controller.createEntity(
             this.dialog.state.createEntityInitalVals
               ? this.dialog.state.createEntityInitalVals({
                   filters: this.filters,
@@ -232,7 +258,7 @@ export default defineComponent({
           );
 
           if (!new_entity) return;
-          group.controller.addEntity(new_entity);
+          controller.addEntity(new_entity);
         });
       this.creatingGroupAssetId = null;
     },
@@ -266,6 +292,8 @@ export default defineComponent({
           ),
           externalAssetBlockEditor: null,
           isLocalCopy: false,
+          loading: false,
+          error: null,
         };
       }
 
@@ -299,6 +327,8 @@ export default defineComponent({
         controller: this.dialog.state.getCollectionController(controller),
         externalAssetBlockEditor: asset_block_editor,
         isLocalCopy: false,
+        loading: false,
+        error: null,
       };
     },
 
@@ -313,31 +343,85 @@ export default defineComponent({
       });
     },
 
+    createGroupPlaceholder(asset_id: string, title: string): CollectionGroup {
+      // reactive(): заглушка должна лежать в this.groups как прокси,
+      // иначе мутации полей в initGroup() (raw-объект) не триггеры ререндер
+      return reactive({
+        assetId: asset_id,
+        controllerAssetId: asset_id,
+        title,
+        controller: null,
+        externalAssetBlockEditor: null,
+        isLocalCopy: false,
+        loading: true,
+        error: null,
+      });
+    },
+
+    async initGroup(group: CollectionGroup, asset_short?: AssetShort) {
+      try {
+        const full_group = await this.createGroup(group.assetId, asset_short);
+        if (!full_group) {
+          group.error = this.$t('common.downloadError');
+          return;
+        }
+        group.controller = full_group.controller;
+        group.controllerAssetId = full_group.controllerAssetId;
+        group.externalAssetBlockEditor = full_group.externalAssetBlockEditor;
+        group.isLocalCopy = full_group.isLocalCopy;
+      } catch {
+        group.error = this.$t('common.downloadError');
+      } finally {
+        group.loading = false;
+      }
+    },
+
     async loadDialog() {
       try {
         assert(this.resolvedBlock?.assetId);
-        const current_group = await this.createGroup(
+
+        // Phase A (behind the global dialog spinner): resolve group titles
+        const current_group = this.createGroupPlaceholder(
           this.resolvedBlock.assetId,
+          this.$t('imsDialogEditor.var.currentScript'),
         );
-        if (current_group) {
-          this.groups.push(current_group);
-        }
+        this.groups.push(current_group);
+        await this.initGroup(current_group);
 
         const asset_short = await this.$getAppManager()
           .get(CreatorAssetManager)
           .getAssetShortViaCache(this.resolvedBlock.assetId);
-        if (asset_short) {
-          for (const type_id of [...asset_short.typeIds].reverse()) {
-            const parent_asset = await this.$getAppManager()
+        const type_ids = asset_short ? [...asset_short.typeIds].reverse() : [];
+        const parent_shorts = await Promise.all(
+          type_ids.map((type_id) =>
+            this.$getAppManager()
               .get(CreatorAssetManager)
-              .getAssetShortViaCache(type_id);
-            if (!parent_asset) continue;
-            const group = await this.createGroup(type_id, parent_asset);
-            if (group) {
-              this.groups.push(group);
-            }
-          }
-        }
+              .getAssetShortViaCache(type_id),
+          ),
+        );
+        const pending_groups: {
+          group: CollectionGroup;
+          short: AssetShort;
+        }[] = [];
+        type_ids.forEach((type_id, index) => {
+          const parent_short = parent_shorts[index];
+          if (!parent_short) return;
+          const group = this.createGroupPlaceholder(
+            type_id,
+            this.getGroupTitle(type_id, parent_short),
+          );
+          this.groups.push(group);
+          pending_groups.push({ group, short: parent_short });
+        });
+
+        this.dialogLoadDone = true;
+
+        // Phase B: heavy per-group controller initialization, in parallel
+        await Promise.all(
+          pending_groups.map(({ group, short }) =>
+            this.initGroup(group, short),
+          ),
+        );
       } catch (err: any) {
         this.dialogLoadingError = err;
       } finally {
@@ -353,7 +437,7 @@ export default defineComponent({
 .ManageCollectionDialog {
   max-width: 100%;
   width: 750px;
-  height: 70vh;
+  height: 80vh;
   display: flex;
   flex-direction: column;
 
@@ -400,5 +484,9 @@ export default defineComponent({
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+.ManageCollectionDialog-groupSpinner {
+  flex-shrink: 0;
+  font-size: 14px;
 }
 </style>

@@ -45,7 +45,8 @@
     <button
       v-if="showAdd"
       type="button"
-      class="VariableList-addButton"
+      class="VariableList-addButton is-button is-button-dotted"
+      :disabled="addDisabled"
       @click="$emit('add')"
     >
       <i class="ri-add-box-fill"></i>
@@ -81,8 +82,8 @@ export default defineComponent({
   },
   props: {
     collectionController: {
-      type: Object as PropType<IDialogVariableController>,
-      required: true,
+      type: Object as PropType<IDialogVariableController | null>,
+      default: null,
     },
     showAutoFill: {
       type: Boolean,
@@ -116,6 +117,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    addDisabled: {
+      type: Boolean,
+      default: false,
+    },
     addCaption: {
       type: String,
       default: '',
@@ -124,7 +129,7 @@ export default defineComponent({
   emits: ['update:filters', 'add'],
   computed: {
     variableList() {
-      return this.collectionController.getEntities();
+      return this.collectionController?.getEntities() ?? [];
     },
     filteredVariables() {
       return this.variableList.filter((v) =>
@@ -132,15 +137,21 @@ export default defineComponent({
       );
     },
   },
-  async mounted() {
-    await this.loadVariablesAssetKinds();
+  watch: {
+    collectionController: {
+      immediate: true,
+      async handler(controller: IDialogVariableController | null) {
+        if (!controller) return;
+        await this.loadVariablesAssetKinds();
+      },
+    },
   },
   methods: {
     async changeList(reordered_variables: ScriptBlockPlainVariable[]) {
       await this.$getAppManager()
         .get(UiManager)
         .doTask(async () => {
-          this.collectionController.reorderEntities(reordered_variables);
+          this.collectionController?.reorderEntities(reordered_variables);
         });
     },
     async loadVariablesAssetKinds() {
@@ -199,34 +210,17 @@ export default defineComponent({
   font-style: italic;
   color: var(--local-sub-text-color);
 }
-.VariableList-addButton {
+.VariableList-addButton.is-button {
   margin-top: 10px;
   width: 100%;
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1.5px dashed var(--local-border-color);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--local-sub-text-color);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+  --button-border-radius: 12px;
+  --button-padding: 0.8em 0.66em !important;
+  --button-outline-width: 0px !important;
 
-  i {
-    font-size: 16px;
-  }
-
-  &:hover {
-    color: var(--local-text-color);
-    border-color: var(--local-border-color);
-    background: var(--button-bg-color-hover);
+  &:disabled {
+    cursor: not-allowed;
   }
 }
 </style>

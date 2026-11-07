@@ -963,7 +963,13 @@ export class DialogBlockController extends BlockEditorController {
     }
     const exported = exportDialogBlockData(this.state);
 
-    const changes = diffAssetPropObjects(exported, this.resolvedBlock.computed);
+    // TODO: The operation is too expensive. Find another solution
+    const changes = diffAssetPropObjects(
+      exported,
+      exportDialogBlockData(
+        extractDialogBlockData(this.resolvedBlock.computed),
+      ),
+    );
 
     if (changes && changes.length) {
       this._expectPropsChange = true;
