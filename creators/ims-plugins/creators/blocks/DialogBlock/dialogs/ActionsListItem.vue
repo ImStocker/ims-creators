@@ -656,13 +656,7 @@ export default defineComponent({
       const service_name_is_auto =
         !this.action.name || this.action.name === old_auto_name;
       if (service_name_is_auto && new_auto_name) {
-        const name_is_busy = this.actionsList.some(
-          (action) =>
-            action.name !== this.action.name && action.name === new_auto_name,
-        );
-        if (!name_is_busy) {
-          this.mainEditItem.name = new_auto_name;
-        }
+        this.mainEditItem.name = new_auto_name;
       }
     },
     mainEditSetName(val: string) {
