@@ -993,16 +993,34 @@ export class DialogBlockController extends BlockEditorController {
       return [];
     }
     const props_state = extractDialogBlockData(this.resolvedBlock.props);
+    const inherited_state = extractDialogBlockData(
+      this.resolvedBlock.inherited ?? {},
+    );
     const computed_state = this.state;
+
+    // Props lag state after rename; exclude inherited keys.
+    const own_keys = new Set(Object.keys(props_state.variables.own));
+    for (const v_key of Object.keys(computed_state.variables.own)) {
+      if (own_keys.has(v_key)) continue;
+      if (inherited_state.variables.own[v_key]) continue;
+      own_keys.add(v_key);
+    }
+
     const res: DialogVariable[] = [];
-    for (const [v_key, v_data] of Object.entries(props_state.variables.own)) {
-      if (Object.keys(v_data).length === 1 && v_data['index']) {
+    for (const v_key of own_keys) {
+      const props_data = props_state.variables.own[v_key];
+      if (
+        props_data &&
+        Object.keys(props_data).length === 1 &&
+        props_data['index']
+      ) {
         continue;
       }
-      if (computed_state.variables.own[v_key]) {
-        Object.assign(v_data, computed_state.variables.own[v_key]);
+      const state_data = computed_state.variables.own[v_key];
+      if (!state_data) {
+        continue;
       }
-      res.push(v_data);
+      res.push({ ...props_data, ...state_data });
     }
 
     return sortCollectionItems(res);
@@ -1013,16 +1031,34 @@ export class DialogBlockController extends BlockEditorController {
       return [];
     }
     const props_state = extractDialogBlockData(this.resolvedBlock.props);
+    const inherited_state = extractDialogBlockData(
+      this.resolvedBlock.inherited ?? {},
+    );
     const computed_state = this.state;
+
+    // Props lag state after rename; exclude inherited keys.
+    const own_keys = new Set(Object.keys(props_state.actions.own));
+    for (const v_key of Object.keys(computed_state.actions.own)) {
+      if (own_keys.has(v_key)) continue;
+      if (inherited_state.actions.own[v_key]) continue;
+      own_keys.add(v_key);
+    }
+
     const res: DialogAction[] = [];
-    for (const [v_key, v_data] of Object.entries(props_state.actions.own)) {
-      if (Object.keys(v_data).length === 1 && v_data['index']) {
+    for (const v_key of own_keys) {
+      const props_data = props_state.actions.own[v_key];
+      if (
+        props_data &&
+        Object.keys(props_data).length === 1 &&
+        props_data['index']
+      ) {
         continue;
       }
-      if (computed_state.actions.own[v_key]) {
-        Object.assign(v_data, computed_state.actions.own[v_key]);
+      const state_data = computed_state.actions.own[v_key];
+      if (!state_data) {
+        continue;
       }
-      res.push(v_data);
+      res.push({ ...props_data, ...state_data });
     }
 
     return sortCollectionItems(res);
