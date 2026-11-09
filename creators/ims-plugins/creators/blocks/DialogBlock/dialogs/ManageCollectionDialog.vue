@@ -307,16 +307,19 @@ export default defineComponent({
         this.$getAppManager(),
         asset_full,
       );
-      const controller = new DialogBlockController(
-        this.$getAppManager(),
-        () =>
-          asset_block_editor
-            .resolveBlocks()
-            .list.find(
-              (b) =>
-                (b.name ? b.name === resolvedBlock.name : false) ||
-                b.id === resolvedBlock.id,
-            ) ?? null,
+      // Reactive so lists re-render before debounced save.
+      const controller = reactive(
+        new DialogBlockController(
+          this.$getAppManager(),
+          () =>
+            asset_block_editor
+              .resolveBlocks()
+              .list.find(
+                (b) =>
+                  (b.name ? b.name === resolvedBlock.name : false) ||
+                  b.id === resolvedBlock.id,
+              ) ?? null,
+        ),
       );
       controller.postCreate();
       controller.mountEditor(asset_block_editor);
