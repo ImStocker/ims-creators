@@ -10,6 +10,7 @@ import {
   exportDialogBlockData,
   extractDialogBlockData,
   generateDataPinId,
+  isDialogBlockPropsEmpty,
   isEdgeBelongToNode,
   parseDataPinId,
   parseExitPinId,
@@ -963,13 +964,14 @@ export class DialogBlockController extends BlockEditorController {
     }
     const exported = exportDialogBlockData(this.state);
 
-    // TODO: The operation is too expensive. Find another solution
-    const changes = diffAssetPropObjects(
-      exported,
-      exportDialogBlockData(
-        extractDialogBlockData(this.resolvedBlock.computed),
-      ),
-    );
+    if (
+      isDialogBlockPropsEmpty(exported) &&
+      isDialogBlockPropsEmpty(this.resolvedBlock.computed)
+    ) {
+      return;
+    }
+
+    const changes = diffAssetPropObjects(exported, this.resolvedBlock.computed);
 
     if (changes && changes.length) {
       this._expectPropsChange = true;

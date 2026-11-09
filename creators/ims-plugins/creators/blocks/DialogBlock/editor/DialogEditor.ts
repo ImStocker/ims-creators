@@ -3,6 +3,8 @@ import {
   AssetPropType,
   assignPlainValueToAssetProps,
   convertAssetPropsToPlainObject,
+  isStructureMarker,
+  sameAssetPropValues,
   type AssetProps,
 } from '~ims-app-base/logic/types/Props';
 import type {
@@ -386,4 +388,30 @@ export function exportDialogBlockData(state: DialogBlockState): AssetProps {
   const props: AssetProps = {};
   assignPlainValueToAssetProps(props, res);
   return props;
+}
+
+let _defaultDialogBlockProps: AssetProps | null = null;
+
+function getDefaultDialogBlockProps(): AssetProps {
+  if (!_defaultDialogBlockProps) {
+    _defaultDialogBlockProps = exportDialogBlockData(
+      extractDialogBlockData({}),
+    );
+  }
+  return _defaultDialogBlockProps;
+}
+
+export function isDialogBlockPropsEmpty(props: AssetProps): boolean {
+  if (!props) return true;
+  const keys = Object.keys(props);
+  if (keys.length === 0) return true;
+
+  const defaults = getDefaultDialogBlockProps();
+  for (const key of keys) {
+    const val = props[key];
+    if (isStructureMarker(val)) continue;
+    if (!Object.prototype.hasOwnProperty.call(defaults, key)) return false;
+    if (!sameAssetPropValues(val, defaults[key], true)) return false;
+  }
+  return true;
 }
