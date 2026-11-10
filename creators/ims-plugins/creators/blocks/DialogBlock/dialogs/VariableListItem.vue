@@ -177,6 +177,7 @@ import RenamableText from '~ims-app-base/components/Common/RenamableText.vue';
 import CaptionString from '~ims-app-base/components/Common/CaptionString.vue';
 import VariableTypeSelector from '../parts/VariableTypeSelector.vue';
 import VariableTypePresenter from '../parts/VariableTypePresenter.vue';
+import { logicalTreeContains } from '~ims-app-base/components/utils/logical-tree';
 import { getVariableTypeDotClass } from '../logic/variableTypes';
 import { VARIABLE_KINDS } from '../logic/variableKinds';
 
@@ -281,9 +282,14 @@ export default defineComponent({
       if (!mainEdit) {
         return;
       }
+      const target = event.relatedTarget as HTMLElement | null;
+      if (!target) {
+        return;
+      }
+      // Dropdowns teleport to body; check logical tree too.
       if (
-        event.relatedTarget &&
-        !mainEdit.contains(event.relatedTarget as HTMLElement)
+        !mainEdit.contains(target) &&
+        !logicalTreeContains(mainEdit, target)
       ) {
         applyRenaming();
       }
@@ -538,6 +544,8 @@ export default defineComponent({
 .VariableListItem-main-editor-type {
   flex: 1 1 40%;
   min-width: 0;
+  // Stack here; component default is a row.
+  flex-direction: column;
 
   :deep(.VariableTypeSelector-type) {
     min-width: 0;

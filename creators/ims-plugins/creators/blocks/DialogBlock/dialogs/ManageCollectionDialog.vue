@@ -393,7 +393,7 @@ export default defineComponent({
         const asset_short = await this.$getAppManager()
           .get(CreatorAssetManager)
           .getAssetShortViaCache(this.resolvedBlock.assetId);
-        const type_ids = asset_short ? [...asset_short.typeIds].reverse() : [];
+        const type_ids = asset_short ? asset_short.typeIds : [];
         const parent_shorts = await Promise.all(
           type_ids.map((type_id) =>
             this.$getAppManager()

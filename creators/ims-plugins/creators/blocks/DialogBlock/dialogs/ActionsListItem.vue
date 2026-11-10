@@ -802,6 +802,11 @@ export default defineComponent({
   min-width: 0;
   max-width: 40%;
 
+  &.is-editing {
+    // Auto-extend input sizes itself by content; don't cap it while editing.
+    max-width: none;
+  }
+
   :deep(.CaptionString) {
     display: block;
     min-width: 0;
@@ -834,6 +839,11 @@ export default defineComponent({
   :deep(.ImsInput-inner) {
     width: 100%;
     min-width: 0;
+    // .is-input (global) paints the field like a regular input; here it must
+    // look like a plain inline text, same as ImsTextInput in VariableListItem.
+    background: transparent;
+    color: inherit;
+    font: inherit;
   }
 
   :deep(.ImsInput-shadow) {
@@ -935,7 +945,6 @@ export default defineComponent({
 .ActionsListItem-serviceName {
   flex: 0 1 160px;
   min-width: 70px;
-  color: var(--local-sub-text-color);
 }
 
 .ActionsListItem-serviceName-editor {
@@ -952,6 +961,8 @@ export default defineComponent({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  // View mode is muted; the editor keeps the regular row color instead.
+  color: var(--local-sub-text-color);
 }
 
 .ActionsListItem-menu {
