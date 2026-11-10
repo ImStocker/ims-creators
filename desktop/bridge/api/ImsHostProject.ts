@@ -220,6 +220,8 @@ export class ImsHostProject extends ImsHostBase {
     await project_db.init();
 
     const id = project_db.info.id || null;
+    // Read before _relocateProjectFolder(): it destroys this ProjectFileDb.
+    const root_workspace_id = project_db.info.rootWorkspaceId;
     await project_db.renameTitle(title);
 
     let new_path = project_db.localPath;
@@ -244,7 +246,7 @@ export class ImsHostProject extends ImsHostBase {
     return {
       id,
       title,
-      rootWorkspaceId: project_db.info.rootWorkspaceId,
+      rootWorkspaceId: root_workspace_id,
       localPath: new_path,
     };
   }
@@ -261,12 +263,14 @@ export class ImsHostProject extends ImsHostBase {
 
     const id = project_db.info.id || null;
     const title = project_db.info.title ?? '';
+    // Read before _relocateProjectFolder(): it destroys this ProjectFileDb.
+    const root_workspace_id = project_db.info.rootWorkspaceId;
 
     if (target_path_norm === norm_path) {
       return {
         id,
         title,
-        rootWorkspaceId: project_db.info.rootWorkspaceId,
+        rootWorkspaceId: root_workspace_id,
         localPath: project_db.localPath,
       };
     }
@@ -282,7 +286,7 @@ export class ImsHostProject extends ImsHostBase {
     return {
       id,
       title,
-      rootWorkspaceId: project_db.info.rootWorkspaceId,
+      rootWorkspaceId: root_workspace_id,
       localPath: target_path_norm,
     };
   }
