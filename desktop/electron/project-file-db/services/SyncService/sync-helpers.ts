@@ -32,7 +32,7 @@ export type SyncEntityOptions<TLocal, TServer, CLocal extends Record<string, any
 export async function syncEntity<TLocal, TServer, CLocal extends Record<string, any>, CServer extends Record<string, any>>(
     entity: SyncTableRow, 
     options: SyncEntityOptions<TLocal, TServer, CLocal, CServer>
-){
+): Promise<SyncConflict | null>{
     let conflict: SyncConflict | null = null;
     let conflict_message: string | null = null;
     let old_server_state: TServer | null = entity.server_state ? JSON.parse(entity.server_state) : null;
@@ -60,7 +60,7 @@ export async function syncEntity<TLocal, TServer, CLocal extends Record<string, 
                     new_server_state = null
                     if (has_local_changes){
                         conflict = SyncConflict.MODIFIED_DELETED;
-                        return;
+                        return conflict;
                     }
                     else {
                         await options.localDelete(entity.id)
@@ -70,14 +70,14 @@ export async function syncEntity<TLocal, TServer, CLocal extends Record<string, 
                     new_server_state = await options.serverPut(entity.id, server_changes_from_local, false);
                     if (!new_server_state){
                         conflict = SyncConflict.NO_ACCESS
-                        return;
+                        return conflict;
                     }
                 }
                 else {
                     new_server_state = !entity.server_state ? old_server_state : await options.serverLoad(entity.id);
                     if(!new_server_state) {
                         conflict = SyncConflict.NO_ACCESS
-                        return;
+                        return conflict;
                     }
                 }
             }
@@ -99,13 +99,13 @@ export async function syncEntity<TLocal, TServer, CLocal extends Record<string, 
                     new_server_state = await options.serverPut(entity.id,save_server_changes, true);
                     if (!new_server_state){
                         conflict = SyncConflict.NO_ACCESS
-                        return;
+                        return conflict;
                     }
                 }
                 catch(err: any){
                     if (err instanceof ApiError && err.code === ApiErrorCodes.ENTITY_ALREADY_EXISTS){
                         conflict = SyncConflict.DUPLICATE;
-                        return;
+                        return conflict;
                     }
                     else {
                         throw err;
@@ -148,4 +148,5 @@ export async function syncEntity<TLocal, TServer, CLocal extends Record<string, 
             `, [conflict, conflict_message, JSON.stringify(save_server_state), entity.id]);
         }
     }
+    return conflict;
 }

@@ -1,4 +1,5 @@
 import type { BrowserWindow } from "electron";
+import log from "electron-log/main";
 import { ProjectFileDb } from "./ProjectFileDb";
 import path from "node:path"
 
@@ -48,6 +49,44 @@ export async function closeAllProjectDb() {
   for (const [path, request] of closing_projects) {
     projectDbMap.delete(path);
     await request.db.destroy();
+  }
+}
+
+/**
+ * Drop `win` from every project it holds and destroy the projects whose last
+ * window just closed. Called from the window `closed` handler — without it a
+ * dead BrowserWindow stays in the `for` set forever, `closeProjectDb` never
+ * sees size 0, and the SQLite connection plus the parcel watcher keep the
+ * project folder locked until the whole app quits.
+ *
+ * `beforeDestroy` runs before each destroy (MCP sessions must disconnect
+ * first, mirroring `closeProject`). Every step is guarded so one failing
+ * project cannot prevent the others from being released.
+ */
+export async function releaseProjectDbForWindow(
+  win: BrowserWindow,
+  beforeDestroy?: (projectPath: string) => Promise<void>,
+): Promise<void> {
+
+  const doomed: Array<[string, ProjectFileDb]> = [];
+  for (const [projectPath, request] of projectDbMap) {
+    if (!request.for.delete(win)) continue;
+    if (request.for.size === 0) {
+      projectDbMap.delete(projectPath);
+      doomed.push([projectPath, request.db]);
+    }
+  }
+  for (const [projectPath, db] of doomed) {
+    try {
+      await beforeDestroy?.(projectPath);
+    } catch (err: any) {
+      log.error(`Pre-destroy step failed for ${projectPath} (continuing with destroy):`, err);
+    }
+    try {
+      await db.destroy();
+    } catch (err: any) {
+      log.error(`Failed to destroy project db for ${projectPath}:`, err);
+    }
   }
 }
 
