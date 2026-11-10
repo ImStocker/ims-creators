@@ -169,15 +169,6 @@ provide('getDropdownHost', () => {
   pointer-events: none;
 }
 
-.DesktopApp-main > .right-panel > .RightPanel {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 400px;
-  pointer-events: auto;
-}
-
 .dropdown-host{
   z-index: 900;
   position: fixed;
