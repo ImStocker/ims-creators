@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "author": "ImStocker <support@cr5.space>",
-  "homepage": "https://ims.cr5.space/desktop",
+  "homepage": "https://imsc.space/desktop",
   "license": "MIT",
   "repository": {
     "url": "https://github.com/ImStocker/ims-creators",
@@ -33,7 +33,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://ims.cr5.space/desktop/releases/"
+        "url": "https://imsc.space/desktop/releases/"
       }
     ],
     "productName": "ImscDesktop",
