@@ -44,7 +44,7 @@ export default defineComponent({
   },
   methods: {
     buyLicense(){
-      window.location.replace(`https://ims.cr5.space/app/prices`)
+      window.location.replace(`https://imsc.space/app/prices`)
     },
     close(){
       this.dialog.close();

@@ -157,15 +157,15 @@ export default defineComponent({
         },
         {
           title: this.$t('desktop.mainMenu.goToSite'),
-          action: () => window.location.replace(`https://ims.cr5.space/${this.lang}`),
+          action: () => window.location.replace(`https://imsc.space/${this.lang}`),
         },
         {
           title: this.$t('desktop.mainMenu.help'),
-          action: () => window.location.replace(`https://ims.cr5.space/help/${this.lang}/start/`),
+          action: () => window.location.replace(`https://imsc.space/help/${this.lang}/start/`),
         },
         {
           title: this.$t('desktop.mainMenu.feedback'),
-          action: () => window.location.replace(`https://ims.cr5.space/${this.lang}/feedback`),
+          action: () => window.location.replace(`https://imsc.space/${this.lang}/feedback`),
         },
         {
           type: 'separator',

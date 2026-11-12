@@ -309,7 +309,7 @@ export default defineComponent({
       return this.hasWarning;
     },
     buyLicense(){
-      window.location.replace(`https://ims.cr5.space/app/prices`)
+      window.location.replace(`https://imsc.space/app/prices`)
     },
     async createProject() {
       this.loading = true;

@@ -90,7 +90,7 @@ export default defineComponent({
   },
   methods: {
     getOpenLink(project_id: string) {
-      return `https://ims.cr5.space/app/p/${project_id}/project`;
+      return `https://imsc.space/app/p/${project_id}/project`;
     },
     async reloadTemplates() {
       this.projectTemplatesLoaded = false;

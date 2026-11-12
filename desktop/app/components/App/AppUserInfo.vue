@@ -61,7 +61,7 @@ export default defineComponent({
               : ''),
           icon: 'user',
           action: () => {
-            window.location.replace('https://ims.cr5.space/app/account/personal');
+            window.location.replace('https://imsc.space/app/account/personal');
           }
         },
         {

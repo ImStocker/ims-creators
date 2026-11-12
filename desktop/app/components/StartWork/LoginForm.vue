@@ -24,7 +24,7 @@
       </FormCheckBox>
     </div>
     <div class="AuthForm-additional">
-      <a href="https://ims.cr5.space/app/restore"
+      <a href="https://imsc.space/app/restore"
         class="AuthForm-links AuthForm-yellow-link"
         :target="openExternal ? '_blank' : undefined">
         {{ $t('auth.forgotPasswordLink') }}
@@ -54,7 +54,7 @@
       <div>
         {{ $t('auth.noAccount') }}
       </div>
-      <a href="https://ims.cr5.space/app/sign-up"
+      <a href="https://imsc.space/app/sign-up"
         class="AuthForm-yellow-link"
         :target="openExternal ? '_blank' : undefined">
         {{ $t('auth.signUpHereLink') }}

@@ -20,7 +20,7 @@
             <div class="AboutProgramDialog-item-title">
                 {{ $t('desktop.mainMenu.website') }}:
             </div>
-            <a href="https://ims.cr5.space/">https://ims.cr5.space/</a>
+            <a href="https://imsc.space/">https://imsc.space/</a>
           </div>
           <div class="AboutProgramDialog-item" v-if="userInfo">
             <div class="AboutProgramDialog-item-title">

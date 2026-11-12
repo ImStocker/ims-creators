@@ -92,7 +92,7 @@ export default class DesktopUpdateManager extends AppSubManagerBase {
       const save_to_temp = this.pathToUpdateDownload + '.tmp';
       this.abortDownloadController = new AbortController();
       const downloaded = await window.imshost.fs.downloadFile(
-        `https://ims.cr5.space/desktop/releases/${new_version_file.url}`,
+        `https://imsc.space/desktop/releases/${new_version_file.url}`,
         save_to_temp,
         {
           progressCallback: (progress: number) => {
@@ -194,7 +194,7 @@ export default class DesktopUpdateManager extends AppSubManagerBase {
 
   async showErrorInfoDialog() {
     const InfoDialog = await import("#components/Update/InfoDialog.vue")
-    const link_for_download = 'https://ims.cr5.space/desktop';
+    const link_for_download = 'https://imsc.space/desktop';
     this.appManager
       .get(UiManager)
       .showError(
